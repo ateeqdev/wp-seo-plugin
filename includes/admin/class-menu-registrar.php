@@ -63,6 +63,7 @@ final class MenuRegistrar
         add_action('admin_post_seoauto_link_brief', [$this, 'handleLinkBrief']);
         add_action('admin_post_seoauto_dispatch_action', [$this, 'handleDispatchAction']);
         add_action('admin_post_seoauto_delete_logs', [$this, 'handleDeleteLogs']);
+        add_action('admin_post_seoauto_delete_local_errors', [$this, 'handleDeleteLocalErrors']);
     }
 
     public function enqueueAssets(string $hookSuffix): void
@@ -496,6 +497,49 @@ final class MenuRegistrar
         exit;
     }
 
+    public function handleDeleteLocalErrors(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_delete_local_errors');
+
+        $severity = isset($_POST['severity']) ? sanitize_text_field((string) $_POST['severity']) : 'all'; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+        $allowed = ['all', 'error', 'warning'];
+        if (!in_array($severity, $allowed, true)) {
+            $severity = 'all';
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_execution_logs';
+
+        if ($severity === 'error') {
+            $deleted = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+                $wpdb->prepare("DELETE FROM {$table} WHERE severity = %s", 'error')
+            );
+        } elseif ($severity === 'warning') {
+            $deleted = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+                $wpdb->prepare("DELETE FROM {$table} WHERE severity = %s", 'warning')
+            );
+        } else {
+            $deleted = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+                "DELETE FROM {$table} WHERE severity IN ('warning','error')"
+            );
+        }
+
+        $notice = $deleted === false ? 'local_errors_delete_failed' : 'local_errors_delete_ok';
+        $deletedCount = $deleted === false ? 0 : (int) $deleted;
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-local-errors',
+            'seoauto_notice' => $notice,
+            'deleted_count' => $deletedCount,
+            'severity' => $severity,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
     public function registerMenu(): void
     {
         add_menu_page(
@@ -510,6 +554,7 @@ final class MenuRegistrar
 
         add_submenu_page('seoauto', 'Dashboard', 'Dashboard', 'manage_options', 'seoauto', [$this, 'renderDashboardPage']);
         add_submenu_page('seoauto', 'Execution Logs', 'Execution Logs', 'manage_options', 'seoauto-logs', [$this, 'renderLogsPage']);
+        add_submenu_page('seoauto', 'Local Errors', 'Local Errors', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
         add_submenu_page('seoauto', 'Schedules', 'Schedules', 'manage_options', 'seoauto-schedules', [$this, 'renderSchedulesPage']);
         add_submenu_page('seoauto', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
         add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
@@ -839,6 +884,163 @@ final class MenuRegistrar
             <?php wp_nonce_field('seoauto_delete_logs'); ?>
             <input type="hidden" name="action" value="seoauto_delete_logs">
             <button type="submit" class="button" onclick="return confirm('Delete all local execution logs?');">Delete Local Logs</button>
+        </form>
+        <p style="margin-bottom:12px;">
+            <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-local-errors')); ?>">Open Local Errors</a>
+        </p>
+        <?php
+    }
+
+    public function renderLocalErrorsPage(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_execution_logs';
+
+        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
+        $deletedCount = isset($_GET['deleted_count']) ? max(0, (int) $_GET['deleted_count']) : 0;
+        $severity = isset($_GET['severity']) ? sanitize_text_field((string) $_GET['severity']) : 'error';
+        $source = isset($_GET['source']) ? sanitize_text_field((string) $_GET['source']) : '';
+        $dateFrom = isset($_GET['date_from']) ? sanitize_text_field((string) $_GET['date_from']) : '';
+        $dateTo = isset($_GET['date_to']) ? sanitize_text_field((string) $_GET['date_to']) : '';
+        $page = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
+        $perPage = 50;
+        $offset = ($page - 1) * $perPage;
+
+        if (!in_array($severity, ['all', 'error', 'warning'], true)) {
+            $severity = 'error';
+        }
+
+        $where = ['1=1'];
+        $params = [];
+
+        if ($severity === 'error') {
+            $where[] = 'severity = %s';
+            $params[] = 'error';
+        } elseif ($severity === 'warning') {
+            $where[] = 'severity = %s';
+            $params[] = 'warning';
+        } else {
+            $where[] = "severity IN ('warning','error')";
+        }
+
+        $validSources = ['inbound', 'outbound', 'executor', 'admin'];
+        if ($source !== '' && in_array($source, $validSources, true)) {
+            $where[] = 'source = %s';
+            $params[] = $source;
+        }
+
+        if ($dateFrom !== '') {
+            $where[] = 'created_at >= %s';
+            $params[] = $dateFrom . ' 00:00:00';
+        }
+
+        if ($dateTo !== '') {
+            $where[] = 'created_at <= %s';
+            $params[] = $dateTo . ' 23:59:59';
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $paramsForList = array_merge($params, [$perPage, $offset]);
+        $listQuery = $wpdb->prepare(
+            "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC LIMIT %d OFFSET %d",
+            ...$paramsForList
+        );
+
+        $rows = $wpdb->get_results($listQuery); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $countQuery = empty($params)
+            ? "SELECT COUNT(*) FROM {$table} WHERE {$whereSql}"
+            : $wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE {$whereSql}", ...$params);
+        $total = (int) $wpdb->get_var($countQuery); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $totalPages = max(1, (int) ceil($total / $perPage));
+
+        ?>
+        <div class="wrap">
+            <h1>Local Errors</h1>
+            <?php $this->renderLocalErrorsToolbar($notice, $deletedCount, $severity); ?>
+
+            <form method="get">
+                <input type="hidden" name="page" value="seoauto-local-errors">
+                <select name="severity">
+                    <option value="all" <?php selected($severity, 'all'); ?>>Warning + Error</option>
+                    <option value="error" <?php selected($severity, 'error'); ?>>Error</option>
+                    <option value="warning" <?php selected($severity, 'warning'); ?>>Warning</option>
+                </select>
+                <select name="source">
+                    <option value="">All Sources</option>
+                    <option value="inbound" <?php selected($source, 'inbound'); ?>>Inbound</option>
+                    <option value="outbound" <?php selected($source, 'outbound'); ?>>Outbound</option>
+                    <option value="executor" <?php selected($source, 'executor'); ?>>Executor</option>
+                    <option value="admin" <?php selected($source, 'admin'); ?>>Admin</option>
+                </select>
+                <input type="date" name="date_from" value="<?php echo esc_attr($dateFrom); ?>">
+                <input type="date" name="date_to" value="<?php echo esc_attr($dateTo); ?>">
+                <button class="button" type="submit">Filter</button>
+                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-local-errors')); ?>">Reset</a>
+            </form>
+
+            <table class="wp-list-table widefat striped" style="margin-top:12px;">
+                <thead>
+                    <tr><th>Time</th><th>Severity</th><th>Source</th><th>Correlation</th><th>Event</th><th>Entity</th><th>Error</th></tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($rows)) : ?>
+                        <?php foreach ($rows as $row) : ?>
+                            <tr>
+                                <td><?php echo esc_html(wp_date('Y-m-d H:i:s', strtotime((string) $row->created_at))); ?></td>
+                                <td><?php echo esc_html((string) $row->severity); ?></td>
+                                <td><?php echo esc_html((string) $row->source); ?></td>
+                                <td><code><?php echo esc_html(substr((string) $row->correlation_id, 0, 8)); ?></code></td>
+                                <td><?php echo esc_html((string) $row->event_name); ?></td>
+                                <td><?php echo esc_html((string) $row->entity_type . ':' . (string) $row->entity_id); ?></td>
+                                <td><?php echo esc_html((string) $row->error_message); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else : ?>
+                        <tr><td colspan="7">No local errors found.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+
+            <div class="tablenav bottom">
+                <div class="tablenav-pages">
+                    <?php
+                    echo wp_kses_post(
+                        paginate_links([
+                            'base' => add_query_arg('paged', '%#%'),
+                            'format' => '',
+                            'current' => $page,
+                            'total' => $totalPages,
+                        ])
+                    );
+                    ?>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    private function renderLocalErrorsToolbar(string $notice, int $deletedCount, string $severity): void
+    {
+        if ($notice === 'local_errors_delete_ok') {
+            ?>
+            <div class="notice notice-success"><p><?php echo esc_html(sprintf('Deleted %d local error entries.', $deletedCount)); ?></p></div>
+            <?php
+        } elseif ($notice === 'local_errors_delete_failed') {
+            ?>
+            <div class="notice notice-error"><p>Failed to delete local error entries.</p></div>
+            <?php
+        }
+        ?>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:12px;">
+            <?php wp_nonce_field('seoauto_delete_local_errors'); ?>
+            <input type="hidden" name="action" value="seoauto_delete_local_errors">
+            <input type="hidden" name="severity" value="<?php echo esc_attr($severity); ?>">
+            <button type="submit" class="button" onclick="return confirm('Delete filtered local errors?');">Delete Local Errors</button>
+            <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-logs')); ?>">Open Execution Logs</a>
         </form>
         <?php
     }
