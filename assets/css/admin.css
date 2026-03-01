@@ -1,0 +1,13 @@
+.seoauto-severity-warning {
+    color: #a16207;
+    font-weight: 600;
+}
+
+.seoauto-severity-error {
+    color: #b91c1c;
+    font-weight: 600;
+}
+
+.seoauto-severity-info {
+    color: #0369a1;
+}

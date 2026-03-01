@@ -1,0 +1,71 @@
+<?php
+
+declare(strict_types=1);
+
+namespace SEOAutomation\Connector\Events;
+
+use SEOAutomation\Connector\SEO\SeoDetector;
+
+final class EventMapper
+{
+    /**
+     * @param \WP_Post $post
+     * @return array<string, mixed>
+     */
+    public function mapPostEvent(string $eventType, \WP_Post $post): array
+    {
+        $adapter = SeoDetector::instance()->getAdapter();
+
+        return [
+            'event_type' => $eventType,
+            'post_id' => $post->ID,
+            'post_type' => $post->post_type,
+            'post_url' => get_permalink($post->ID),
+            'post_title' => $post->post_title,
+            'post_content' => $post->post_content,
+            'post_meta' => [
+                'seo_title' => $adapter->getTitle($post->ID),
+                'seo_description' => $adapter->getDescription($post->ID),
+                'canonical' => $adapter->getCanonical($post->ID),
+            ],
+            'event_time' => gmdate('c'),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function mapAttachmentUploaded(int $attachmentId): array
+    {
+        $attachment = get_post($attachmentId);
+
+        return [
+            'event_type' => 'attachment_uploaded',
+            'post_id' => $attachmentId,
+            'post_type' => 'attachment',
+            'post_url' => wp_get_attachment_url($attachmentId),
+            'event_data' => [
+                'attachment_id' => $attachmentId,
+                'attachment_url' => wp_get_attachment_url($attachmentId),
+                'file_path' => get_attached_file($attachmentId),
+                'mime_type' => $attachment ? $attachment->post_mime_type : '',
+            ],
+            'event_time' => gmdate('c'),
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function mapSystemEvent(string $eventType, array $eventData = []): array
+    {
+        return [
+            'event_type' => $eventType,
+            'post_id' => 0,
+            'post_type' => 'system',
+            'post_url' => home_url('/'),
+            'event_data' => $eventData,
+            'event_time' => gmdate('c'),
+        ];
+    }
+}
