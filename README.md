@@ -5,6 +5,7 @@ WordPress plugin that integrates with a Laravel SEO automation backend.
 ## Features
 
 - Site registration and token-based authentication (`X-Site-Token`)
+- OAuth handoff via Laravel (`Connect Google` button + callback state persistence)
 - Event outbox + async dispatch to Laravel
 - Push and pull action ingestion
 - Async action execution via Action Scheduler (with WP-Cron fallback)
@@ -16,6 +17,7 @@ WordPress plugin that integrates with a Laravel SEO automation backend.
 
 - Requires PHP 8.0+
 - Follows strict types and WordPress coding style
+- PHPUnit scaffolding included (`composer test`)
 
 ## Installation
 

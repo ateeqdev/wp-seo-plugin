@@ -15,6 +15,7 @@ use SEOAutomation\Connector\Admin\MenuRegistrar;
 use SEOAutomation\Connector\API\ApiClient;
 use SEOAutomation\Connector\API\LaravelClient;
 use SEOAutomation\Connector\API\RetryPolicy;
+use SEOAutomation\Connector\Auth\OAuthHandler;
 use SEOAutomation\Connector\Auth\SiteTokenManager;
 use SEOAutomation\Connector\Auth\TokenEncryption;
 use SEOAutomation\Connector\Events\EventCollector;
@@ -171,6 +172,15 @@ final class Plugin
             true
         );
         $this->container->register(
+            'oauth_handler',
+            fn (ServiceContainer $c): OAuthHandler => new OAuthHandler(
+                $c->get('laravel_client'),
+                $c->get('health_checker'),
+                $c->get('logger')
+            ),
+            true
+        );
+        $this->container->register(
             'user_syncer',
             fn (ServiceContainer $c): UserSyncer => new UserSyncer($c->get('laravel_client'), $c->get('logger')),
             true
@@ -188,6 +198,7 @@ final class Plugin
                 $c->get('brief_syncer'),
                 $c->get('site_registrar'),
                 $c->get('health_checker'),
+                $c->get('oauth_handler'),
                 $c->get('logger')
             ),
             true

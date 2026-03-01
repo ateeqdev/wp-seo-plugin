@@ -114,6 +114,8 @@ final class ActionExecutor
             return;
         }
 
+        $handler = null;
+
         try {
             $this->repository->markRunning($laravelActionId);
 
@@ -148,9 +150,25 @@ final class ActionExecutor
             $this->repository->markResult($laravelActionId, $resultStatus, $error, $before, $after);
             $this->statusReporter->report($action, $resultStatus, $metadata, $error);
         } catch (\Throwable $exception) {
-            $this->repository->markResult($laravelActionId, 'failed', $exception->getMessage());
+            $rolledBack = false;
+
+            if ($handler instanceof InterfaceActionHandler) {
+                try {
+                    $rollbackResult = $handler->rollback($action);
+                    $rolledBack = (($rollbackResult['status'] ?? '') === 'rolled_back');
+                } catch (\Throwable $rollbackException) {
+                    $this->logger->warning('action_rollback_failed', [
+                        'entity_type' => 'action',
+                        'entity_id' => (string) $laravelActionId,
+                        'error' => $rollbackException->getMessage(),
+                    ]);
+                }
+            }
+
+            $this->repository->markResult($laravelActionId, $rolledBack ? 'rolled_back' : 'failed', $exception->getMessage());
             $this->statusReporter->report($action, 'failed', [
                 'reason' => 'execution_failed',
+                'rolled_back' => $rolledBack,
             ], $exception->getMessage());
             $this->logger->error('action_execution_failed', [
                 'entity_type' => 'action',

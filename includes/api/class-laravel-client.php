@@ -75,6 +75,19 @@ final class LaravelClient
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
+    public function initializeGoogleOAuth(array $payload): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($payload): array {
+            return $this->apiClient->request('POST', '/api/oauth/google/init', [], $payload, [], true, 20);
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
     public function sendEvent(int $siteId, array $payload): array
     {
         $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {

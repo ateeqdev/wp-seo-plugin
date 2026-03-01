@@ -30,6 +30,9 @@ final class Activator
         add_option('seoauto_last_brief_sync', 0, '', 'no');
         add_option('seoauto_oauth_status', 'pending', '', 'no');
         add_option('seoauto_oauth_scopes', [], '', 'no');
+        add_option('seoauto_oauth_provider', '', '', 'no');
+        add_option('seoauto_oauth_connected_at', 0, '', 'no');
+        add_option('seoauto_oauth_last_error', '', '', 'no');
         add_option(
             'seoauto_features',
             [

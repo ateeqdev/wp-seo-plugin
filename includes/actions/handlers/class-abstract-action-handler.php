@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace SEOAutomation\Connector\Actions\Handlers;
 
+use SEOAutomation\Connector\Content\RollbackManager;
 use SEOAutomation\Connector\Utils\JsonHelper;
 use SEOAutomation\Connector\Utils\Logger;
 
@@ -11,9 +12,12 @@ abstract class AbstractActionHandler implements InterfaceActionHandler
 {
     protected Logger $logger;
 
-    public function __construct(Logger $logger)
+    protected RollbackManager $rollbackManager;
+
+    public function __construct(Logger $logger, ?RollbackManager $rollbackManager = null)
     {
         $this->logger = $logger;
+        $this->rollbackManager = $rollbackManager ?? new RollbackManager();
     }
 
     /**
@@ -59,5 +63,21 @@ abstract class AbstractActionHandler implements InterfaceActionHandler
     protected function sanitizeText(string $value): string
     {
         return trim(wp_strip_all_tags($value));
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    protected function capturePostSnapshot(int $postId): array
+    {
+        return $this->rollbackManager->capturePostSnapshot($postId);
+    }
+
+    /**
+     * @param array<string, mixed> $snapshot
+     */
+    protected function restorePostSnapshot(int $postId, array $snapshot): bool
+    {
+        return $this->rollbackManager->restorePostSnapshot($postId, $snapshot);
     }
 }

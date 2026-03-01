@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SEOAutomation\Connector\Admin;
 
 use SEOAutomation\Connector\API\LaravelClient;
+use SEOAutomation\Connector\Auth\OAuthHandler;
 use SEOAutomation\Connector\Sync\BriefSyncer;
 use SEOAutomation\Connector\Sync\HealthChecker;
 use SEOAutomation\Connector\Sync\SiteRegistrar;
@@ -20,6 +21,8 @@ final class MenuRegistrar
 
     private HealthChecker $healthChecker;
 
+    private OAuthHandler $oauthHandler;
+
     private Logger $logger;
 
     public function __construct(
@@ -27,6 +30,7 @@ final class MenuRegistrar
         BriefSyncer $briefSyncer,
         SiteRegistrar $siteRegistrar,
         HealthChecker $healthChecker,
+        OAuthHandler $oauthHandler,
         Logger $logger
     )
     {
@@ -34,6 +38,7 @@ final class MenuRegistrar
         $this->briefSyncer = $briefSyncer;
         $this->siteRegistrar = $siteRegistrar;
         $this->healthChecker = $healthChecker;
+        $this->oauthHandler = $oauthHandler;
         $this->logger = $logger;
     }
 
@@ -44,6 +49,7 @@ final class MenuRegistrar
         add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
         add_action('admin_post_seoauto_register_site', [$this, 'handleRegisterSite']);
         add_action('admin_post_seoauto_health_check', [$this, 'handleHealthCheck']);
+        add_action('admin_post_seoauto_start_oauth', [$this, 'handleStartOAuth']);
     }
 
     public function enqueueAssets(string $hookSuffix): void
@@ -110,6 +116,39 @@ final class MenuRegistrar
         exit;
     }
 
+    public function handleStartOAuth(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_start_oauth');
+
+        try {
+            $oauthUrl = $this->oauthHandler->beginGoogleOAuth(['search_console', 'analytics']);
+
+            if ($oauthUrl === '') {
+                throw new \RuntimeException('Missing oauth_url');
+            }
+
+            wp_redirect($oauthUrl);
+            exit;
+        } catch (\Throwable $exception) {
+            update_option('seoauto_oauth_status', 'failed', false);
+            update_option('seoauto_oauth_last_error', $exception->getMessage(), false);
+
+            $redirect = add_query_arg(
+                [
+                    'page' => 'seoauto-settings',
+                    'seoauto_notice' => 'oauth_init_failed',
+                ],
+                admin_url('admin.php')
+            );
+            wp_safe_redirect($redirect);
+            exit;
+        }
+    }
+
     public function registerMenu(): void
     {
         add_menu_page(
@@ -127,6 +166,7 @@ final class MenuRegistrar
         add_submenu_page('seoauto', 'Schedules', 'Schedules', 'manage_options', 'seoauto-schedules', [$this, 'renderSchedulesPage']);
         add_submenu_page('seoauto', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
         add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
+        add_submenu_page('seoauto', 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seoauto-oauth-callback', [$this, 'renderOauthCallbackPage']);
     }
 
     public function registerSettings(): void
@@ -413,6 +453,60 @@ final class MenuRegistrar
         <?php
     }
 
+    public function renderOauthCallbackPage(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        $hasCallbackState = isset($_GET['status']); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+
+        if ($hasCallbackState) {
+            $result = $this->oauthHandler->handleCallback($_GET); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            $status = sanitize_text_field((string) ($result['status'] ?? 'failed'));
+            $provider = sanitize_text_field((string) ($result['provider'] ?? 'google'));
+            $scopes = isset($result['scopes']) && is_array($result['scopes']) ? $result['scopes'] : [];
+            $error = sanitize_text_field((string) ($result['error'] ?? ''));
+            $health = isset($result['health']) && is_array($result['health']) ? $result['health'] : [];
+        } else {
+            $status = (string) get_option('seoauto_oauth_status', 'pending');
+            $provider = (string) get_option('seoauto_oauth_provider', '');
+            $scopes = get_option('seoauto_oauth_scopes', []);
+            if (!is_array($scopes)) {
+                $scopes = [];
+            }
+            $error = (string) get_option('seoauto_oauth_last_error', '');
+            $health = [];
+        }
+
+        ?>
+        <div class="wrap">
+            <h1>OAuth Connection</h1>
+            <?php if ($status === 'active') : ?>
+                <div class="notice notice-success"><p>OAuth connected successfully.</p></div>
+            <?php elseif ($status === 'error') : ?>
+                <div class="notice notice-warning"><p>OAuth succeeded but health check failed.</p></div>
+            <?php else : ?>
+                <div class="notice notice-error"><p>OAuth callback failed.</p></div>
+            <?php endif; ?>
+
+            <table class="widefat striped" style="max-width:900px;">
+                <tbody>
+                    <tr><th scope="row">Status</th><td><?php echo esc_html($status); ?></td></tr>
+                    <tr><th scope="row">Provider</th><td><?php echo esc_html($provider); ?></td></tr>
+                    <tr><th scope="row">Scopes</th><td><?php echo esc_html(!empty($scopes) ? implode(', ', array_map('strval', $scopes)) : 'None'); ?></td></tr>
+                    <tr><th scope="row">Error</th><td><?php echo esc_html($error !== '' ? $error : 'None'); ?></td></tr>
+                    <tr><th scope="row">Health Connected</th><td><?php echo !empty($health['connected']) ? 'Yes' : 'No'; ?></td></tr>
+                </tbody>
+            </table>
+
+            <p style="margin-top:16px;">
+                <a class="button button-primary" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-settings')); ?>">Back to Settings</a>
+            </p>
+        </div>
+        <?php
+    }
+
     public function renderSettingsPage(): void
     {
         if (!current_user_can('manage_options')) {
@@ -432,6 +526,8 @@ final class MenuRegistrar
                 <div class="notice notice-success"><p>Health check passed.</p></div>
             <?php elseif ($notice === 'health_failed') : ?>
                 <div class="notice notice-warning"><p>Health check failed.</p></div>
+            <?php elseif ($notice === 'oauth_init_failed') : ?>
+                <div class="notice notice-error"><p>Failed to initialize OAuth. Check API settings and registration.</p></div>
             <?php endif; ?>
             <form method="post" action="options.php">
                 <?php settings_fields('seoauto_settings'); ?>
@@ -479,6 +575,27 @@ final class MenuRegistrar
 
             <hr>
             <h2>Connection</h2>
+            <?php
+            $oauthStatus = (string) get_option('seoauto_oauth_status', 'pending');
+            $oauthProvider = (string) get_option('seoauto_oauth_provider', '');
+            $oauthScopes = get_option('seoauto_oauth_scopes', []);
+            if (!is_array($oauthScopes)) {
+                $oauthScopes = [];
+            }
+            $oauthConnectedAt = (int) get_option('seoauto_oauth_connected_at', 0);
+            $oauthError = (string) get_option('seoauto_oauth_last_error', '');
+            ?>
+
+            <table class="widefat striped" style="max-width:900px;margin-bottom:16px;">
+                <tbody>
+                    <tr><th scope="row">OAuth Status</th><td><?php echo esc_html($oauthStatus); ?></td></tr>
+                    <tr><th scope="row">Connected Provider</th><td><?php echo esc_html($oauthProvider !== '' ? $oauthProvider : 'Not connected'); ?></td></tr>
+                    <tr><th scope="row">Connected Scopes</th><td><?php echo esc_html(!empty($oauthScopes) ? implode(', ', array_map('strval', $oauthScopes)) : 'None'); ?></td></tr>
+                    <tr><th scope="row">Connected At</th><td><?php echo esc_html($oauthConnectedAt > 0 ? wp_date('Y-m-d H:i:s', $oauthConnectedAt) : 'Never'); ?></td></tr>
+                    <tr><th scope="row">Last OAuth Error</th><td><?php echo esc_html($oauthError !== '' ? $oauthError : 'None'); ?></td></tr>
+                </tbody>
+            </table>
+
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:12px;">
                 <?php wp_nonce_field('seoauto_register_site'); ?>
                 <input type="hidden" name="action" value="seoauto_register_site">
@@ -489,6 +606,12 @@ final class MenuRegistrar
                 <?php wp_nonce_field('seoauto_health_check'); ?>
                 <input type="hidden" name="action" value="seoauto_health_check">
                 <button type="submit" class="button">Run Health Check</button>
+            </form>
+
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-left:12px;">
+                <?php wp_nonce_field('seoauto_start_oauth'); ?>
+                <input type="hidden" name="action" value="seoauto_start_oauth">
+                <button type="submit" class="button button-secondary">Connect Google (via Laravel OAuth)</button>
             </form>
         </div>
         <?php
