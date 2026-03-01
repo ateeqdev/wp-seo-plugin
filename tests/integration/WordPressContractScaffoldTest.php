@@ -3,27 +3,55 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
+use SEOAutomation\Connector\API\LaravelClient;
+use SEOAutomation\Connector\REST\ActionsEndpoint;
+use SEOAutomation\Connector\REST\MediaEndpoint;
+use SEOAutomation\Connector\REST\PagesEndpoint;
 
 final class WordPressContractScaffoldTest extends TestCase
 {
-    public function testRestEndpointsContractScaffold(): void
+    public function testLaravelClientExposesContractMethods(): void
     {
-        $this->markTestIncomplete(
-            'Integration scaffold: bootstrap WP test suite and assert /wp-json/seoauto/v1/pages,/media,/actions/execute contracts.'
-        );
+        $reflection = new ReflectionClass(LaravelClient::class);
+
+        $required = [
+            'registerSite',
+            'updateSiteRegistration',
+            'verifySite',
+            'health',
+            'initializeGoogleOAuth',
+            'revokeGoogleOAuth',
+            'sendEvent',
+            'fetchPendingActions',
+            'reportActionStatus',
+            'rotateSiteToken',
+            'updateSiteProfile',
+            'listTasks',
+            'updateTaskConfig',
+            'scheduleTask',
+            'listScheduledTasks',
+            'listExecutionLogs',
+            'listContentBriefs',
+            'linkArticleToBrief',
+            'dispatchAction',
+        ];
+
+        foreach ($required as $method) {
+            self::assertTrue($reflection->hasMethod($method), "Missing LaravelClient contract method: {$method}");
+        }
     }
 
-    public function testOAuthCallbackFlowScaffold(): void
+    public function testRestEndpointClassesExistForWordPressInboundContract(): void
     {
-        $this->markTestIncomplete(
-            'Integration scaffold: simulate Laravel redirect to admin.php?page=seoauto-oauth-callback and assert options are persisted.'
-        );
+        self::assertTrue(class_exists(PagesEndpoint::class));
+        self::assertTrue(class_exists(MediaEndpoint::class));
+        self::assertTrue(class_exists(ActionsEndpoint::class));
     }
 
-    public function testActionExecutionLifecycleScaffold(): void
+    public function testWordPressRuntimeContractScaffold(): void
     {
-        $this->markTestIncomplete(
-            'Integration scaffold: enqueue action, execute handler, verify before/after snapshots, and Laravel status reporting payload.'
+        $this->markTestSkipped(
+            'Scaffold: run under WordPress integration bootstrap to assert route registration and OAuth callback option persistence.'
         );
     }
 }

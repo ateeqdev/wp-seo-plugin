@@ -63,12 +63,22 @@ final class StatusReporter
             $this->repository->markAckPending($actionId, 'Missing acknowledged=true in response');
             QueueManager::scheduleAckRetry($actionId);
         } catch (\Throwable $exception) {
-            $this->repository->markAckPending($actionId, $exception->getMessage());
-            QueueManager::scheduleAckRetry($actionId);
+            $code = (int) $exception->getCode();
+            $isTerminal = $code >= 400 && $code < 500 && $code !== 429;
+
+            if ($isTerminal) {
+                $this->repository->markAckFailed($actionId, $exception->getMessage());
+            } else {
+                $this->repository->markAckPending($actionId, $exception->getMessage());
+                QueueManager::scheduleAckRetry($actionId);
+            }
+
             $this->logger->warning('action_ack_pending', [
                 'entity_type' => 'action',
                 'entity_id' => (string) $actionId,
                 'error' => $exception->getMessage(),
+                'status_code' => $code,
+                'terminal' => $isTerminal,
                 'request_payload' => $payload,
             ], 'outbound');
         }

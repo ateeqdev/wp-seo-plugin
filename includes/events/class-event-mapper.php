@@ -61,9 +61,6 @@ final class EventMapper
     {
         return [
             'event_type' => $eventType,
-            'post_id' => 0,
-            'post_type' => 'system',
-            'post_url' => home_url('/'),
             'event_data' => $eventData,
             'event_time' => gmdate('c'),
         ];

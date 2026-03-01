@@ -37,11 +37,18 @@ final class OAuthCallbackState
         $provider = self::sanitize((string) ($query['provider'] ?? 'google'));
         $error = self::sanitize((string) ($query['error'] ?? ''));
 
-        $scopeString = (string) ($query['connected_scopes'] ?? '');
         $scopes = [];
+        $rawScopes = $query['connected_scopes'] ?? ($query['scopes'] ?? '');
 
-        if ($scopeString !== '') {
-            $scopes = array_filter(array_map('trim', explode(',', $scopeString)));
+        if (is_array($rawScopes)) {
+            $scopes = array_values(array_filter(array_map(static function ($scope): string {
+                return trim((string) $scope);
+            }, $rawScopes)));
+        } else {
+            $scopeString = (string) $rawScopes;
+            if ($scopeString !== '') {
+                $scopes = array_filter(array_map('trim', explode(',', $scopeString)));
+            }
         }
 
         return new self($status, $provider, $scopes, $error);

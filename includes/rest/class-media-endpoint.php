@@ -17,11 +17,13 @@ final class MediaEndpoint
 
     public function registerRoutes(): void
     {
-        register_rest_route('seoauto/v1', '/media', [
-            'methods' => 'GET',
-            'callback' => [$this, 'listMedia'],
-            'permission_callback' => [$this, 'authorize'],
-        ]);
+        foreach (['seoauto/v1', 'seo-platform/v1'] as $namespace) {
+            register_rest_route($namespace, '/media', [
+                'methods' => 'GET',
+                'callback' => [$this, 'listMedia'],
+                'permission_callback' => [$this, 'authorize'],
+            ]);
+        }
     }
 
     public function authorize(\WP_REST_Request $request)

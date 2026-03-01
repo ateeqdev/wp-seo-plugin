@@ -29,6 +29,7 @@ final class SiteRegistrar
     public function registerOrUpdate(): array
     {
         $siteId = (int) get_option('seoauto_site_id', 0);
+        $token = $this->tokenManager->getToken();
 
         $payload = [
             'domain' => home_url('/'),
@@ -38,6 +39,10 @@ final class SiteRegistrar
             'admin_email' => get_option('admin_email'),
             'users' => $this->collectUsers(),
         ];
+
+        if ($token !== null && $token !== '') {
+            $payload['api_key'] = $token;
+        }
 
         try {
             if ($siteId > 0 && $this->tokenManager->hasToken()) {
@@ -75,15 +80,27 @@ final class SiteRegistrar
         ]);
 
         $mapped = [];
+        $ownerAssigned = false;
 
         foreach ($users as $user) {
             $roles = is_array($user->roles) ? $user->roles : [];
+            $mappedRole = RoleMapper::mapWordPressRole((string) ($roles[0] ?? ''));
+
+            if (!$ownerAssigned && $mappedRole === RoleMapper::ADMIN) {
+                $mappedRole = RoleMapper::OWNER;
+                $ownerAssigned = true;
+            }
+
             $mapped[] = [
                 'name' => (string) $user->display_name,
                 'email' => (string) $user->user_email,
                 'platform_user_id' => (string) $user->ID,
-                'role' => (string) ($roles[0] ?? 'editor'),
+                'role' => $mappedRole,
             ];
+        }
+
+        if (!$ownerAssigned && !empty($mapped)) {
+            $mapped[0]['role'] = RoleMapper::OWNER;
         }
 
         return $mapped;

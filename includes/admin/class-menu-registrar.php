@@ -6,6 +6,7 @@ namespace SEOAutomation\Connector\Admin;
 
 use SEOAutomation\Connector\API\LaravelClient;
 use SEOAutomation\Connector\Auth\OAuthHandler;
+use SEOAutomation\Connector\Auth\SiteTokenManager;
 use SEOAutomation\Connector\Sync\BriefSyncer;
 use SEOAutomation\Connector\Sync\HealthChecker;
 use SEOAutomation\Connector\Sync\SiteRegistrar;
@@ -23,6 +24,8 @@ final class MenuRegistrar
 
     private OAuthHandler $oauthHandler;
 
+    private SiteTokenManager $tokenManager;
+
     private Logger $logger;
 
     public function __construct(
@@ -31,6 +34,7 @@ final class MenuRegistrar
         SiteRegistrar $siteRegistrar,
         HealthChecker $healthChecker,
         OAuthHandler $oauthHandler,
+        SiteTokenManager $tokenManager,
         Logger $logger
     )
     {
@@ -39,6 +43,7 @@ final class MenuRegistrar
         $this->siteRegistrar = $siteRegistrar;
         $this->healthChecker = $healthChecker;
         $this->oauthHandler = $oauthHandler;
+        $this->tokenManager = $tokenManager;
         $this->logger = $logger;
     }
 
@@ -50,6 +55,13 @@ final class MenuRegistrar
         add_action('admin_post_seoauto_register_site', [$this, 'handleRegisterSite']);
         add_action('admin_post_seoauto_health_check', [$this, 'handleHealthCheck']);
         add_action('admin_post_seoauto_start_oauth', [$this, 'handleStartOAuth']);
+        add_action('admin_post_seoauto_revoke_oauth', [$this, 'handleRevokeOAuth']);
+        add_action('admin_post_seoauto_rotate_token', [$this, 'handleRotateToken']);
+        add_action('admin_post_seoauto_update_site_profile', [$this, 'handleUpdateSiteProfile']);
+        add_action('admin_post_seoauto_update_task', [$this, 'handleUpdateTask']);
+        add_action('admin_post_seoauto_schedule_task', [$this, 'handleScheduleTask']);
+        add_action('admin_post_seoauto_link_brief', [$this, 'handleLinkBrief']);
+        add_action('admin_post_seoauto_dispatch_action', [$this, 'handleDispatchAction']);
     }
 
     public function enqueueAssets(string $hookSuffix): void
@@ -149,6 +161,308 @@ final class MenuRegistrar
         }
     }
 
+    public function handleRevokeOAuth(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_revoke_oauth');
+
+        try {
+            $reason = isset($_POST['revocation_reason']) ? sanitize_text_field((string) $_POST['revocation_reason']) : '';
+            $this->client->revokeGoogleOAuth($reason !== '' ? ['revocation_reason' => $reason] : []);
+
+            update_option('seoauto_oauth_status', 'pending', false);
+            update_option('seoauto_oauth_provider', '', false);
+            update_option('seoauto_oauth_scopes', [], false);
+            update_option('seoauto_oauth_connected_at', 0, false);
+            update_option('seoauto_oauth_last_error', '', false);
+
+            $notice = 'oauth_revoke_ok';
+        } catch (\Throwable $exception) {
+            if ((int) $exception->getCode() === 404) {
+                update_option('seoauto_oauth_status', 'pending', false);
+                update_option('seoauto_oauth_provider', '', false);
+                update_option('seoauto_oauth_scopes', [], false);
+                update_option('seoauto_oauth_connected_at', 0, false);
+                update_option('seoauto_oauth_last_error', '', false);
+                $notice = 'oauth_revoke_ok';
+            } else {
+                update_option('seoauto_oauth_last_error', $exception->getMessage(), false);
+                $notice = 'oauth_revoke_failed';
+            }
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-settings',
+            'seoauto_notice' => $notice,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleRotateToken(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_rotate_token');
+        $siteId = (int) get_option('seoauto_site_id', 0);
+
+        if ($siteId <= 0) {
+            wp_safe_redirect(add_query_arg([
+                'page' => 'seoauto-settings',
+                'seoauto_notice' => 'rotate_failed',
+            ], admin_url('admin.php')));
+            exit;
+        }
+
+        try {
+            $response = $this->client->rotateSiteToken($siteId);
+            $newToken = isset($response['api_key']) ? (string) $response['api_key'] : '';
+
+            if ($newToken === '') {
+                throw new \RuntimeException('Token rotation response missing api_key.');
+            }
+
+            $this->tokenManager->storeToken($newToken);
+            update_option('seoauto_oauth_last_error', '', false);
+            $notice = 'rotate_ok';
+        } catch (\Throwable $exception) {
+            update_option('seoauto_oauth_last_error', $exception->getMessage(), false);
+            $notice = 'rotate_failed';
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-settings',
+            'seoauto_notice' => $notice,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleUpdateSiteProfile(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_update_site_profile');
+        $siteId = (int) get_option('seoauto_site_id', 0);
+
+        $platformUserId = isset($_POST['platform_user_id']) ? sanitize_text_field((string) $_POST['platform_user_id']) : '';
+        $description = isset($_POST['site_description']) ? sanitize_textarea_field((string) $_POST['site_description']) : '';
+        $taste = isset($_POST['site_taste']) ? sanitize_textarea_field((string) $_POST['site_taste']) : '';
+
+        update_option('seoauto_owner_platform_user_id', $platformUserId, false);
+        update_option('seoauto_site_profile_description', $description, false);
+        update_option('seoauto_site_profile_taste', $taste, false);
+
+        if ($siteId <= 0 || $platformUserId === '') {
+            wp_safe_redirect(add_query_arg([
+                'page' => 'seoauto-settings',
+                'seoauto_notice' => 'profile_failed',
+            ], admin_url('admin.php')));
+            exit;
+        }
+
+        try {
+            $this->client->updateSiteProfile($siteId, [
+                'platform_user_id' => $platformUserId,
+                'description' => $description,
+                'taste' => $taste,
+            ]);
+            $notice = 'profile_ok';
+        } catch (\Throwable $exception) {
+            update_option('seoauto_oauth_last_error', $exception->getMessage(), false);
+            $notice = 'profile_failed';
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-settings',
+            'seoauto_notice' => $notice,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleUpdateTask(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_update_task');
+        $taskId = isset($_POST['task_id']) ? (int) $_POST['task_id'] : 0;
+
+        if ($taskId <= 0) {
+            wp_safe_redirect(add_query_arg([
+                'page' => 'seoauto-schedules',
+                'seoauto_notice' => 'task_update_failed',
+            ], admin_url('admin.php')));
+            exit;
+        }
+
+        try {
+            $isEnabled = !empty($_POST['is_enabled']);
+            $delayMinutes = isset($_POST['delay_minutes']) ? max(0, (int) $_POST['delay_minutes']) : 0;
+
+            $this->client->updateTaskConfig($taskId, [
+                'is_enabled' => $isEnabled,
+                'delay_minutes' => $delayMinutes,
+            ]);
+            $notice = 'task_update_ok';
+        } catch (\Throwable $exception) {
+            $this->logger->warning('admin_task_update_failed', ['error' => $exception->getMessage()], 'admin');
+            $notice = 'task_update_failed';
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-schedules',
+            'seoauto_notice' => $notice,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleScheduleTask(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_schedule_task');
+        $taskId = isset($_POST['task_id']) ? (int) $_POST['task_id'] : 0;
+
+        if ($taskId <= 0) {
+            wp_safe_redirect(add_query_arg([
+                'page' => 'seoauto-schedules',
+                'seoauto_notice' => 'task_schedule_failed',
+            ], admin_url('admin.php')));
+            exit;
+        }
+
+        $payload = [];
+        $scheduledFor = isset($_POST['scheduled_for']) ? sanitize_text_field((string) $_POST['scheduled_for']) : '';
+        if ($scheduledFor !== '') {
+            $timestamp = strtotime($scheduledFor);
+            if ($timestamp !== false) {
+                $payload['scheduled_for'] = gmdate('c', $timestamp);
+            }
+        }
+
+        $inputJson = isset($_POST['input_params_json']) ? trim((string) $_POST['input_params_json']) : '';
+        if ($inputJson !== '') {
+            $decoded = json_decode($inputJson, true);
+            if (is_array($decoded)) {
+                $payload['input_params'] = $decoded;
+            }
+        }
+
+        try {
+            $this->client->scheduleTask($taskId, $payload);
+            $notice = 'task_schedule_ok';
+        } catch (\Throwable $exception) {
+            $this->logger->warning('admin_task_schedule_failed', ['error' => $exception->getMessage()], 'admin');
+            $notice = 'task_schedule_failed';
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-schedules',
+            'seoauto_notice' => $notice,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleLinkBrief(): void
+    {
+        if (!current_user_can('edit_posts')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_link_brief');
+
+        $briefId = isset($_POST['brief_id']) ? (int) $_POST['brief_id'] : 0;
+        $postId = isset($_POST['wp_post_id']) ? (int) $_POST['wp_post_id'] : 0;
+        $articleStatus = isset($_POST['article_status']) ? sanitize_text_field((string) $_POST['article_status']) : 'drafted';
+        if (!in_array($articleStatus, ['drafted', 'published'], true)) {
+            $articleStatus = 'drafted';
+        }
+        $siteId = (int) get_option('seoauto_site_id', 0);
+
+        if ($briefId <= 0 || $postId <= 0 || $siteId <= 0) {
+            wp_safe_redirect(add_query_arg([
+                'page' => 'seoauto-briefs',
+                'seoauto_notice' => 'brief_link_failed',
+            ], admin_url('admin.php')));
+            exit;
+        }
+
+        $post = get_post($postId);
+        if (!$post instanceof \WP_Post) {
+            wp_safe_redirect(add_query_arg([
+                'page' => 'seoauto-briefs',
+                'seoauto_notice' => 'brief_link_failed',
+            ], admin_url('admin.php')));
+            exit;
+        }
+
+        try {
+            $payload = [
+                'wp_post_id' => $postId,
+                'wp_post_url' => get_permalink($postId),
+                'wp_post_title' => get_the_title($postId),
+                'article_status' => $articleStatus,
+                'published_at' => get_post_status($postId) === 'publish' ? gmdate('c', (int) get_post_time('U', true, $postId)) : null,
+            ];
+
+            $this->client->linkArticleToBrief($siteId, $briefId, $payload);
+            $this->updateLocalBriefLinkState($briefId, $postId, (string) get_permalink($postId), $articleStatus);
+            $notice = 'brief_link_ok';
+        } catch (\Throwable $exception) {
+            $this->logger->warning('admin_brief_link_failed', ['error' => $exception->getMessage()], 'admin');
+            $notice = 'brief_link_failed';
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-briefs',
+            'seoauto_notice' => $notice,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleDispatchAction(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_dispatch_action');
+
+        $siteId = (int) get_option('seoauto_site_id', 0);
+        $actionId = isset($_POST['dispatch_action_id']) ? (int) $_POST['dispatch_action_id'] : 0;
+
+        if ($siteId <= 0 || $actionId <= 0) {
+            wp_safe_redirect(add_query_arg([
+                'page' => 'seoauto-settings',
+                'seoauto_notice' => 'dispatch_failed',
+            ], admin_url('admin.php')));
+            exit;
+        }
+
+        try {
+            $this->client->dispatchAction($siteId, $actionId);
+            $notice = 'dispatch_ok';
+        } catch (\Throwable $exception) {
+            $this->logger->warning('admin_dispatch_action_failed', ['error' => $exception->getMessage()], 'admin');
+            $notice = 'dispatch_failed';
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-settings',
+            'seoauto_notice' => $notice,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
     public function registerMenu(): void
     {
         add_menu_page(
@@ -167,6 +481,7 @@ final class MenuRegistrar
         add_submenu_page('seoauto', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
         add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
         add_submenu_page('seoauto', 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seoauto-oauth-callback', [$this, 'renderOauthCallbackPage']);
+        add_submenu_page('seoauto', 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seo-platform-oauth-complete', [$this, 'renderOauthCallbackPage']);
     }
 
     public function registerSettings(): void
@@ -193,6 +508,24 @@ final class MenuRegistrar
             'type' => 'boolean',
             'sanitize_callback' => 'rest_sanitize_boolean',
             'default' => false,
+        ]);
+
+        register_setting('seoauto_settings', 'seoauto_owner_platform_user_id', [
+            'type' => 'string',
+            'sanitize_callback' => 'sanitize_text_field',
+            'default' => '1',
+        ]);
+
+        register_setting('seoauto_settings', 'seoauto_site_profile_description', [
+            'type' => 'string',
+            'sanitize_callback' => 'sanitize_textarea_field',
+            'default' => '',
+        ]);
+
+        register_setting('seoauto_settings', 'seoauto_site_profile_taste', [
+            'type' => 'string',
+            'sanitize_callback' => 'sanitize_textarea_field',
+            'default' => '',
         ]);
     }
 
@@ -233,6 +566,120 @@ final class MenuRegistrar
             wp_die('Unauthorized');
         }
 
+        $pageNo = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
+        $status = isset($_GET['status']) ? sanitize_text_field((string) $_GET['status']) : '';
+        $taskId = isset($_GET['seo_execution_task_id']) ? max(0, (int) $_GET['seo_execution_task_id']) : 0;
+        $startedFrom = isset($_GET['started_from']) ? sanitize_text_field((string) $_GET['started_from']) : '';
+        $startedTo = isset($_GET['started_to']) ? sanitize_text_field((string) $_GET['started_to']) : '';
+        $perPage = 20;
+
+        $query = [
+            'per_page' => $perPage,
+            'page' => $pageNo,
+        ];
+
+        if ($status !== '') {
+            $query['status'] = $status;
+        }
+        if ($taskId > 0) {
+            $query['seo_execution_task_id'] = $taskId;
+        }
+        if ($startedFrom !== '') {
+            $query['started_from'] = $startedFrom;
+        }
+        if ($startedTo !== '') {
+            $query['started_to'] = $startedTo;
+        }
+
+        $remote = null;
+        $remoteError = '';
+
+        try {
+            $remote = $this->client->listExecutionLogs($query);
+        } catch (\Throwable $exception) {
+            $remoteError = $exception->getMessage();
+        }
+
+        if (is_array($remote) && isset($remote['execution_logs']) && is_array($remote['execution_logs'])) {
+            $logs = $remote['execution_logs'];
+            $current = (int) ($remote['current_page'] ?? $pageNo);
+            $last = (int) ($remote['last_page'] ?? $pageNo);
+            ?>
+            <div class="wrap">
+                <h1>Execution Logs</h1>
+                <form method="get">
+                    <input type="hidden" name="page" value="seoauto-logs">
+                    <select name="status">
+                        <option value="">All Statuses</option>
+                        <option value="queued" <?php selected($status, 'queued'); ?>>Queued</option>
+                        <option value="running" <?php selected($status, 'running'); ?>>Running</option>
+                        <option value="completed" <?php selected($status, 'completed'); ?>>Completed</option>
+                        <option value="failed" <?php selected($status, 'failed'); ?>>Failed</option>
+                    </select>
+                    <input type="number" name="seo_execution_task_id" min="0" placeholder="Task ID" value="<?php echo esc_attr($taskId > 0 ? (string) $taskId : ''); ?>">
+                    <input type="datetime-local" name="started_from" value="<?php echo esc_attr($startedFrom); ?>">
+                    <input type="datetime-local" name="started_to" value="<?php echo esc_attr($startedTo); ?>">
+                    <button class="button" type="submit">Filter</button>
+                </form>
+
+                <table class="wp-list-table widefat striped" style="margin-top:12px;">
+                    <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Job ID</th>
+                            <th>Status</th>
+                            <th>Progress</th>
+                            <th>Task</th>
+                            <th>Started</th>
+                            <th>Completed</th>
+                            <th>Duration (s)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <?php if (!empty($logs)) : ?>
+                            <?php foreach ($logs as $log) : ?>
+                                <?php if (!is_array($log)) { continue; } ?>
+                                <tr>
+                                    <td><?php echo esc_html((string) ($log['id'] ?? '')); ?></td>
+                                    <td><code><?php echo esc_html((string) ($log['job_id'] ?? '')); ?></code></td>
+                                    <td><?php echo esc_html((string) ($log['status'] ?? '')); ?></td>
+                                    <td><?php echo esc_html((string) ($log['progress'] ?? '')); ?></td>
+                                    <td><?php echo esc_html((string) (($log['execution_task']['name'] ?? ''))); ?></td>
+                                    <td><?php echo esc_html((string) ($log['started_at'] ?? '')); ?></td>
+                                    <td><?php echo esc_html((string) ($log['completed_at'] ?? '')); ?></td>
+                                    <td><?php echo esc_html((string) ($log['duration_seconds'] ?? '')); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        <?php else : ?>
+                            <tr><td colspan="8">No remote execution logs found.</td></tr>
+                        <?php endif; ?>
+                    </tbody>
+                </table>
+
+                <div class="tablenav bottom">
+                    <div class="tablenav-pages">
+                        <?php
+                        echo wp_kses_post(
+                            paginate_links([
+                                'base' => add_query_arg('paged', '%#%'),
+                                'format' => '',
+                                'current' => $current,
+                                'total' => max(1, $last),
+                            ])
+                        );
+                        ?>
+                    </div>
+                </div>
+            </div>
+            <?php
+            return;
+        }
+
+        $this->renderLocalLogsFallback($remoteError);
+    }
+
+    private function renderLocalLogsFallback(string $remoteError = ''): void
+    {
         global $wpdb;
         $table = $wpdb->prefix . 'seoauto_execution_logs';
 
@@ -250,26 +697,22 @@ final class MenuRegistrar
             $where[] = 'severity = %s';
             $params[] = $severity;
         }
-
         if ($dateFrom !== '') {
             $where[] = 'created_at >= %s';
             $params[] = $dateFrom . ' 00:00:00';
         }
-
         if ($dateTo !== '') {
             $where[] = 'created_at <= %s';
             $params[] = $dateTo . ' 23:59:59';
         }
 
         $whereSql = implode(' AND ', $where);
-
         $paramsForList = array_merge($params, [$perPage, $offset]);
         $listQuery = $wpdb->prepare(
             "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC LIMIT %d OFFSET %d",
             ...$paramsForList
         );
         $rows = $wpdb->get_results($listQuery); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-
         $countQuery = empty($params)
             ? "SELECT COUNT(*) FROM {$table} WHERE {$whereSql}"
             : $wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE {$whereSql}", ...$params);
@@ -279,6 +722,9 @@ final class MenuRegistrar
         ?>
         <div class="wrap">
             <h1>Execution Logs</h1>
+            <?php if ($remoteError !== '') : ?>
+                <div class="notice notice-warning"><p>Remote execution logs unavailable. Showing local logs. <?php echo esc_html($remoteError); ?></p></div>
+            <?php endif; ?>
             <form method="get">
                 <input type="hidden" name="page" value="seoauto-logs">
                 <select name="severity">
@@ -295,14 +741,7 @@ final class MenuRegistrar
 
             <table class="wp-list-table widefat striped" style="margin-top:12px;">
                 <thead>
-                    <tr>
-                        <th>Time</th>
-                        <th>Correlation</th>
-                        <th>Event</th>
-                        <th>Severity</th>
-                        <th>Entity</th>
-                        <th>Error</th>
-                    </tr>
+                    <tr><th>Time</th><th>Correlation</th><th>Event</th><th>Severity</th><th>Entity</th><th>Error</th></tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($rows)) : ?>
@@ -346,6 +785,7 @@ final class MenuRegistrar
             wp_die('Unauthorized');
         }
 
+        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
         $tasks = [];
         $scheduled = [];
 
@@ -361,23 +801,66 @@ final class MenuRegistrar
         ?>
         <div class="wrap">
             <h1>Schedules</h1>
+            <?php if ($notice === 'task_update_ok') : ?>
+                <div class="notice notice-success"><p>Task configuration updated.</p></div>
+            <?php elseif ($notice === 'task_update_failed') : ?>
+                <div class="notice notice-error"><p>Task configuration update failed.</p></div>
+            <?php elseif ($notice === 'task_schedule_ok') : ?>
+                <div class="notice notice-success"><p>Task scheduled successfully.</p></div>
+            <?php elseif ($notice === 'task_schedule_failed') : ?>
+                <div class="notice notice-error"><p>Task scheduling failed.</p></div>
+            <?php endif; ?>
 
             <h2>Configured Tasks</h2>
             <table class="wp-list-table widefat striped">
-                <thead><tr><th>Name</th><th>Category</th><th>Frequency</th><th>Enabled</th><th>Timezone</th></tr></thead>
+                <thead><tr><th>Task ID</th><th>Name</th><th>Category</th><th>Frequency</th><th>Enabled</th><th>Timezone</th><th>Actions</th></tr></thead>
                 <tbody>
                 <?php if (!empty($tasks)) : ?>
                     <?php foreach ($tasks as $task) : ?>
+                        <?php
+                        $taskId = isset($task['seo_execution_task_id']) ? (int) $task['seo_execution_task_id'] : 0;
+                        $isEnabled = !empty($task['is_enabled']);
+                        $delay = isset($task['delay_minutes']) ? (int) $task['delay_minutes'] : 0;
+                        ?>
                         <tr>
+                            <td><?php echo esc_html((string) $taskId); ?></td>
                             <td><?php echo esc_html((string) ($task['name'] ?? '')); ?></td>
                             <td><?php echo esc_html((string) ($task['category'] ?? '')); ?></td>
                             <td><?php echo esc_html((string) ($task['frequency'] ?? '')); ?></td>
-                            <td><?php echo !empty($task['is_enabled']) ? 'Yes' : 'No'; ?></td>
+                            <td><?php echo $isEnabled ? 'Yes' : 'No'; ?></td>
                             <td><?php echo esc_html((string) ($task['run_timezone'] ?? 'UTC')); ?></td>
+                            <td>
+                                <?php if ($taskId > 0) : ?>
+                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:8px;">
+                                        <?php wp_nonce_field('seoauto_update_task'); ?>
+                                        <input type="hidden" name="action" value="seoauto_update_task">
+                                        <input type="hidden" name="task_id" value="<?php echo esc_attr((string) $taskId); ?>">
+                                        <label style="display:inline-block;margin-right:6px;">
+                                            <input type="checkbox" name="is_enabled" value="1" <?php checked($isEnabled); ?>> Enabled
+                                        </label>
+                                        <label style="display:inline-block;margin-right:6px;">
+                                            Delay
+                                            <input type="number" min="0" name="delay_minutes" value="<?php echo esc_attr((string) $delay); ?>" style="width:70px;">
+                                        </label>
+                                        <button type="submit" class="button button-small">Save</button>
+                                    </form>
+
+                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                        <?php wp_nonce_field('seoauto_schedule_task'); ?>
+                                        <input type="hidden" name="action" value="seoauto_schedule_task">
+                                        <input type="hidden" name="task_id" value="<?php echo esc_attr((string) $taskId); ?>">
+                                        <input type="datetime-local" name="scheduled_for" style="margin-right:6px;">
+                                        <input type="text" name="input_params_json" placeholder='{\"origin\":\"wp-admin\"}' style="width:180px;margin-right:6px;">
+                                        <button type="submit" class="button button-small">Schedule</button>
+                                    </form>
+                                <?php else : ?>
+                                    —
+                                <?php endif; ?>
+                            </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else : ?>
-                    <tr><td colspan="5">No tasks found or API unavailable.</td></tr>
+                    <tr><td colspan="7">No tasks found or API unavailable.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -411,6 +894,7 @@ final class MenuRegistrar
             wp_die('Unauthorized');
         }
 
+        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
         $this->briefSyncer->sync();
 
         global $wpdb;
@@ -423,8 +907,13 @@ final class MenuRegistrar
         ?>
         <div class="wrap">
             <h1>Content Briefs</h1>
+            <?php if ($notice === 'brief_link_ok') : ?>
+                <div class="notice notice-success"><p>Content brief linked to article.</p></div>
+            <?php elseif ($notice === 'brief_link_failed') : ?>
+                <div class="notice notice-error"><p>Failed to link content brief.</p></div>
+            <?php endif; ?>
             <table class="wp-list-table widefat striped">
-                <thead><tr><th>ID</th><th>Title</th><th>Focus Keyword</th><th>Article Status</th><th>Assignment</th><th>Linked Post</th></tr></thead>
+                <thead><tr><th>ID</th><th>Title</th><th>Focus Keyword</th><th>Article Status</th><th>Assignment</th><th>Linked Post</th><th>Link Article</th></tr></thead>
                 <tbody>
                     <?php if (!empty($rows)) : ?>
                         <?php foreach ($rows as $row) : ?>
@@ -442,10 +931,23 @@ final class MenuRegistrar
                                         —
                                     <?php endif; ?>
                                 </td>
+                                <td>
+                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                        <?php wp_nonce_field('seoauto_link_brief'); ?>
+                                        <input type="hidden" name="action" value="seoauto_link_brief">
+                                        <input type="hidden" name="brief_id" value="<?php echo esc_attr((string) $row->laravel_content_brief_id); ?>">
+                                        <input type="number" min="1" name="wp_post_id" placeholder="WP Post ID" style="width:110px;margin-right:6px;">
+                                        <select name="article_status" style="margin-right:6px;">
+                                            <option value="drafted">drafted</option>
+                                            <option value="published">published</option>
+                                        </select>
+                                        <button class="button button-small" type="submit">Link</button>
+                                    </form>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else : ?>
-                        <tr><td colspan="6">No briefs synced yet.</td></tr>
+                        <tr><td colspan="7">No briefs synced yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -486,6 +988,8 @@ final class MenuRegistrar
                 <div class="notice notice-success"><p>OAuth connected successfully.</p></div>
             <?php elseif ($status === 'error') : ?>
                 <div class="notice notice-warning"><p>OAuth succeeded but health check failed.</p></div>
+            <?php elseif ($status === 'pending' || $status === 'in_progress') : ?>
+                <div class="notice notice-info"><p>OAuth not connected yet.</p></div>
             <?php else : ?>
                 <div class="notice notice-error"><p>OAuth callback failed.</p></div>
             <?php endif; ?>
@@ -528,6 +1032,22 @@ final class MenuRegistrar
                 <div class="notice notice-warning"><p>Health check failed.</p></div>
             <?php elseif ($notice === 'oauth_init_failed') : ?>
                 <div class="notice notice-error"><p>Failed to initialize OAuth. Check API settings and registration.</p></div>
+            <?php elseif ($notice === 'oauth_revoke_ok') : ?>
+                <div class="notice notice-success"><p>OAuth token revoked successfully.</p></div>
+            <?php elseif ($notice === 'oauth_revoke_failed') : ?>
+                <div class="notice notice-error"><p>OAuth revoke failed.</p></div>
+            <?php elseif ($notice === 'rotate_ok') : ?>
+                <div class="notice notice-success"><p>Site token rotated and stored.</p></div>
+            <?php elseif ($notice === 'rotate_failed') : ?>
+                <div class="notice notice-error"><p>Site token rotation failed.</p></div>
+            <?php elseif ($notice === 'profile_ok') : ?>
+                <div class="notice notice-success"><p>Site profile updated.</p></div>
+            <?php elseif ($notice === 'profile_failed') : ?>
+                <div class="notice notice-error"><p>Site profile update failed.</p></div>
+            <?php elseif ($notice === 'dispatch_ok') : ?>
+                <div class="notice notice-success"><p>Action dispatch requested.</p></div>
+            <?php elseif ($notice === 'dispatch_failed') : ?>
+                <div class="notice notice-error"><p>Action dispatch failed.</p></div>
             <?php endif; ?>
             <form method="post" action="options.php">
                 <?php settings_fields('seoauto_settings'); ?>
@@ -584,6 +1104,9 @@ final class MenuRegistrar
             }
             $oauthConnectedAt = (int) get_option('seoauto_oauth_connected_at', 0);
             $oauthError = (string) get_option('seoauto_oauth_last_error', '');
+            $ownerPlatformUserId = (string) get_option('seoauto_owner_platform_user_id', (string) get_current_user_id());
+            $siteDescription = (string) get_option('seoauto_site_profile_description', '');
+            $siteTaste = (string) get_option('seoauto_site_profile_taste', '');
             ?>
 
             <table class="widefat striped" style="max-width:900px;margin-bottom:16px;">
@@ -613,7 +1136,69 @@ final class MenuRegistrar
                 <input type="hidden" name="action" value="seoauto_start_oauth">
                 <button type="submit" class="button button-secondary">Connect Google (via Laravel OAuth)</button>
             </form>
+
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-left:12px;">
+                <?php wp_nonce_field('seoauto_rotate_token'); ?>
+                <input type="hidden" name="action" value="seoauto_rotate_token">
+                <button type="submit" class="button">Rotate Site Token</button>
+            </form>
+
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-left:12px;">
+                <?php wp_nonce_field('seoauto_revoke_oauth'); ?>
+                <input type="hidden" name="action" value="seoauto_revoke_oauth">
+                <input type="text" name="revocation_reason" placeholder="Revocation reason" style="margin-right:6px;">
+                <button type="submit" class="button">Revoke Google OAuth</button>
+            </form>
+
+            <h3 style="margin-top:20px;">Update Site Profile (Laravel)</h3>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="max-width:900px;">
+                <?php wp_nonce_field('seoauto_update_site_profile'); ?>
+                <input type="hidden" name="action" value="seoauto_update_site_profile">
+                <table class="form-table" role="presentation">
+                    <tr>
+                        <th scope="row"><label for="platform_user_id">Owner Platform User ID</label></th>
+                        <td><input id="platform_user_id" name="platform_user_id" type="text" class="regular-text" value="<?php echo esc_attr($ownerPlatformUserId); ?>"></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="site_description">Description</label></th>
+                        <td><textarea id="site_description" name="site_description" rows="3" class="large-text"><?php echo esc_textarea($siteDescription); ?></textarea></td>
+                    </tr>
+                    <tr>
+                        <th scope="row"><label for="site_taste">Taste</label></th>
+                        <td><textarea id="site_taste" name="site_taste" rows="3" class="large-text"><?php echo esc_textarea($siteTaste); ?></textarea></td>
+                    </tr>
+                </table>
+                <button type="submit" class="button button-secondary">Update Profile</button>
+            </form>
+
+            <h3 style="margin-top:20px;">Manual Action Dispatch</h3>
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                <?php wp_nonce_field('seoauto_dispatch_action'); ?>
+                <input type="hidden" name="action" value="seoauto_dispatch_action">
+                <input type="number" min="1" name="dispatch_action_id" placeholder="Action ID" style="width:140px;margin-right:6px;">
+                <button type="submit" class="button">Dispatch Action</button>
+            </form>
         </div>
         <?php
+    }
+
+    private function updateLocalBriefLinkState(int $briefId, int $postId, string $postUrl, string $articleStatus): void
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_content_briefs';
+
+        $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $table,
+            [
+                'linked_wp_post_id' => $postId,
+                'linked_wp_post_url' => $postUrl,
+                'article_status' => $articleStatus,
+                'assignment_status' => 'completed',
+                'updated_at' => current_time('mysql'),
+            ],
+            ['laravel_content_brief_id' => $briefId],
+            ['%d', '%s', '%s', '%s', '%s'],
+            ['%d']
+        );
     }
 }

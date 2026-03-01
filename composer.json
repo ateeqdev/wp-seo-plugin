@@ -21,5 +21,10 @@
     "test": "phpunit -c phpunit.xml.dist",
     "test:unit": "phpunit -c phpunit.xml.dist --testsuite unit",
     "test:integration": "phpunit -c phpunit.xml.dist --testsuite integration"
+  },
+  "config": {
+    "allow-plugins": {
+      "dealerdirect/phpcodesniffer-composer-installer": true
+    }
   }
 }

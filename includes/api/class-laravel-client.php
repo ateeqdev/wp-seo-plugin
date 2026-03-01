@@ -88,6 +88,19 @@ final class LaravelClient
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
+    public function revokeGoogleOAuth(array $payload = []): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($payload): array {
+            return $this->apiClient->request('POST', '/api/oauth/google/revoke', [], $payload, [], true, 20);
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
     public function sendEvent(int $siteId, array $payload): array
     {
         $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {
@@ -134,10 +147,93 @@ final class LaravelClient
     /**
      * @return array<string, mixed>
      */
+    public function rotateSiteToken(int $siteId): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($siteId): array {
+            return $this->apiClient->request(
+                'POST',
+                '/api/sites/' . $siteId . '/token/rotate',
+                [],
+                null,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function updateSiteProfile(int $siteId, array $payload): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {
+            return $this->apiClient->request(
+                'PATCH',
+                '/api/sites/' . $siteId . '/profile',
+                [],
+                $payload,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
     public function listTasks(): array
     {
         $response = $this->retryPolicy->execute(function (): array {
             return $this->apiClient->request('GET', '/api/seo/tasks');
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function updateTaskConfig(int $taskId, array $payload): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($taskId, $payload): array {
+            return $this->apiClient->request(
+                'PATCH',
+                '/api/seo/tasks/' . $taskId,
+                [],
+                $payload,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function scheduleTask(int $taskId, array $payload): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($taskId, $payload): array {
+            return $this->apiClient->request(
+                'POST',
+                '/api/seo/tasks/' . $taskId . '/schedule',
+                [],
+                $payload,
+                [],
+                true,
+                20
+            );
         });
 
         return (array) $response['body'];
@@ -194,6 +290,26 @@ final class LaravelClient
                 '/api/sites/' . $siteId . '/content-briefs/' . $briefId . '/link-article',
                 [],
                 $payload,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function dispatchAction(int $siteId, int $actionId): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($siteId, $actionId): array {
+            return $this->apiClient->request(
+                'POST',
+                '/api/sites/' . $siteId . '/actions/' . $actionId . '/dispatch',
+                [],
+                null,
                 [],
                 true,
                 20

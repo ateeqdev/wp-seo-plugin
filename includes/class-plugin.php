@@ -199,6 +199,7 @@ final class Plugin
                 $c->get('site_registrar'),
                 $c->get('health_checker'),
                 $c->get('oauth_handler'),
+                $c->get('site_token_manager'),
                 $c->get('logger')
             ),
             true

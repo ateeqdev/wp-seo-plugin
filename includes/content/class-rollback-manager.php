@@ -35,7 +35,11 @@ final class RollbackManager
 
         $meta = [];
         foreach ($metaKeys as $key) {
-            $meta[$key] = get_post_meta($postId, $key, true);
+            $exists = metadata_exists('post', $postId, $key);
+            $meta[$key] = [
+                'exists' => $exists,
+                'value' => $exists ? get_post_meta($postId, $key, true) : null,
+            ];
         }
 
         return [
@@ -65,6 +69,7 @@ final class RollbackManager
             'post_content' => (string) ($snapshot['post_content'] ?? ''),
             'post_title' => (string) ($snapshot['post_title'] ?? ''),
             'post_excerpt' => (string) ($snapshot['post_excerpt'] ?? ''),
+            'post_status' => (string) ($snapshot['post_status'] ?? 'draft'),
         ];
 
         $result = wp_update_post($update, true);
@@ -74,17 +79,36 @@ final class RollbackManager
         }
 
         $meta = isset($snapshot['meta']) && is_array($snapshot['meta']) ? $snapshot['meta'] : [];
-        foreach ($meta as $key => $value) {
+        foreach ($meta as $key => $entry) {
             if (!is_string($key) || $key === '') {
                 continue;
             }
 
-            if ($value === '') {
+            if (is_array($entry) && array_key_exists('exists', $entry)) {
+                $exists = (bool) $entry['exists'];
+                $value = $entry['value'] ?? null;
+
+                if (!$exists) {
+                    delete_post_meta($postId, $key);
+                    continue;
+                }
+
+                if ($value === null) {
+                    delete_post_meta($postId, $key);
+                    continue;
+                }
+
+                update_post_meta($postId, $key, $value);
+                continue;
+            }
+
+            // Backward-compatibility for pre-v2 snapshots that only stored value.
+            if ($entry === '') {
                 delete_post_meta($postId, $key);
                 continue;
             }
 
-            update_post_meta($postId, $key, $value);
+            update_post_meta($postId, $key, $entry);
         }
 
         return true;

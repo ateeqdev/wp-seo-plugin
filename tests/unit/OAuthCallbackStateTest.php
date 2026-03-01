@@ -31,4 +31,16 @@ final class OAuthCallbackStateTest extends TestCase
         self::assertFalse($state->isSuccess());
         self::assertSame('access_denied', $state->getError());
     }
+
+    public function testFromQueryParsesArrayScopes(): void
+    {
+        $state = OAuthCallbackState::fromQuery([
+            'status' => 'success',
+            'provider' => 'google',
+            'connected_scopes' => ['search_console', 'analytics', ''],
+        ]);
+
+        self::assertTrue($state->isSuccess());
+        self::assertSame(['search_console', 'analytics'], $state->getScopes());
+    }
 }

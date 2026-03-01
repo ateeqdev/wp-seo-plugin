@@ -35,7 +35,9 @@ final class Autoloader
             $directory = strtolower(implode('/', $parts)) . '/';
         }
 
-        $fileName = 'class-' . strtolower((string) preg_replace('/(?<!^)[A-Z]/', '-$0', $className)) . '.php';
+        // Split only on lower/digit -> upper boundaries so acronyms like OAuth stay intact.
+        $normalized = (string) preg_replace('/(?<=[a-z0-9])([A-Z])/', '-$1', $className);
+        $fileName = 'class-' . strtolower($normalized) . '.php';
         $path = SEOAUTO_PLUGIN_DIR . 'includes/' . $directory . $fileName;
 
         if (is_readable($path)) {

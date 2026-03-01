@@ -21,17 +21,19 @@ final class PagesEndpoint
 
     public function registerRoutes(): void
     {
-        register_rest_route('seoauto/v1', '/pages', [
-            'methods' => 'GET',
-            'callback' => [$this, 'listPages'],
-            'permission_callback' => [$this, 'authorize'],
-        ]);
+        foreach (['seoauto/v1', 'seo-platform/v1'] as $namespace) {
+            register_rest_route($namespace, '/pages', [
+                'methods' => 'GET',
+                'callback' => [$this, 'listPages'],
+                'permission_callback' => [$this, 'authorize'],
+            ]);
 
-        register_rest_route('seoauto/v1', '/pages/(?P<id>\d+)', [
-            'methods' => 'GET',
-            'callback' => [$this, 'getPage'],
-            'permission_callback' => [$this, 'authorize'],
-        ]);
+            register_rest_route($namespace, '/pages/(?P<id>\d+)', [
+                'methods' => 'GET',
+                'callback' => [$this, 'getPage'],
+                'permission_callback' => [$this, 'authorize'],
+            ]);
+        }
     }
 
     public function authorize(\WP_REST_Request $request)
