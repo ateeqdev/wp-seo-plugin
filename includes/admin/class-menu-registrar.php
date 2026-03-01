@@ -62,6 +62,7 @@ final class MenuRegistrar
         add_action('admin_post_seoauto_schedule_task', [$this, 'handleScheduleTask']);
         add_action('admin_post_seoauto_link_brief', [$this, 'handleLinkBrief']);
         add_action('admin_post_seoauto_dispatch_action', [$this, 'handleDispatchAction']);
+        add_action('admin_post_seoauto_delete_logs', [$this, 'handleDeleteLogs']);
     }
 
     public function enqueueAssets(string $hookSuffix): void
@@ -93,8 +94,17 @@ final class MenuRegistrar
         }
 
         check_admin_referer('seoauto_register_site');
-        $result = $this->siteRegistrar->registerOrUpdate();
-        $ok = !isset($result['error']) && !empty($result['site_id']);
+        $baseUrl = trim((string) get_option('seoauto_base_url', ''));
+        if ($baseUrl === '' || !$this->isBaseUrlSyntaxValid($baseUrl)) {
+            wp_safe_redirect(add_query_arg([
+                'page' => 'seoauto-settings',
+                'seoauto_notice' => 'register_missing_base_url',
+            ], admin_url('admin.php')));
+            exit;
+        }
+
+        $result = $this->siteRegistrar->registerOrUpdate(true);
+        $ok = !isset($result['error']) && (!empty($result['site_id']) || ((int) get_option('seoauto_site_id', 0) > 0));
 
         $redirect = add_query_arg(
             [
@@ -463,6 +473,29 @@ final class MenuRegistrar
         exit;
     }
 
+    public function handleDeleteLogs(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_delete_logs');
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_execution_logs';
+        $deleted = $wpdb->query("DELETE FROM {$table}"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+
+        $notice = $deleted === false ? 'logs_delete_failed' : 'logs_delete_ok';
+        $deletedCount = $deleted === false ? 0 : (int) $deleted;
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-logs',
+            'seoauto_notice' => $notice,
+            'deleted_count' => $deletedCount,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
     public function registerMenu(): void
     {
         add_menu_page(
@@ -481,14 +514,15 @@ final class MenuRegistrar
         add_submenu_page('seoauto', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
         add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
         add_submenu_page('seoauto', 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seoauto-oauth-callback', [$this, 'renderOauthCallbackPage']);
-        add_submenu_page('seoauto', 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seo-platform-oauth-complete', [$this, 'renderOauthCallbackPage']);
+        // Backward-compatible callback slug kept accessible but hidden from sidebar menu.
+        add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seo-platform-oauth-complete', [$this, 'renderOauthCallbackPage']);
     }
 
     public function registerSettings(): void
     {
         register_setting('seoauto_settings', 'seoauto_base_url', [
             'type' => 'string',
-            'sanitize_callback' => 'esc_url_raw',
+            'sanitize_callback' => [$this, 'sanitizeBaseUrl'],
             'default' => '',
         ]);
 
@@ -505,6 +539,12 @@ final class MenuRegistrar
         ]);
 
         register_setting('seoauto_settings', 'seoauto_debug_enabled', [
+            'type' => 'boolean',
+            'sanitize_callback' => 'rest_sanitize_boolean',
+            'default' => false,
+        ]);
+
+        register_setting('seoauto_settings', 'seoauto_allow_insecure_ssl', [
             'type' => 'boolean',
             'sanitize_callback' => 'rest_sanitize_boolean',
             'default' => false,
@@ -566,6 +606,8 @@ final class MenuRegistrar
             wp_die('Unauthorized');
         }
 
+        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
+        $deletedCount = isset($_GET['deleted_count']) ? max(0, (int) $_GET['deleted_count']) : 0;
         $pageNo = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
         $status = isset($_GET['status']) ? sanitize_text_field((string) $_GET['status']) : '';
         $taskId = isset($_GET['seo_execution_task_id']) ? max(0, (int) $_GET['seo_execution_task_id']) : 0;
@@ -595,7 +637,7 @@ final class MenuRegistrar
         $remoteError = '';
 
         try {
-            $remote = $this->client->listExecutionLogs($query);
+            $remote = $this->client->listExecutionLogsFast($query);
         } catch (\Throwable $exception) {
             $remoteError = $exception->getMessage();
         }
@@ -607,6 +649,7 @@ final class MenuRegistrar
             ?>
             <div class="wrap">
                 <h1>Execution Logs</h1>
+                <?php $this->renderLogsToolbar($notice, $deletedCount); ?>
                 <form method="get">
                     <input type="hidden" name="page" value="seoauto-logs">
                     <select name="status">
@@ -675,10 +718,10 @@ final class MenuRegistrar
             return;
         }
 
-        $this->renderLocalLogsFallback($remoteError);
+        $this->renderLocalLogsFallback($remoteError, $notice, $deletedCount);
     }
 
-    private function renderLocalLogsFallback(string $remoteError = ''): void
+    private function renderLocalLogsFallback(string $remoteError = '', string $notice = '', int $deletedCount = 0): void
     {
         global $wpdb;
         $table = $wpdb->prefix . 'seoauto_execution_logs';
@@ -722,6 +765,7 @@ final class MenuRegistrar
         ?>
         <div class="wrap">
             <h1>Execution Logs</h1>
+            <?php $this->renderLogsToolbar($notice, $deletedCount); ?>
             <?php if ($remoteError !== '') : ?>
                 <div class="notice notice-warning"><p>Remote execution logs unavailable. Showing local logs. <?php echo esc_html($remoteError); ?></p></div>
             <?php endif; ?>
@@ -779,6 +823,26 @@ final class MenuRegistrar
         <?php
     }
 
+    private function renderLogsToolbar(string $notice, int $deletedCount): void
+    {
+        if ($notice === 'logs_delete_ok') {
+            ?>
+            <div class="notice notice-success"><p><?php echo esc_html(sprintf('Deleted %d local execution log entries.', $deletedCount)); ?></p></div>
+            <?php
+        } elseif ($notice === 'logs_delete_failed') {
+            ?>
+            <div class="notice notice-error"><p>Failed to delete local execution logs.</p></div>
+            <?php
+        }
+        ?>
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:12px;">
+            <?php wp_nonce_field('seoauto_delete_logs'); ?>
+            <input type="hidden" name="action" value="seoauto_delete_logs">
+            <button type="submit" class="button" onclick="return confirm('Delete all local execution logs?');">Delete Local Logs</button>
+        </form>
+        <?php
+    }
+
     public function renderSchedulesPage(): void
     {
         if (!current_user_can('manage_options')) {
@@ -788,14 +852,22 @@ final class MenuRegistrar
         $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
         $tasks = [];
         $scheduled = [];
+        $remoteErrors = [];
 
         try {
-            $tasksRes = $this->client->listTasks();
-            $scheduledRes = $this->client->listScheduledTasks(['limit' => 50]);
+            $tasksRes = $this->client->listTasksFast();
             $tasks = isset($tasksRes['tasks']) && is_array($tasksRes['tasks']) ? $tasksRes['tasks'] : [];
+        } catch (\Throwable $exception) {
+            $remoteErrors[] = 'Tasks: ' . $exception->getMessage();
+            $this->logger->warning('admin_tasks_fetch_failed', ['error' => $exception->getMessage()], 'admin');
+        }
+
+        try {
+            $scheduledRes = $this->client->listScheduledTasksFast(['limit' => 50]);
             $scheduled = isset($scheduledRes['scheduled_tasks']) && is_array($scheduledRes['scheduled_tasks']) ? $scheduledRes['scheduled_tasks'] : [];
         } catch (\Throwable $exception) {
-            $this->logger->warning('admin_schedule_fetch_failed', ['error' => $exception->getMessage()], 'admin');
+            $remoteErrors[] = 'Scheduled runs: ' . $exception->getMessage();
+            $this->logger->warning('admin_scheduled_runs_fetch_failed', ['error' => $exception->getMessage()], 'admin');
         }
 
         ?>
@@ -809,6 +881,11 @@ final class MenuRegistrar
                 <div class="notice notice-success"><p>Task scheduled successfully.</p></div>
             <?php elseif ($notice === 'task_schedule_failed') : ?>
                 <div class="notice notice-error"><p>Task scheduling failed.</p></div>
+            <?php endif; ?>
+            <?php if (!empty($remoteErrors)) : ?>
+                <div class="notice notice-warning">
+                    <p>Some schedule data could not be loaded from Laravel. <?php echo esc_html(implode(' | ', $remoteErrors)); ?></p>
+                </div>
             <?php endif; ?>
 
             <h2>Configured Tasks</h2>
@@ -1022,8 +1099,11 @@ final class MenuRegistrar
         ?>
         <div class="wrap">
             <h1>SEO Automation Settings</h1>
+            <?php settings_errors('seoauto_base_url'); ?>
             <?php if ($notice === 'register_ok') : ?>
                 <div class="notice notice-success"><p>Site registration updated successfully.</p></div>
+            <?php elseif ($notice === 'register_missing_base_url') : ?>
+                <div class="notice notice-warning"><p>Set Laravel Base URL first, then click Register/Update Site.</p></div>
             <?php elseif ($notice === 'register_failed') : ?>
                 <div class="notice notice-error"><p>Site registration failed. Check logs for details.</p></div>
             <?php elseif ($notice === 'health_ok') : ?>
@@ -1048,6 +1128,9 @@ final class MenuRegistrar
                 <div class="notice notice-success"><p>Action dispatch requested.</p></div>
             <?php elseif ($notice === 'dispatch_failed') : ?>
                 <div class="notice notice-error"><p>Action dispatch failed.</p></div>
+            <?php endif; ?>
+            <?php if ((bool) get_option('seoauto_allow_insecure_ssl', false)) : ?>
+                <div class="notice notice-warning"><p>Insecure SSL mode is enabled for Laravel API calls. Use for local development only.</p></div>
             <?php endif; ?>
             <form method="post" action="options.php">
                 <?php settings_fields('seoauto_settings'); ?>
@@ -1086,6 +1169,15 @@ final class MenuRegistrar
                             <label>
                                 <input type="checkbox" name="seoauto_debug_enabled" value="1" <?php checked((bool) get_option('seoauto_debug_enabled', false)); ?>>
                                 Enabled
+                            </label>
+                        </td>
+                    </tr>
+                    <tr>
+                        <th scope="row">Allow Insecure SSL (Dev)</th>
+                        <td>
+                            <label>
+                                <input type="checkbox" name="seoauto_allow_insecure_ssl" value="1" <?php checked((bool) get_option('seoauto_allow_insecure_ssl', false)); ?>>
+                                Disable TLS cert verification for Laravel API calls
                             </label>
                         </td>
                     </tr>
@@ -1200,5 +1292,48 @@ final class MenuRegistrar
             ['%d', '%s', '%s', '%s', '%s'],
             ['%d']
         );
+    }
+
+    /**
+     * Normalize/stabilize Laravel API base URL from settings input.
+     *
+     * @param mixed $value
+     */
+    public function sanitizeBaseUrl($value): string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return '';
+        }
+
+        if (!preg_match('#^https?://#i', $raw)) {
+            $raw = 'https://' . $raw;
+        }
+
+        $sanitized = esc_url_raw($raw);
+        if ($sanitized === '') {
+            add_settings_error('seoauto_base_url', 'seoauto_base_url_invalid', 'Invalid Laravel Base URL.');
+            return (string) get_option('seoauto_base_url', '');
+        }
+
+        $host = wp_parse_url($sanitized, PHP_URL_HOST);
+        if (!is_string($host) || $host === '') {
+            add_settings_error('seoauto_base_url', 'seoauto_base_url_invalid_host', 'Laravel Base URL must include a valid host.');
+            return (string) get_option('seoauto_base_url', '');
+        }
+
+        return rtrim($sanitized, '/');
+    }
+
+    private function isBaseUrlSyntaxValid(string $url): bool
+    {
+        $scheme = wp_parse_url($url, PHP_URL_SCHEME);
+        $host = wp_parse_url($url, PHP_URL_HOST);
+
+        if (!is_string($scheme) || !in_array(strtolower($scheme), ['http', 'https'], true)) {
+            return false;
+        }
+
+        return is_string($host) && $host !== '';
     }
 }

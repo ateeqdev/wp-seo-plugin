@@ -35,6 +35,19 @@ final class LaravelClient
     }
 
     /**
+     * Fast, single-attempt registration for admin UI actions.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function registerSiteFast(array $payload): array
+    {
+        $response = $this->apiClient->request('POST', '/api/sites/register', [], $payload, [], false, 8);
+
+        return (array) $response['body'];
+    }
+
+    /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
@@ -43,6 +56,27 @@ final class LaravelClient
         $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {
             return $this->apiClient->request('POST', '/api/sites/' . $siteId . '/register', [], $payload, [], true, 20);
         });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * Fast, single-attempt update for admin UI actions.
+     *
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function updateSiteRegistrationFast(int $siteId, array $payload): array
+    {
+        $response = $this->apiClient->request(
+            'POST',
+            '/api/sites/' . $siteId . '/register',
+            [],
+            $payload,
+            [],
+            true,
+            8
+        );
 
         return (array) $response['body'];
     }
@@ -198,6 +232,18 @@ final class LaravelClient
     }
 
     /**
+     * Fast, single-attempt task fetch for admin UI rendering.
+     *
+     * @return array<string, mixed>
+     */
+    public function listTasksFast(): array
+    {
+        $response = $this->apiClient->request('GET', '/api/seo/tasks', [], null, [], true, 6);
+
+        return (array) $response['body'];
+    }
+
+    /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
@@ -253,6 +299,19 @@ final class LaravelClient
     }
 
     /**
+     * Fast, single-attempt scheduled-task fetch for admin UI rendering.
+     *
+     * @param array<string, mixed> $query
+     * @return array<string, mixed>
+     */
+    public function listScheduledTasksFast(array $query = []): array
+    {
+        $response = $this->apiClient->request('GET', '/api/seo/scheduled-tasks', $query, null, [], true, 6);
+
+        return (array) $response['body'];
+    }
+
+    /**
      * @param array<string, mixed> $query
      * @return array<string, mixed>
      */
@@ -261,6 +320,19 @@ final class LaravelClient
         $response = $this->retryPolicy->execute(function () use ($query): array {
             return $this->apiClient->request('GET', '/api/seo/execution-logs', $query);
         });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * Fast, single-attempt execution-log fetch for admin UI rendering.
+     *
+     * @param array<string, mixed> $query
+     * @return array<string, mixed>
+     */
+    public function listExecutionLogsFast(array $query = []): array
+    {
+        $response = $this->apiClient->request('GET', '/api/seo/execution-logs', $query, null, [], true, 6);
 
         return (array) $response['body'];
     }

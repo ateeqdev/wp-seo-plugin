@@ -67,13 +67,33 @@ final class ApiClient
             'method' => strtoupper($method),
             'timeout' => $timeout,
             'headers' => $requestHeaders,
+            'sslverify' => true,
         ];
+
+        $allowInsecureSsl = (bool) get_option('seoauto_allow_insecure_ssl', false);
+        $autoAllowInsecureSsl = $this->shouldAutoDisableSslVerifyForBaseUrl($baseUrl);
+        $args['sslverify'] = !($allowInsecureSsl || $autoAllowInsecureSsl);
 
         if ($body !== null) {
             $args['body'] = wp_json_encode($body);
         }
 
         $response = wp_remote_request($url, $args);
+
+        if (is_wp_error($response) && $this->isSslCertificateError($response)) {
+            // Local development fallback: if cert chain is untrusted but host resolves locally,
+            // retry once without certificate verification.
+            if ($autoAllowInsecureSsl && (($args['sslverify'] ?? true) === true)) {
+                $this->logger->warning('api_sslverify_fallback', [
+                    'entity_id' => $path,
+                    'error' => $response->get_error_message(),
+                    'base_url' => $baseUrl,
+                ], 'outbound');
+
+                $args['sslverify'] = false;
+                $response = wp_remote_request($url, $args);
+            }
+        }
 
         if (is_wp_error($response)) {
             $this->logger->warning('api_transport_error', [
@@ -107,5 +127,52 @@ final class ApiClient
         }
 
         return $result;
+    }
+
+    private function isSslCertificateError(\WP_Error $error): bool
+    {
+        return stripos($error->get_error_message(), 'cURL error 60') !== false
+            || stripos($error->get_error_message(), 'SSL certificate') !== false;
+    }
+
+    private function shouldAutoDisableSslVerifyForBaseUrl(string $baseUrl): bool
+    {
+        $host = wp_parse_url($baseUrl, PHP_URL_HOST);
+        if (!is_string($host) || $host === '') {
+            return false;
+        }
+
+        $hostLower = strtolower($host);
+        if (in_array($hostLower, ['localhost'], true)) {
+            return true;
+        }
+
+        if (preg_match('/\.(test|local|localhost|invalid)$/i', $hostLower) === 1) {
+            return true;
+        }
+
+        if ($this->isPrivateOrReservedIp($hostLower)) {
+            return true;
+        }
+
+        $resolved = gethostbyname($hostLower);
+        if ($resolved !== $hostLower && $this->isPrivateOrReservedIp($resolved)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function isPrivateOrReservedIp(string $ip): bool
+    {
+        if (filter_var($ip, FILTER_VALIDATE_IP) === false) {
+            return false;
+        }
+
+        if ($ip === '::1') {
+            return true;
+        }
+
+        return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
     }
 }

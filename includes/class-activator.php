@@ -24,6 +24,7 @@ final class Activator
         add_option('seoauto_site_id', 0, '', 'no');
         add_option('seoauto_site_token', '', '', 'no');
         add_option('seoauto_debug_enabled', false, '', 'no');
+        add_option('seoauto_allow_insecure_ssl', false, '', 'no');
         add_option('seoauto_primary_seo_adapter', 'auto', '', 'no');
         add_option('seoauto_force_apply_non_auto', true, '', 'no');
         add_option('seoauto_last_user_sync', 0, '', 'no');

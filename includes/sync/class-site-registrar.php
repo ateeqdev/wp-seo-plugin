@@ -26,7 +26,7 @@ final class SiteRegistrar
     /**
      * @return array<string, mixed>
      */
-    public function registerOrUpdate(): array
+    public function registerOrUpdate(bool $fast = false): array
     {
         $siteId = (int) get_option('seoauto_site_id', 0);
         $token = $this->tokenManager->getToken();
@@ -46,9 +46,13 @@ final class SiteRegistrar
 
         try {
             if ($siteId > 0 && $this->tokenManager->hasToken()) {
-                $response = $this->client->updateSiteRegistration($siteId, $payload);
+                $response = $fast
+                    ? $this->client->updateSiteRegistrationFast($siteId, $payload)
+                    : $this->client->updateSiteRegistration($siteId, $payload);
             } else {
-                $response = $this->client->registerSite($payload);
+                $response = $fast
+                    ? $this->client->registerSiteFast($payload)
+                    : $this->client->registerSite($payload);
                 if (!empty($response['site_id'])) {
                     update_option('seoauto_site_id', (int) $response['site_id'], false);
                 }
