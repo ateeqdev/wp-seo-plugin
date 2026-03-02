@@ -22,6 +22,7 @@ $options = [
     'seoauto_oauth_provider',
     'seoauto_oauth_connected_at',
     'seoauto_oauth_last_error',
+    'seoauto_provider_connection_alerts',
     'seoauto_owner_platform_user_id',
     'seoauto_site_profile_description',
     'seoauto_site_profile_taste',

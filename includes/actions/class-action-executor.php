@@ -13,6 +13,7 @@ use SEOAutomation\Connector\Actions\Handlers\InternalLinkHandler;
 use SEOAutomation\Connector\Actions\Handlers\InterfaceActionHandler;
 use SEOAutomation\Connector\Actions\Handlers\MetaDescriptionHandler;
 use SEOAutomation\Connector\Actions\Handlers\MonitorHandler;
+use SEOAutomation\Connector\Actions\Handlers\ProviderConnectionIssueHandler;
 use SEOAutomation\Connector\Actions\Handlers\RedirectHandler;
 use SEOAutomation\Connector\Actions\Handlers\RobotsHandler;
 use SEOAutomation\Connector\Actions\Handlers\SchemaHandler;
@@ -68,6 +69,7 @@ final class ActionExecutor
             'robots_directives' => new RobotsHandler($logger),
             'submit_for_indexing' => new IndexingHandler($logger),
             'monitor_only' => new MonitorHandler($logger),
+            'provider_connection_issue' => new ProviderConnectionIssueHandler($logger),
         ];
     }
 

@@ -34,6 +34,7 @@ final class Activator
         add_option('seoauto_oauth_provider', '', '', 'no');
         add_option('seoauto_oauth_connected_at', 0, '', 'no');
         add_option('seoauto_oauth_last_error', '', '', 'no');
+        add_option('seoauto_provider_connection_alerts', [], '', 'no');
         add_option('seoauto_owner_platform_user_id', '1', '', 'no');
         add_option('seoauto_site_profile_description', '', '', 'no');
         add_option('seoauto_site_profile_taste', '', '', 'no');

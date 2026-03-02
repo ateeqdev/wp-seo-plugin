@@ -1297,6 +1297,10 @@ final class MenuRegistrar
         }
 
         $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
+        $providerAlerts = get_option('seoauto_provider_connection_alerts', []);
+        if (!is_array($providerAlerts)) {
+            $providerAlerts = [];
+        }
 
         ?>
         <div class="wrap">
@@ -1331,6 +1335,33 @@ final class MenuRegistrar
             <?php elseif ($notice === 'dispatch_failed') : ?>
                 <div class="notice notice-error"><p>Action dispatch failed.</p></div>
             <?php endif; ?>
+            <?php foreach ($providerAlerts as $key => $alert) : ?>
+                <?php if (!is_array($alert)) {
+                    continue;
+                } ?>
+                <?php
+                $providerName = sanitize_text_field((string) ($alert['provider_name'] ?? $key));
+                $taskName = sanitize_text_field((string) ($alert['task_name'] ?? 'unknown'));
+                $message = sanitize_text_field((string) ($alert['message'] ?? 'Provider access issue detected.'));
+                $resolutionHint = sanitize_text_field((string) ($alert['resolution_hint'] ?? 'Reconnect credentials and verify account permissions.'));
+                $statusCode = isset($alert['status_code']) ? (int) $alert['status_code'] : 0;
+                $occurrences = max((int) ($alert['occurrences'] ?? 1), 1);
+                $lastDetectedAt = sanitize_text_field((string) ($alert['last_detected_at'] ?? 'unknown'));
+                ?>
+                <div class="notice notice-warning">
+                    <p>
+                        <strong><?php echo esc_html($providerName); ?> provider issue</strong>
+                        <?php echo esc_html($message); ?>
+                        <?php if ($statusCode > 0) : ?>
+                            <?php echo esc_html(' (HTTP ' . $statusCode . ')'); ?>
+                        <?php endif; ?>
+                    </p>
+                    <p>
+                        <?php echo esc_html('Task: ' . $taskName . ' | Occurrences: ' . $occurrences . ' | Last detected: ' . $lastDetectedAt); ?>
+                    </p>
+                    <p><?php echo esc_html($resolutionHint); ?></p>
+                </div>
+            <?php endforeach; ?>
             <?php if ((bool) get_option('seoauto_allow_insecure_ssl', false)) : ?>
                 <div class="notice notice-warning"><p>Insecure SSL mode is enabled for Laravel API calls. Use for local development only.</p></div>
             <?php endif; ?>
