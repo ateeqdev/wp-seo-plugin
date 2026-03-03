@@ -35,7 +35,7 @@ final class ApiClient
         bool $includeToken = true,
         int $timeout = 15
     ): array {
-        $baseUrl = rtrim((string) get_option('seoauto_base_url', ''), '/');
+        $baseUrl = rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/');
 
         if ($baseUrl === '') {
             throw new RuntimeException('seoauto_base_url is not configured.');
@@ -96,6 +96,9 @@ final class ApiClient
         }
 
         if (is_wp_error($response)) {
+            update_option('seoauto_api_blocked', true, false);
+            update_option('seoauto_api_last_error', $response->get_error_message(), false);
+            update_option('seoauto_api_last_error_at', time(), false);
             $this->logger->warning('api_transport_error', [
                 'entity_id' => $path,
                 'error' => $response->get_error_message(),
@@ -117,6 +120,9 @@ final class ApiClient
 
         if ($statusCode >= 400) {
             $message = sprintf('HTTP %d for %s', $statusCode, $path);
+            update_option('seoauto_api_blocked', true, false);
+            update_option('seoauto_api_last_error', $message, false);
+            update_option('seoauto_api_last_error_at', time(), false);
             $this->logger->warning('api_http_error', [
                 'entity_id' => $path,
                 'error' => $message,
@@ -125,6 +131,10 @@ final class ApiClient
 
             throw new RuntimeException($message, $statusCode);
         }
+
+        update_option('seoauto_api_blocked', false, false);
+        update_option('seoauto_api_last_error', '', false);
+        update_option('seoauto_api_last_error_at', 0, false);
 
         return $result;
     }

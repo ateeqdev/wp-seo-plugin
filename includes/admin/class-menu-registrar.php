@@ -1503,7 +1503,7 @@ final class MenuRegistrar
             <?php if ($notice === 'register_ok') : ?>
                 <div class="notice notice-success"><p>Site registration updated successfully.</p></div>
             <?php elseif ($notice === 'register_missing_base_url') : ?>
-                <div class="notice notice-warning"><p>Set Laravel Base URL first, then click Register/Update Site.</p></div>
+                <div class="notice notice-warning"><p>Laravel endpoint configuration is missing.</p></div>
             <?php elseif ($notice === 'register_failed') : ?>
                 <div class="notice notice-error"><p>Site registration failed. Check logs for details.</p></div>
             <?php elseif ($notice === 'health_ok') : ?>
@@ -1559,13 +1559,26 @@ final class MenuRegistrar
             <?php if ((bool) get_option('seoauto_allow_insecure_ssl', false)) : ?>
                 <div class="notice notice-warning"><p>Insecure SSL mode is enabled for Laravel API calls. Use for local development only.</p></div>
             <?php endif; ?>
+            <?php if ((bool) get_option('seoauto_api_blocked', false)) : ?>
+                <?php
+                $apiError = (string) get_option('seoauto_api_last_error', '');
+                $apiErrorAt = (int) get_option('seoauto_api_last_error_at', 0);
+                ?>
+                <div class="notice notice-error">
+                    <p><strong>Laravel API connectivity issue detected.</strong> Outbound calls from WordPress to the Laravel endpoint are failing.</p>
+                    <p><?php echo esc_html($apiError !== '' ? $apiError : 'Unknown transport error'); ?></p>
+                    <p><?php echo esc_html($apiErrorAt > 0 ? 'Last failure: ' . wp_date('Y-m-d H:i:s', $apiErrorAt) : ''); ?></p>
+                    <p>Recommended: verify firewall/WAF rules, DNS, TLS certs, and outbound HTTP availability from this host. No automatic firewall exception is applied.</p>
+                </div>
+            <?php endif; ?>
             <form method="post" action="options.php">
                 <?php settings_fields('seoauto_settings'); ?>
                 <table class="form-table">
                     <tr>
                         <th scope="row"><label for="seoauto_base_url">Laravel Base URL</label></th>
                         <td>
-                            <input type="url" class="regular-text" id="seoauto_base_url" name="seoauto_base_url" value="<?php echo esc_attr((string) get_option('seoauto_base_url', '')); ?>" placeholder="https://api.example.com">
+                            <input type="url" class="regular-text" id="seoauto_base_url" name="seoauto_base_url" value="<?php echo esc_attr(rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/')); ?>" readonly>
+                            <p class="description">Managed by plugin configuration and not customer-editable.</p>
                         </td>
                     </tr>
                     <tr>
@@ -1733,28 +1746,7 @@ final class MenuRegistrar
      */
     public function sanitizeBaseUrl($value): string
     {
-        $raw = trim((string) $value);
-        if ($raw === '') {
-            return '';
-        }
-
-        if (!preg_match('#^https?://#i', $raw)) {
-            $raw = 'https://' . $raw;
-        }
-
-        $sanitized = esc_url_raw($raw);
-        if ($sanitized === '') {
-            add_settings_error('seoauto_base_url', 'seoauto_base_url_invalid', 'Invalid Laravel Base URL.');
-            return (string) get_option('seoauto_base_url', '');
-        }
-
-        $host = wp_parse_url($sanitized, PHP_URL_HOST);
-        if (!is_string($host) || $host === '') {
-            add_settings_error('seoauto_base_url', 'seoauto_base_url_invalid_host', 'Laravel Base URL must include a valid host.');
-            return (string) get_option('seoauto_base_url', '');
-        }
-
-        return rtrim($sanitized, '/');
+        return rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/');
     }
 
     /**

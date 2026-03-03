@@ -20,7 +20,7 @@ final class Activator
 
     private static function setDefaultOptions(): void
     {
-        add_option('seoauto_base_url', '', '', 'no');
+        add_option('seoauto_base_url', rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/'), '', 'no');
         add_option('seoauto_site_id', 0, '', 'no');
         add_option('seoauto_site_token', '', '', 'no');
         add_option('seoauto_debug_enabled', false, '', 'no');
@@ -51,5 +51,8 @@ final class Activator
         add_option('seoauto_adapter_priority', ['yoast', 'rankmath', 'aioseo'], '', 'no');
         add_option('seoauto_mirror_post_title', false, '', 'no');
         add_option('seoauto_canonical_same_host', true, '', 'no');
+        add_option('seoauto_api_blocked', false, '', 'no');
+        add_option('seoauto_api_last_error', '', '', 'no');
+        add_option('seoauto_api_last_error_at', 0, '', 'no');
     }
 }

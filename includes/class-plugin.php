@@ -63,6 +63,7 @@ final class Plugin
     public function onPluginsLoaded(): void
     {
         Schema::createOrUpgrade();
+        update_option('seoauto_base_url', rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/'), false);
         $this->registerServices();
         $this->registerHooks();
     }
