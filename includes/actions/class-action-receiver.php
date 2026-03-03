@@ -113,7 +113,7 @@ final class ActionReceiver
 
         return [
             'laravel_action_id' => (int) ($payload['action_id'] ?? 0),
-            'action_type' => str_replace('-', '_', sanitize_text_field((string) ($payload['action_type'] ?? ''))),
+            'action_type' => sanitize_text_field((string) ($payload['action_type'] ?? '')),
             'target_type' => sanitize_text_field((string) ($target['type'] ?? 'post')),
             'target_id' => (string) ($target['id'] ?? ''),
             'target_url' => isset($target['url']) ? esc_url_raw((string) $target['url']) : null,
@@ -131,7 +131,7 @@ final class ActionReceiver
     {
         return [
             'laravel_action_id' => (int) ($payload['id'] ?? 0),
-            'action_type' => str_replace('-', '_', sanitize_text_field((string) ($payload['action_type'] ?? ''))),
+            'action_type' => sanitize_text_field((string) ($payload['action_type'] ?? '')),
             'target_type' => sanitize_text_field((string) ($payload['target_type'] ?? 'post')),
             'target_id' => (string) ($payload['target_id'] ?? ''),
             'target_url' => isset($payload['target_url']) ? esc_url_raw((string) $payload['target_url']) : null,
