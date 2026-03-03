@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SEOAutomation\Connector\Admin;
 
+use SEOAutomation\Connector\Actions\ActionExecutor;
+use SEOAutomation\Connector\Actions\ActionRepository;
 use SEOAutomation\Connector\API\LaravelClient;
 use SEOAutomation\Connector\Auth\OAuthHandler;
 use SEOAutomation\Connector\Auth\SiteTokenManager;
@@ -28,6 +30,10 @@ final class MenuRegistrar
 
     private Logger $logger;
 
+    private ActionRepository $actionRepository;
+
+    private ActionExecutor $actionExecutor;
+
     public function __construct(
         LaravelClient $client,
         BriefSyncer $briefSyncer,
@@ -35,6 +41,8 @@ final class MenuRegistrar
         HealthChecker $healthChecker,
         OAuthHandler $oauthHandler,
         SiteTokenManager $tokenManager,
+        ActionRepository $actionRepository,
+        ActionExecutor $actionExecutor,
         Logger $logger
     )
     {
@@ -44,6 +52,8 @@ final class MenuRegistrar
         $this->healthChecker = $healthChecker;
         $this->oauthHandler = $oauthHandler;
         $this->tokenManager = $tokenManager;
+        $this->actionRepository = $actionRepository;
+        $this->actionExecutor = $actionExecutor;
         $this->logger = $logger;
     }
 
@@ -64,6 +74,10 @@ final class MenuRegistrar
         add_action('admin_post_seoauto_dispatch_action', [$this, 'handleDispatchAction']);
         add_action('admin_post_seoauto_delete_logs', [$this, 'handleDeleteLogs']);
         add_action('admin_post_seoauto_delete_local_errors', [$this, 'handleDeleteLocalErrors']);
+        add_action('admin_post_seoauto_apply_action', [$this, 'handleApplyAction']);
+        add_action('admin_post_seoauto_revert_action', [$this, 'handleRevertAction']);
+        add_action('admin_post_seoauto_edit_action_payload', [$this, 'handleEditActionPayload']);
+        add_action('admin_post_seoauto_update_action_item', [$this, 'handleUpdateActionItem']);
     }
 
     public function enqueueAssets(string $hookSuffix): void
@@ -483,7 +497,7 @@ final class MenuRegistrar
         check_admin_referer('seoauto_delete_logs');
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_execution_logs';
+        $table = $wpdb->prefix . 'seoauto_change_logs';
         $deleted = $wpdb->query("DELETE FROM {$table}"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 
         $notice = $deleted === false ? 'logs_delete_failed' : 'logs_delete_ok';
@@ -512,7 +526,7 @@ final class MenuRegistrar
         }
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_execution_logs';
+        $table = $wpdb->prefix . 'seoauto_activity_logs';
 
         if ($severity === 'error') {
             $deleted = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
@@ -540,6 +554,111 @@ final class MenuRegistrar
         exit;
     }
 
+    public function handleApplyAction(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_apply_action');
+        $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
+
+        if ($actionId > 0) {
+            \SEOAutomation\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 50);
+            $this->actionRepository->markQueued($actionId);
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-logs',
+            'seoauto_notice' => 'action_apply_requested',
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleRevertAction(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_revert_action');
+        $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
+
+        $notice = 'action_revert_failed';
+        if ($actionId > 0) {
+            $result = $this->actionExecutor->revertByLaravelId($actionId);
+            if (($result['status'] ?? '') === 'rolled_back') {
+                $notice = 'action_revert_ok';
+            }
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-logs',
+            'seoauto_notice' => $notice,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleEditActionPayload(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_edit_action_payload');
+        $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
+        $payloadJson = isset($_POST['payload_json']) ? (string) wp_unslash($_POST['payload_json']) : '';
+        $payload = json_decode($payloadJson, true);
+
+        $notice = 'action_edit_failed';
+        if ($actionId > 0 && is_array($payload)) {
+            $updated = $this->actionRepository->updatePayload($actionId, $payload, get_current_user_id());
+            if ($updated) {
+                $notice = 'action_edit_ok';
+            }
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-logs',
+            'seoauto_notice' => $notice,
+        ], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleUpdateActionItem(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        check_admin_referer('seoauto_update_action_item');
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_admin_action_items';
+        $itemId = isset($_POST['item_id']) ? (int) $_POST['item_id'] : 0;
+        $status = isset($_POST['status']) ? sanitize_text_field((string) $_POST['status']) : 'open';
+        $valid = ['open', 'in_progress', 'resolved'];
+
+        if ($itemId > 0 && in_array($status, $valid, true)) {
+            $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+                $table,
+                [
+                    'status' => $status,
+                    'resolved_at' => $status === 'resolved' ? current_time('mysql') : null,
+                    'updated_at' => current_time('mysql'),
+                ],
+                ['id' => $itemId],
+                ['%s', '%s', '%s'],
+                ['%d']
+            );
+        }
+
+        wp_safe_redirect(add_query_arg([
+            'page' => 'seoauto-action-items',
+            'seoauto_notice' => 'action_item_updated',
+        ], admin_url('admin.php')));
+        exit;
+    }
+
     public function registerMenu(): void
     {
         add_menu_page(
@@ -553,8 +672,9 @@ final class MenuRegistrar
         );
 
         add_submenu_page('seoauto', 'Dashboard', 'Dashboard', 'manage_options', 'seoauto', [$this, 'renderDashboardPage']);
-        add_submenu_page('seoauto', 'Execution Logs', 'Execution Logs', 'manage_options', 'seoauto-logs', [$this, 'renderLogsPage']);
-        add_submenu_page('seoauto', 'Local Errors', 'Local Errors', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
+        add_submenu_page('seoauto', 'Change Center', 'Change Center', 'manage_options', 'seoauto-logs', [$this, 'renderLogsPage']);
+        add_submenu_page('seoauto', 'Action Items', 'Action Items', 'manage_options', 'seoauto-action-items', [$this, 'renderActionItemsPage']);
+        add_submenu_page('seoauto', 'Activity Logs', 'Activity Logs', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
         add_submenu_page('seoauto', 'Schedules', 'Schedules', 'manage_options', 'seoauto-schedules', [$this, 'renderSchedulesPage']);
         add_submenu_page('seoauto', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
         add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
@@ -577,10 +697,10 @@ final class MenuRegistrar
             'default' => 'auto',
         ]);
 
-        register_setting('seoauto_settings', 'seoauto_force_apply_non_auto', [
-            'type' => 'boolean',
-            'sanitize_callback' => 'rest_sanitize_boolean',
-            'default' => true,
+        register_setting('seoauto_settings', 'seoauto_change_application_mode', [
+            'type' => 'string',
+            'sanitize_callback' => [$this, 'sanitizeChangeApplicationMode'],
+            'default' => 'dangerous_auto_apply',
         ]);
 
         register_setting('seoauto_settings', 'seoauto_debug_enabled', [
@@ -652,124 +772,138 @@ final class MenuRegistrar
         }
 
         $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
-        $deletedCount = isset($_GET['deleted_count']) ? max(0, (int) $_GET['deleted_count']) : 0;
-        $pageNo = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
         $status = isset($_GET['status']) ? sanitize_text_field((string) $_GET['status']) : '';
-        $taskId = isset($_GET['seo_execution_task_id']) ? max(0, (int) $_GET['seo_execution_task_id']) : 0;
-        $startedFrom = isset($_GET['started_from']) ? sanitize_text_field((string) $_GET['started_from']) : '';
-        $startedTo = isset($_GET['started_to']) ? sanitize_text_field((string) $_GET['started_to']) : '';
-        $perPage = 20;
-
-        $query = [
-            'per_page' => $perPage,
-            'page' => $pageNo,
-        ];
-
+        $filters = [];
         if ($status !== '') {
-            $query['status'] = $status;
-        }
-        if ($taskId > 0) {
-            $query['seo_execution_task_id'] = $taskId;
-        }
-        if ($startedFrom !== '') {
-            $query['started_from'] = $startedFrom;
-        }
-        if ($startedTo !== '') {
-            $query['started_to'] = $startedTo;
+            $filters['status'] = $status;
         }
 
-        $remote = null;
-        $remoteError = '';
+        $actions = $this->actionRepository->listActions($filters, 200);
+        ?>
+        <div class="wrap">
+            <h1>Change Center</h1>
+            <?php if ($notice === 'action_apply_requested') : ?>
+                <div class="notice notice-success"><p>Action queued for execution.</p></div>
+            <?php elseif ($notice === 'action_revert_ok') : ?>
+                <div class="notice notice-success"><p>Action reverted.</p></div>
+            <?php elseif ($notice === 'action_revert_failed') : ?>
+                <div class="notice notice-error"><p>Failed to revert action.</p></div>
+            <?php elseif ($notice === 'action_edit_ok') : ?>
+                <div class="notice notice-success"><p>Action payload updated.</p></div>
+            <?php elseif ($notice === 'action_edit_failed') : ?>
+                <div class="notice notice-error"><p>Failed to update action payload.</p></div>
+            <?php endif; ?>
+            <p>Use this table to review, edit, apply, and revert changes.</p>
+            <form method="get" style="margin-bottom:12px;">
+                <input type="hidden" name="page" value="seoauto-logs">
+                <select name="status">
+                    <option value="">All statuses</option>
+                    <option value="received" <?php selected($status, 'received'); ?>>Received</option>
+                    <option value="queued" <?php selected($status, 'queued'); ?>>Queued</option>
+                    <option value="running" <?php selected($status, 'running'); ?>>Running</option>
+                    <option value="applied" <?php selected($status, 'applied'); ?>>Applied</option>
+                    <option value="failed" <?php selected($status, 'failed'); ?>>Failed</option>
+                    <option value="rolled_back" <?php selected($status, 'rolled_back'); ?>>Rolled Back</option>
+                </select>
+                <button class="button" type="submit">Filter</button>
+            </form>
 
-        try {
-            $remote = $this->client->listExecutionLogsFast($query);
-        } catch (\Throwable $exception) {
-            $remoteError = $exception->getMessage();
-        }
-
-        if (is_array($remote) && isset($remote['execution_logs']) && is_array($remote['execution_logs'])) {
-            $logs = $remote['execution_logs'];
-            $current = (int) ($remote['current_page'] ?? $pageNo);
-            $last = (int) ($remote['last_page'] ?? $pageNo);
-            ?>
-            <div class="wrap">
-                <h1>Execution Logs</h1>
-                <?php $this->renderLogsToolbar($notice, $deletedCount); ?>
-                <form method="get">
-                    <input type="hidden" name="page" value="seoauto-logs">
-                    <select name="status">
-                        <option value="">All Statuses</option>
-                        <option value="queued" <?php selected($status, 'queued'); ?>>Queued</option>
-                        <option value="running" <?php selected($status, 'running'); ?>>Running</option>
-                        <option value="completed" <?php selected($status, 'completed'); ?>>Completed</option>
-                        <option value="failed" <?php selected($status, 'failed'); ?>>Failed</option>
-                    </select>
-                    <input type="number" name="seo_execution_task_id" min="0" placeholder="Task ID" value="<?php echo esc_attr($taskId > 0 ? (string) $taskId : ''); ?>">
-                    <input type="datetime-local" name="started_from" value="<?php echo esc_attr($startedFrom); ?>">
-                    <input type="datetime-local" name="started_to" value="<?php echo esc_attr($startedTo); ?>">
-                    <button class="button" type="submit">Filter</button>
-                </form>
-
-                <table class="wp-list-table widefat striped" style="margin-top:12px;">
-                    <thead>
-                        <tr>
-                            <th>ID</th>
-                            <th>Job ID</th>
-                            <th>Status</th>
-                            <th>Progress</th>
-                            <th>Task</th>
-                            <th>Started</th>
-                            <th>Completed</th>
-                            <th>Duration (s)</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if (!empty($logs)) : ?>
-                            <?php foreach ($logs as $log) : ?>
-                                <?php if (!is_array($log)) { continue; } ?>
-                                <tr>
-                                    <td><?php echo esc_html((string) ($log['id'] ?? '')); ?></td>
-                                    <td><code><?php echo esc_html((string) ($log['job_id'] ?? '')); ?></code></td>
-                                    <td><?php echo esc_html((string) ($log['status'] ?? '')); ?></td>
-                                    <td><?php echo esc_html((string) ($log['progress'] ?? '')); ?></td>
-                                    <td><?php echo esc_html((string) (($log['execution_task']['name'] ?? ''))); ?></td>
-                                    <td><?php echo esc_html((string) ($log['started_at'] ?? '')); ?></td>
-                                    <td><?php echo esc_html((string) ($log['completed_at'] ?? '')); ?></td>
-                                    <td><?php echo esc_html((string) ($log['duration_seconds'] ?? '')); ?></td>
-                                </tr>
-                            <?php endforeach; ?>
-                        <?php else : ?>
-                            <tr><td colspan="8">No remote execution logs found.</td></tr>
-                        <?php endif; ?>
-                    </tbody>
-                </table>
-
-                <div class="tablenav bottom">
-                    <div class="tablenav-pages">
+            <table class="wp-list-table widefat striped">
+                <thead>
+                    <tr><th>Laravel ID</th><th>Type</th><th>Status</th><th>Auto</th><th>Received</th><th>Actions</th></tr>
+                </thead>
+                <tbody>
+                <?php if (!empty($actions)) : ?>
+                    <?php foreach ($actions as $row) : ?>
                         <?php
-                        echo wp_kses_post(
-                            paginate_links([
-                                'base' => add_query_arg('paged', '%#%'),
-                                'format' => '',
-                                'current' => $current,
-                                'total' => max(1, $last),
-                            ])
-                        );
+                        $laravelId = (int) ($row['laravel_action_id'] ?? 0);
+                        $actionPayload = json_decode((string) ($row['action_payload'] ?? '{}'), true);
+                        $beforeSnapshot = json_decode((string) ($row['before_snapshot'] ?? '{}'), true);
+                        $afterSnapshot = json_decode((string) ($row['after_snapshot'] ?? '{}'), true);
+                        if (!is_array($actionPayload)) {
+                            $actionPayload = [];
+                        }
+                        if (!is_array($beforeSnapshot)) {
+                            $beforeSnapshot = [];
+                        }
+                        if (!is_array($afterSnapshot)) {
+                            $afterSnapshot = [];
+                        }
                         ?>
-                    </div>
-                </div>
-            </div>
-            <?php
-            return;
-        }
+                        <tr>
+                            <td><?php echo esc_html((string) $laravelId); ?></td>
+                            <td><?php echo esc_html((string) ($row['action_type'] ?? '')); ?></td>
+                            <td><?php echo esc_html((string) ($row['status'] ?? '')); ?></td>
+                            <td><?php echo !empty($row['auto_apply']) ? 'Yes' : 'No'; ?></td>
+                            <td><?php echo esc_html((string) ($row['received_at'] ?? '')); ?></td>
+                            <td>
+                                <details style="margin-bottom:8px;">
+                                    <summary>See change</summary>
+                                    <strong>Payload</strong>
+                                    <pre style="white-space:pre-wrap;"><?php echo esc_html(wp_json_encode($actionPayload, JSON_PRETTY_PRINT)); ?></pre>
+                                    <strong>Before</strong>
+                                    <pre style="white-space:pre-wrap;"><?php echo esc_html(wp_json_encode($beforeSnapshot, JSON_PRETTY_PRINT)); ?></pre>
+                                    <strong>After</strong>
+                                    <pre style="white-space:pre-wrap;"><?php echo esc_html(wp_json_encode($afterSnapshot, JSON_PRETTY_PRINT)); ?></pre>
+                                </details>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:6px;">
+                                    <?php wp_nonce_field('seoauto_apply_action'); ?>
+                                    <input type="hidden" name="action" value="seoauto_apply_action">
+                                    <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
+                                    <button class="button button-small" type="submit">Apply</button>
+                                </form>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:6px;">
+                                    <?php wp_nonce_field('seoauto_revert_action'); ?>
+                                    <input type="hidden" name="action" value="seoauto_revert_action">
+                                    <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
+                                    <button class="button button-small" type="submit">Revert</button>
+                                </form>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                    <?php wp_nonce_field('seoauto_edit_action_payload'); ?>
+                                    <input type="hidden" name="action" value="seoauto_edit_action_payload">
+                                    <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
+                                    <textarea name="payload_json" rows="4" style="width:100%;"><?php echo esc_textarea(wp_json_encode($actionPayload, JSON_PRETTY_PRINT)); ?></textarea>
+                                    <button class="button button-small" type="submit">Edit Values</button>
+                                </form>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else : ?>
+                    <tr><td colspan="6">No actions found.</td></tr>
+                <?php endif; ?>
+                </tbody>
+            </table>
 
-        $this->renderLocalLogsFallback($remoteError, $notice, $deletedCount);
+            <h2 style="margin-top:20px;">Change Log</h2>
+            <?php $changeLogs = $this->actionRepository->listChangeLogs(0, 200); ?>
+            <table class="wp-list-table widefat striped">
+                <thead>
+                    <tr><th>Time</th><th>Laravel ID</th><th>Event</th><th>Status</th><th>Note</th></tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($changeLogs)) : ?>
+                        <?php foreach ($changeLogs as $log) : ?>
+                            <tr>
+                                <td><?php echo esc_html((string) ($log['created_at'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($log['laravel_action_id'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($log['event_type'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($log['status'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string) ($log['note'] ?? '')); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else : ?>
+                        <tr><td colspan="5">No change log entries yet.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+        </div>
+        <?php
     }
 
     private function renderLocalLogsFallback(string $remoteError = '', string $notice = '', int $deletedCount = 0): void
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_execution_logs';
+        $table = $wpdb->prefix . 'seoauto_activity_logs';
 
         $severity = isset($_GET['severity']) ? sanitize_text_field((string) $_GET['severity']) : '';
         $dateFrom = isset($_GET['date_from']) ? sanitize_text_field((string) $_GET['date_from']) : '';
@@ -809,7 +943,7 @@ final class MenuRegistrar
 
         ?>
         <div class="wrap">
-            <h1>Execution Logs</h1>
+            <h1>Activity Logs</h1>
             <?php $this->renderLogsToolbar($notice, $deletedCount); ?>
             <?php if ($remoteError !== '') : ?>
                 <div class="notice notice-warning"><p>Remote execution logs unavailable. Showing local logs. <?php echo esc_html($remoteError); ?></p></div>
@@ -898,7 +1032,7 @@ final class MenuRegistrar
         }
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_execution_logs';
+        $table = $wpdb->prefix . 'seoauto_activity_logs';
 
         $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
         $deletedCount = isset($_GET['deleted_count']) ? max(0, (int) $_GET['deleted_count']) : 0;
@@ -1019,6 +1153,62 @@ final class MenuRegistrar
                     ?>
                 </div>
             </div>
+        </div>
+        <?php
+    }
+
+    public function renderActionItemsPage(): void
+    {
+        if (!current_user_can('manage_options')) {
+            wp_die('Unauthorized');
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_admin_action_items';
+        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
+
+        $items = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            "SELECT * FROM {$table} ORDER BY updated_at DESC LIMIT 200"
+        );
+        ?>
+        <div class="wrap">
+            <h1>Admin Action Items</h1>
+            <?php if ($notice === 'action_item_updated') : ?>
+                <div class="notice notice-success"><p>Action item updated.</p></div>
+            <?php endif; ?>
+            <table class="wp-list-table widefat striped">
+                <thead>
+                    <tr><th>ID</th><th>Title</th><th>Category</th><th>Status</th><th>Details</th><th>Update</th></tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($items)) : ?>
+                        <?php foreach ($items as $item) : ?>
+                            <tr>
+                                <td><?php echo esc_html((string) $item->id); ?></td>
+                                <td><?php echo esc_html((string) $item->title); ?></td>
+                                <td><?php echo esc_html((string) $item->category); ?></td>
+                                <td><?php echo esc_html((string) $item->status); ?></td>
+                                <td><?php echo esc_html((string) $item->details); ?></td>
+                                <td>
+                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                        <?php wp_nonce_field('seoauto_update_action_item'); ?>
+                                        <input type="hidden" name="action" value="seoauto_update_action_item">
+                                        <input type="hidden" name="item_id" value="<?php echo esc_attr((string) $item->id); ?>">
+                                        <select name="status">
+                                            <option value="open" <?php selected((string) $item->status, 'open'); ?>>Open</option>
+                                            <option value="in_progress" <?php selected((string) $item->status, 'in_progress'); ?>>In Progress</option>
+                                            <option value="resolved" <?php selected((string) $item->status, 'resolved'); ?>>Resolved</option>
+                                        </select>
+                                        <button class="button button-small" type="submit">Save</button>
+                                    </form>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else : ?>
+                        <tr><td colspan="6">No human action items found.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
         </div>
         <?php
     }
@@ -1388,11 +1578,16 @@ final class MenuRegistrar
                         </td>
                     </tr>
                     <tr>
-                        <th scope="row">Force Apply Non-Auto Actions</th>
+                        <th scope="row">Change Application Mode</th>
                         <td>
-                            <label>
-                                <input type="checkbox" name="seoauto_force_apply_non_auto" value="1" <?php checked((bool) get_option('seoauto_force_apply_non_auto', true)); ?>>
-                                Enabled
+                            <?php $mode = (string) get_option('seoauto_change_application_mode', 'dangerous_auto_apply'); ?>
+                            <label style="display:block;margin-bottom:6px;">
+                                <input type="radio" name="seoauto_change_application_mode" value="dangerous_auto_apply" <?php checked($mode, 'dangerous_auto_apply'); ?>>
+                                Dangerously apply all suggestions
+                            </label>
+                            <label style="display:block;">
+                                <input type="radio" name="seoauto_change_application_mode" value="review_before_apply" <?php checked($mode, 'review_before_apply'); ?>>
+                                Review every change before application
                             </label>
                         </td>
                     </tr>
@@ -1556,6 +1751,17 @@ final class MenuRegistrar
         }
 
         return rtrim($sanitized, '/');
+    }
+
+    /**
+     * @param mixed $value
+     */
+    public function sanitizeChangeApplicationMode($value): string
+    {
+        $mode = trim((string) $value);
+        $allowed = ['dangerous_auto_apply', 'review_before_apply'];
+
+        return in_array($mode, $allowed, true) ? $mode : 'dangerous_auto_apply';
     }
 
     private function isBaseUrlSyntaxValid(string $url): bool
