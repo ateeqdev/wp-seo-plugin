@@ -38,7 +38,7 @@ final class StatusReporter
         }
 
         $payload = [
-            'status' => $status,
+            'status' => $this->mapProviderStatus($status),
         ];
 
         if ($status === 'applied') {
@@ -112,5 +112,14 @@ final class StatusReporter
             $after = JsonHelper::decodeArray(isset($action['after_snapshot']) ? (string) $action['after_snapshot'] : '');
             $this->report($action, $status, $after, isset($action['last_error']) ? (string) $action['last_error'] : null);
         }
+    }
+
+    private function mapProviderStatus(string $status): string
+    {
+        return match ($status) {
+            'applied' => 'provider-applied',
+            'failed' => 'provider-error',
+            default => $status,
+        };
     }
 }

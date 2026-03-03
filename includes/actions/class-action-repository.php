@@ -287,6 +287,11 @@ final class ActionRepository
             $params[] = (string) $filters['status'];
         }
 
+        if (!isset($filters['include_human_actions']) || !$filters['include_human_actions']) {
+            $where[] = 'action_type != %s';
+            $params[] = 'human_action_required';
+        }
+
         $whereSql = implode(' AND ', $where);
         $params[] = max(1, $limit);
 
