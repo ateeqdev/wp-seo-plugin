@@ -15,7 +15,6 @@ use SEOAutomation\Connector\Actions\Handlers\InterfaceActionHandler;
 use SEOAutomation\Connector\Actions\Handlers\MetaDescriptionHandler;
 use SEOAutomation\Connector\Actions\Handlers\MonitorHandler;
 use SEOAutomation\Connector\Actions\Handlers\PostDatesHandler;
-use SEOAutomation\Connector\Actions\Handlers\ProviderConnectionIssueHandler;
 use SEOAutomation\Connector\Actions\Handlers\RedirectHandler;
 use SEOAutomation\Connector\Actions\Handlers\RobotsHandler;
 use SEOAutomation\Connector\Actions\Handlers\SchemaHandler;
@@ -72,7 +71,6 @@ final class ActionExecutor
             'robots-directives' => new RobotsHandler($logger),
             'submit-for-indexing' => new IndexingHandler($logger),
             'monitor-only' => new MonitorHandler($logger),
-            'provider-connection-issue' => new ProviderConnectionIssueHandler($logger),
             'set-social-tags' => new SocialTagsHandler($logger),
             'set-post-dates' => new PostDatesHandler($logger),
             'human-action-required' => new HumanActionRequiredHandler($repository, $logger),

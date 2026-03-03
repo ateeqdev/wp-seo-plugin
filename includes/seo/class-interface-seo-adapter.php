@@ -38,5 +38,10 @@ interface InterfaceSeoAdapter
      */
     public function setSchema(int $postId, array $schema): bool;
 
+    /**
+     * @return array<string, array<string, string>>
+     */
+    public function getSocialTags(int $postId): array;
+
     public function getName(): string;
 }

@@ -142,7 +142,10 @@ final class PagesEndpoint
                 'meta_description' => $adapter->getDescription($post->ID),
                 'canonical' => $adapter->getCanonical($post->ID),
                 'robots' => $adapter->getRobots($post->ID),
+                'schema_markup' => $adapter->getSchema($post->ID),
+                'social_tags' => $adapter->getSocialTags($post->ID),
             ],
+            'published_at' => gmdate('c', strtotime((string) $post->post_date_gmt)),
             'modified_gmt' => gmdate('c', strtotime((string) $post->post_modified_gmt)),
         ];
     }

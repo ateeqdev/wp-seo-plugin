@@ -98,4 +98,42 @@ final class YoastAdapter implements InterfaceSeoAdapter
     {
         return 'yoast';
     }
+
+    /**
+     * @return array<string, array<string, string>>
+     */
+    public function getSocialTags(int $postId): array
+    {
+        return [
+            'og' => [
+                'title' => $this->readFirstMeta($postId, ['_yoast_wpseo_opengraph-title', '_seoauto_og_title']),
+                'type' => $this->readFirstMeta($postId, ['_yoast_wpseo_opengraph-type', '_seoauto_og_type']),
+                'image' => $this->readFirstMeta($postId, ['_yoast_wpseo_opengraph-image', '_seoauto_og_image']),
+                'url' => $this->readFirstMeta($postId, ['_yoast_wpseo_opengraph-url', '_seoauto_og_url']),
+                'description' => $this->readFirstMeta($postId, ['_yoast_wpseo_opengraph-description', '_seoauto_og_description']),
+            ],
+            'twitter' => [
+                'card' => $this->readFirstMeta($postId, ['_yoast_wpseo_twitter-card', '_seoauto_twitter_card']),
+                'site' => $this->readFirstMeta($postId, ['_yoast_wpseo_twitter-site', '_seoauto_twitter_site']),
+                'title' => $this->readFirstMeta($postId, ['_yoast_wpseo_twitter-title', '_seoauto_twitter_title']),
+                'description' => $this->readFirstMeta($postId, ['_yoast_wpseo_twitter-description', '_seoauto_twitter_description']),
+                'image' => $this->readFirstMeta($postId, ['_yoast_wpseo_twitter-image', '_seoauto_twitter_image']),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<int, string> $keys
+     */
+    private function readFirstMeta(int $postId, array $keys): string
+    {
+        foreach ($keys as $key) {
+            $value = (string) get_post_meta($postId, $key, true);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
 }

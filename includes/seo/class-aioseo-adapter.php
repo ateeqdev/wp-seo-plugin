@@ -128,4 +128,42 @@ final class AioseoAdapter implements InterfaceSeoAdapter
     {
         return 'aioseo';
     }
+
+    /**
+     * @return array<string, array<string, string>>
+     */
+    public function getSocialTags(int $postId): array
+    {
+        return [
+            'og' => [
+                'title' => $this->readFirstMeta($postId, ['_aioseo_og_title', '_seoauto_og_title']),
+                'type' => $this->readFirstMeta($postId, ['_aioseo_og_type', '_seoauto_og_type']),
+                'image' => $this->readFirstMeta($postId, ['_aioseo_og_image', '_seoauto_og_image']),
+                'url' => $this->readFirstMeta($postId, ['_aioseo_og_url', '_seoauto_og_url']),
+                'description' => $this->readFirstMeta($postId, ['_aioseo_og_description', '_seoauto_og_description']),
+            ],
+            'twitter' => [
+                'card' => $this->readFirstMeta($postId, ['_aioseo_twitter_card', '_seoauto_twitter_card']),
+                'site' => $this->readFirstMeta($postId, ['_aioseo_twitter_site', '_seoauto_twitter_site']),
+                'title' => $this->readFirstMeta($postId, ['_aioseo_twitter_title', '_seoauto_twitter_title']),
+                'description' => $this->readFirstMeta($postId, ['_aioseo_twitter_description', '_seoauto_twitter_description']),
+                'image' => $this->readFirstMeta($postId, ['_aioseo_twitter_image', '_seoauto_twitter_image']),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<int, string> $keys
+     */
+    private function readFirstMeta(int $postId, array $keys): string
+    {
+        foreach ($keys as $key) {
+            $value = (string) get_post_meta($postId, $key, true);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
 }

@@ -108,6 +108,29 @@ final class CoreAdapter implements InterfaceSeoAdapter
         return 'core';
     }
 
+    /**
+     * @return array<string, array<string, string>>
+     */
+    public function getSocialTags(int $postId): array
+    {
+        return [
+            'og' => [
+                'title' => (string) get_post_meta($postId, '_seoauto_og_title', true),
+                'type' => (string) get_post_meta($postId, '_seoauto_og_type', true),
+                'image' => (string) get_post_meta($postId, '_seoauto_og_image', true),
+                'url' => (string) get_post_meta($postId, '_seoauto_og_url', true),
+                'description' => (string) get_post_meta($postId, '_seoauto_og_description', true),
+            ],
+            'twitter' => [
+                'card' => (string) get_post_meta($postId, '_seoauto_twitter_card', true),
+                'site' => (string) get_post_meta($postId, '_seoauto_twitter_site', true),
+                'title' => (string) get_post_meta($postId, '_seoauto_twitter_title', true),
+                'description' => (string) get_post_meta($postId, '_seoauto_twitter_description', true),
+                'image' => (string) get_post_meta($postId, '_seoauto_twitter_image', true),
+            ],
+        ];
+    }
+
     public function renderMetaTags(): void
     {
         if (!is_singular()) {

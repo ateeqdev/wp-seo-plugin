@@ -132,4 +132,42 @@ final class RankmathAdapter implements InterfaceSeoAdapter
     {
         return 'rankmath';
     }
+
+    /**
+     * @return array<string, array<string, string>>
+     */
+    public function getSocialTags(int $postId): array
+    {
+        return [
+            'og' => [
+                'title' => $this->readFirstMeta($postId, ['rank_math_facebook_title', '_rank_math_facebook_title', '_seoauto_og_title']),
+                'type' => $this->readFirstMeta($postId, ['rank_math_facebook_type', '_rank_math_facebook_type', '_seoauto_og_type']),
+                'image' => $this->readFirstMeta($postId, ['rank_math_facebook_image', '_rank_math_facebook_image', '_seoauto_og_image']),
+                'url' => $this->readFirstMeta($postId, ['rank_math_facebook_url', '_rank_math_facebook_url', '_seoauto_og_url']),
+                'description' => $this->readFirstMeta($postId, ['rank_math_facebook_description', '_rank_math_facebook_description', '_seoauto_og_description']),
+            ],
+            'twitter' => [
+                'card' => $this->readFirstMeta($postId, ['rank_math_twitter_card_type', '_rank_math_twitter_card_type', '_seoauto_twitter_card']),
+                'site' => $this->readFirstMeta($postId, ['rank_math_twitter_site', '_rank_math_twitter_site', '_seoauto_twitter_site']),
+                'title' => $this->readFirstMeta($postId, ['rank_math_twitter_title', '_rank_math_twitter_title', '_seoauto_twitter_title']),
+                'description' => $this->readFirstMeta($postId, ['rank_math_twitter_description', '_rank_math_twitter_description', '_seoauto_twitter_description']),
+                'image' => $this->readFirstMeta($postId, ['rank_math_twitter_image', '_rank_math_twitter_image', '_seoauto_twitter_image']),
+            ],
+        ];
+    }
+
+    /**
+     * @param array<int, string> $keys
+     */
+    private function readFirstMeta(int $postId, array $keys): string
+    {
+        foreach ($keys as $key) {
+            $value = (string) get_post_meta($postId, $key, true);
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return '';
+    }
 }
