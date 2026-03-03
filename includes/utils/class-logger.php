@@ -65,7 +65,7 @@ final class Logger
         ];
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_execution_logs';
+        $table = $wpdb->prefix . 'seoauto_activity_logs';
 
         $inserted = $wpdb->insert($table, $entry); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 

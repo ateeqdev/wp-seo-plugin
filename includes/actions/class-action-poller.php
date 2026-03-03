@@ -32,9 +32,6 @@ final class ActionPoller
 
         try {
             $query = ['limit' => 20];
-            if (!(bool) get_option('seoauto_force_apply_non_auto', true)) {
-                $query['auto_apply'] = 'true';
-            }
 
             $response = $this->client->fetchPendingActions($siteId, $query);
 

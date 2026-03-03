@@ -47,6 +47,7 @@ final class ActionRepository
                 'target_id' => (string) ($data['target_id'] ?? ''),
                 'target_url' => isset($data['target_url']) ? (string) $data['target_url'] : null,
                 'action_payload' => JsonHelper::encode($payload),
+                'auto_apply' => !empty($data['auto_apply']) ? 1 : 0,
                 'payload_checksum' => hash('sha256', JsonHelper::encode($payload)),
                 'status' => 'received',
                 'attempts' => 0,
@@ -61,6 +62,7 @@ final class ActionRepository
                 '%s',
                 '%s',
                 '%s',
+                '%d',
                 '%s',
                 '%s',
                 '%d',
@@ -69,6 +71,15 @@ final class ActionRepository
                 '%s',
             ]
         );
+
+        if ($inserted !== false) {
+            $this->logChange(
+                laravelActionId: (int) ($data['laravel_action_id'] ?? 0),
+                eventType: 'received',
+                status: 'received',
+                note: 'Action received from Laravel.'
+            );
+        }
 
         return $inserted !== false;
     }
@@ -91,6 +102,13 @@ final class ActionRepository
     public function markQueued(int $laravelActionId): void
     {
         $this->updateStatus($laravelActionId, 'queued');
+        $this->logChange($laravelActionId, 'queued', 'queued', 'Action queued for execution.');
+    }
+
+    public function markAwaitingReview(int $laravelActionId): void
+    {
+        $this->updateStatus($laravelActionId, 'received');
+        $this->logChange($laravelActionId, 'queued', 'received', 'Action awaiting manual review.');
     }
 
     public function markRunning(int $laravelActionId): void
@@ -103,6 +121,7 @@ final class ActionRepository
                 $laravelActionId
             )
         );
+        $this->logChange($laravelActionId, 'queued', 'running', 'Action execution started.');
     }
 
     /**
@@ -142,6 +161,23 @@ final class ActionRepository
             [
                 '%d',
             ]
+        );
+
+        $eventType = match ($status) {
+            'applied' => 'applied',
+            'failed' => 'failed',
+            'rejected' => 'rejected',
+            'rolled_back' => 'reverted',
+            default => 'failed',
+        };
+
+        $this->logChange(
+            laravelActionId: $laravelActionId,
+            eventType: $eventType,
+            status: $status,
+            note: $error,
+            before: $before,
+            after: $after
         );
     }
 
@@ -206,6 +242,124 @@ final class ActionRepository
         );
     }
 
+    public function updatePayload(int $laravelActionId, array $newPayload, int $userId = 0): bool
+    {
+        global $wpdb;
+
+        $encoded = JsonHelper::encode($newPayload);
+        $updated = $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $this->table,
+            [
+                'action_payload' => $encoded,
+                'payload_checksum' => hash('sha256', $encoded),
+                'reviewed_by' => $userId > 0 ? $userId : null,
+                'reviewed_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql'),
+            ],
+            [
+                'laravel_action_id' => $laravelActionId,
+            ],
+            ['%s', '%s', '%d', '%s', '%s'],
+            ['%d']
+        );
+
+        if ($updated === false) {
+            return false;
+        }
+
+        $this->logChange($laravelActionId, 'edited', 'received', 'Action payload edited by admin.', [], $newPayload);
+
+        return true;
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listActions(array $filters = [], int $limit = 100): array
+    {
+        global $wpdb;
+
+        $where = ['1=1'];
+        $params = [];
+
+        if (!empty($filters['status'])) {
+            $where[] = 'status = %s';
+            $params[] = (string) $filters['status'];
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $params[] = max(1, $limit);
+
+        $query = $wpdb->prepare(
+            "SELECT * FROM {$this->table} WHERE {$whereSql} ORDER BY received_at DESC LIMIT %d",
+            ...$params
+        );
+        $rows = $wpdb->get_results($query, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function listChangeLogs(int $laravelActionId = 0, int $limit = 200): array
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_change_logs';
+
+        if ($laravelActionId > 0) {
+            $query = $wpdb->prepare(
+                "SELECT * FROM {$table} WHERE laravel_action_id = %d ORDER BY created_at DESC LIMIT %d",
+                $laravelActionId,
+                $limit
+            );
+        } else {
+            $query = $wpdb->prepare(
+                "SELECT * FROM {$table} ORDER BY created_at DESC LIMIT %d",
+                $limit
+            );
+        }
+
+        $rows = $wpdb->get_results($query, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    public function addAdminActionItem(int $laravelActionId, array $payload): void
+    {
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_admin_action_items';
+        $action = $this->findByLaravelId($laravelActionId);
+
+        $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $table,
+            [
+                'action_id' => isset($action['id']) ? (int) $action['id'] : null,
+                'laravel_action_id' => $laravelActionId,
+                'site_id' => (int) get_option('seoauto_site_id', 0),
+                'title' => sanitize_text_field((string) ($payload['title'] ?? 'Manual action required')),
+                'details' => sanitize_textarea_field((string) ($payload['details'] ?? '')),
+                'recommended_value' => sanitize_text_field((string) ($payload['recommended_value'] ?? '')),
+                'category' => sanitize_text_field((string) ($payload['category'] ?? 'general')),
+                'status' => 'open',
+                'created_at' => current_time('mysql'),
+                'updated_at' => current_time('mysql'),
+            ],
+            ['%d', '%d', '%d', '%s', '%s', '%s', '%s', '%s', '%s', '%s']
+        );
+
+        $this->logChange(
+            laravelActionId: $laravelActionId,
+            eventType: 'human_action_created',
+            status: 'applied',
+            note: 'Human action item created.',
+            after: $payload
+        );
+    }
+
     /**
      * @return array<int, array<string, mixed>>
      */
@@ -235,6 +389,45 @@ final class ActionRepository
                 current_time('mysql'),
                 $days
             )
+        );
+    }
+
+    /**
+     * @param array<string, mixed> $before
+     * @param array<string, mixed> $after
+     */
+    private function logChange(
+        int $laravelActionId,
+        string $eventType,
+        string $status,
+        ?string $note = null,
+        array $before = [],
+        array $after = []
+    ): void {
+        if ($laravelActionId <= 0) {
+            return;
+        }
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_change_logs';
+        $action = $this->findByLaravelId($laravelActionId);
+        $actionId = isset($action['id']) ? (int) $action['id'] : null;
+
+        $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $table,
+            [
+                'action_id' => $actionId,
+                'laravel_action_id' => $laravelActionId,
+                'event_type' => $eventType,
+                'status' => $status,
+                'actor_user_id' => get_current_user_id() ?: null,
+                'note' => $note,
+                'before_snapshot' => empty($before) ? null : JsonHelper::encode($before),
+                'after_snapshot' => empty($after) ? null : JsonHelper::encode($after),
+                'metadata' => null,
+                'created_at' => current_time('mysql'),
+            ],
+            ['%d', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s']
         );
     }
 }

@@ -159,5 +159,32 @@ final class CoreAdapter implements InterfaceSeoAdapter
             echo wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             echo "</script>\n";
         }
+
+        $socialMap = [
+            'og:title' => (string) get_post_meta($postId, '_seoauto_og_title', true),
+            'og:type' => (string) get_post_meta($postId, '_seoauto_og_type', true),
+            'og:image' => (string) get_post_meta($postId, '_seoauto_og_image', true),
+            'og:url' => (string) get_post_meta($postId, '_seoauto_og_url', true),
+            'og:description' => (string) get_post_meta($postId, '_seoauto_og_description', true),
+            'twitter:card' => (string) get_post_meta($postId, '_seoauto_twitter_card', true),
+            'twitter:site' => (string) get_post_meta($postId, '_seoauto_twitter_site', true),
+            'twitter:title' => (string) get_post_meta($postId, '_seoauto_twitter_title', true),
+            'twitter:description' => (string) get_post_meta($postId, '_seoauto_twitter_description', true),
+            'twitter:image' => (string) get_post_meta($postId, '_seoauto_twitter_image', true),
+        ];
+
+        foreach ($socialMap as $name => $value) {
+            if ($value === '') {
+                continue;
+            }
+
+            $isProperty = str_starts_with($name, 'og:');
+            if ($isProperty) {
+                echo '<meta property="' . esc_attr($name) . '" content="' . esc_attr($value) . '">' . "\n";
+                continue;
+            }
+
+            echo '<meta name="' . esc_attr($name) . '" content="' . esc_attr($value) . '">' . "\n";
+        }
     }
 }

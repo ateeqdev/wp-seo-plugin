@@ -79,16 +79,26 @@ final class ActionReceiver
             ];
         }
 
-        $priority = isset($action['priority']) ? (int) $action['priority'] : 30;
-        QueueManager::enqueueActionExecution($actionId, $priority);
-        $this->repository->markQueued($actionId);
+        $applicationMode = (string) get_option('seoauto_change_application_mode', 'dangerous_auto_apply');
+        $isDangerousMode = $applicationMode === 'dangerous_auto_apply';
+        $autoApply = !empty($action['auto_apply']);
+
+        if ($isDangerousMode || $autoApply) {
+            $priority = isset($action['priority']) ? (int) $action['priority'] : 30;
+            QueueManager::enqueueActionExecution($actionId, $priority);
+            $this->repository->markQueued($actionId);
+        } else {
+            $this->repository->markAwaitingReview($actionId);
+        }
 
         return [
             'status' => 'accepted',
-            'message' => 'Action queued for execution',
+            'message' => ($isDangerousMode || $autoApply)
+                ? 'Action queued for execution'
+                : 'Action stored for manual review',
             'data' => [
                 'action_id' => $actionId,
-                'queued' => true,
+                'queued' => ($isDangerousMode || $autoApply),
             ],
         ];
     }
@@ -108,6 +118,7 @@ final class ActionReceiver
             'target_id' => (string) ($target['id'] ?? ''),
             'target_url' => isset($target['url']) ? esc_url_raw((string) $target['url']) : null,
             'action_payload' => isset($payload['data']) && is_array($payload['data']) ? $payload['data'] : [],
+            'auto_apply' => !empty($payload['auto_apply']),
             'priority' => (int) ($payload['priority'] ?? 30),
         ];
     }
@@ -127,6 +138,7 @@ final class ActionReceiver
             'action_payload' => isset($payload['action_data']) && is_array($payload['action_data'])
                 ? $payload['action_data']
                 : [],
+            'auto_apply' => !empty($payload['auto_apply']),
             'priority' => (int) ($payload['priority'] ?? 30),
         ];
     }

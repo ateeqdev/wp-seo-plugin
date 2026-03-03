@@ -19,7 +19,9 @@ final class Schema
 
         $actions = $wpdb->prefix . 'seoauto_actions';
         $outbox = $wpdb->prefix . 'seoauto_event_outbox';
-        $logs = $wpdb->prefix . 'seoauto_execution_logs';
+        $activityLogs = $wpdb->prefix . 'seoauto_activity_logs';
+        $changeLogs = $wpdb->prefix . 'seoauto_change_logs';
+        $actionItems = $wpdb->prefix . 'seoauto_admin_action_items';
         $briefs = $wpdb->prefix . 'seoauto_content_briefs';
         $locks = $wpdb->prefix . 'seoauto_locks';
         $redirects = $wpdb->prefix . 'seoauto_redirects';
@@ -34,12 +36,15 @@ final class Schema
             target_id varchar(255) NOT NULL,
             target_url text DEFAULT NULL,
             action_payload longtext NOT NULL,
+            auto_apply tinyint(1) unsigned NOT NULL DEFAULT 0,
             payload_checksum char(64) NOT NULL,
             status enum('received','queued','running','applied','failed','rejected','ack_pending','ack_failed','rolled_back') NOT NULL DEFAULT 'received',
             attempts smallint(5) unsigned NOT NULL DEFAULT 0,
             last_error text DEFAULT NULL,
             before_snapshot longtext DEFAULT NULL,
             after_snapshot longtext DEFAULT NULL,
+            reviewed_by bigint(20) unsigned DEFAULT NULL,
+            reviewed_at datetime DEFAULT NULL,
             received_at datetime NOT NULL,
             processed_at datetime DEFAULT NULL,
             acknowledged_at datetime DEFAULT NULL,
@@ -48,6 +53,7 @@ final class Schema
             PRIMARY KEY  (id),
             UNIQUE KEY laravel_action_id (laravel_action_id),
             KEY status_idx (status, received_at),
+            KEY auto_apply_idx (auto_apply, status),
             KEY action_type_idx (action_type),
             KEY target_idx (target_type, target_id)
         ) {$charset};";
@@ -70,7 +76,7 @@ final class Schema
             KEY created_at_idx (created_at)
         ) {$charset};";
 
-        $sql[] = "CREATE TABLE {$logs} (
+        $sql[] = "CREATE TABLE {$activityLogs} (
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             correlation_id char(36) NOT NULL,
             source enum('inbound','outbound','executor','admin') NOT NULL,
@@ -89,6 +95,44 @@ final class Schema
             KEY created_at_idx (created_at),
             KEY entity_idx (entity_type, entity_id),
             KEY correlation_idx (correlation_id)
+        ) {$charset};";
+
+        $sql[] = "CREATE TABLE {$changeLogs} (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            action_id bigint(20) unsigned DEFAULT NULL,
+            laravel_action_id bigint(20) unsigned DEFAULT NULL,
+            event_type enum('received','queued','applied','failed','rejected','edited','reverted','human_action_created') NOT NULL,
+            status varchar(32) NOT NULL,
+            actor_user_id bigint(20) unsigned DEFAULT NULL,
+            note text DEFAULT NULL,
+            before_snapshot longtext DEFAULT NULL,
+            after_snapshot longtext DEFAULT NULL,
+            metadata longtext DEFAULT NULL,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY  (id),
+            KEY action_idx (action_id, created_at),
+            KEY laravel_action_idx (laravel_action_id),
+            KEY event_type_idx (event_type),
+            KEY created_at_idx (created_at)
+        ) {$charset};";
+
+        $sql[] = "CREATE TABLE {$actionItems} (
+            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
+            action_id bigint(20) unsigned DEFAULT NULL,
+            laravel_action_id bigint(20) unsigned DEFAULT NULL,
+            site_id bigint(20) unsigned DEFAULT NULL,
+            title varchar(255) NOT NULL,
+            details text DEFAULT NULL,
+            recommended_value varchar(255) DEFAULT NULL,
+            category varchar(64) NOT NULL DEFAULT 'general',
+            status enum('open','in_progress','resolved') NOT NULL DEFAULT 'open',
+            resolved_at datetime DEFAULT NULL,
+            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+            PRIMARY KEY (id),
+            KEY status_idx (status, updated_at),
+            KEY action_idx (action_id),
+            KEY laravel_action_idx (laravel_action_id)
         ) {$charset};";
 
         $sql[] = "CREATE TABLE {$briefs} (

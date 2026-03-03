@@ -200,6 +200,8 @@ final class Plugin
                 $c->get('health_checker'),
                 $c->get('oauth_handler'),
                 $c->get('site_token_manager'),
+                $c->get('action_repository'),
+                $c->get('action_executor'),
                 $c->get('logger')
             ),
             true

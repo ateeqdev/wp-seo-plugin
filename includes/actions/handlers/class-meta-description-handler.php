@@ -92,4 +92,33 @@ final class MetaDescriptionHandler extends AbstractActionHandler
             'after' => $after,
         ];
     }
+
+    /**
+     * @param array<string, mixed> $action
+     * @return array<string, mixed>
+     */
+    public function rollback(array $action): array
+    {
+        $postId = $this->resolvePostId($action);
+        $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
+        $before = json_decode($rawBefore, true);
+
+        if (!is_array($before)) {
+            return ['status' => 'failed', 'error' => 'Missing before snapshot'];
+        }
+
+        $previous = isset($before['meta_description']) ? (string) $before['meta_description'] : '';
+
+        if ($previous !== '') {
+            $this->adapter->setDescription($postId, $previous);
+        } else {
+            delete_post_meta($postId, '_seoauto_meta_description');
+            delete_post_meta($postId, '_yoast_wpseo_metadesc');
+            delete_post_meta($postId, '_rank_math_description');
+            delete_post_meta($postId, 'rank_math_description');
+            delete_post_meta($postId, '_aioseo_description');
+        }
+
+        return ['status' => 'rolled_back'];
+    }
 }

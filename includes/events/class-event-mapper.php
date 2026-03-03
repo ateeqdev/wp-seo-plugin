@@ -15,6 +15,7 @@ final class EventMapper
     public function mapPostEvent(string $eventType, \WP_Post $post): array
     {
         $adapter = SeoDetector::instance()->getAdapter();
+        $featuredImageId = (int) get_post_thumbnail_id($post->ID);
 
         return [
             'event_type' => $eventType,
@@ -27,6 +28,11 @@ final class EventMapper
                 'seo_title' => $adapter->getTitle($post->ID),
                 'seo_description' => $adapter->getDescription($post->ID),
                 'canonical' => $adapter->getCanonical($post->ID),
+                'schema_markup' => $adapter->getSchema($post->ID),
+                'published_at' => get_post_time('c', true, $post->ID),
+                'modified_at' => get_post_modified_time('c', true, $post->ID),
+                'featured_image' => $featuredImageId > 0 ? (string) wp_get_attachment_url($featuredImageId) : '',
+                'social_tags' => $this->extractSocialTags($post->ID),
             ],
             'event_time' => gmdate('c'),
         ];
@@ -63,6 +69,29 @@ final class EventMapper
             'event_type' => $eventType,
             'event_data' => $eventData,
             'event_time' => gmdate('c'),
+        ];
+    }
+
+    /**
+     * @return array<string, array<string, string>>
+     */
+    private function extractSocialTags(int $postId): array
+    {
+        return [
+            'og' => [
+                'title' => (string) get_post_meta($postId, '_seoauto_og_title', true),
+                'type' => (string) get_post_meta($postId, '_seoauto_og_type', true),
+                'image' => (string) get_post_meta($postId, '_seoauto_og_image', true),
+                'url' => (string) get_post_meta($postId, '_seoauto_og_url', true),
+                'description' => (string) get_post_meta($postId, '_seoauto_og_description', true),
+            ],
+            'twitter' => [
+                'card' => (string) get_post_meta($postId, '_seoauto_twitter_card', true),
+                'site' => (string) get_post_meta($postId, '_seoauto_twitter_site', true),
+                'title' => (string) get_post_meta($postId, '_seoauto_twitter_title', true),
+                'description' => (string) get_post_meta($postId, '_seoauto_twitter_description', true),
+                'image' => (string) get_post_meta($postId, '_seoauto_twitter_image', true),
+            ],
         ];
     }
 }

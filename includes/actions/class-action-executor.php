@@ -8,16 +8,19 @@ use SEOAutomation\Connector\Actions\Handlers\AltTextHandler;
 use SEOAutomation\Connector\Actions\Handlers\BrokenLinkHandler;
 use SEOAutomation\Connector\Actions\Handlers\CanonicalHandler;
 use SEOAutomation\Connector\Actions\Handlers\HeadingHandler;
+use SEOAutomation\Connector\Actions\Handlers\HumanActionRequiredHandler;
 use SEOAutomation\Connector\Actions\Handlers\IndexingHandler;
 use SEOAutomation\Connector\Actions\Handlers\InternalLinkHandler;
 use SEOAutomation\Connector\Actions\Handlers\InterfaceActionHandler;
 use SEOAutomation\Connector\Actions\Handlers\MetaDescriptionHandler;
 use SEOAutomation\Connector\Actions\Handlers\MonitorHandler;
+use SEOAutomation\Connector\Actions\Handlers\PostDatesHandler;
 use SEOAutomation\Connector\Actions\Handlers\ProviderConnectionIssueHandler;
 use SEOAutomation\Connector\Actions\Handlers\RedirectHandler;
 use SEOAutomation\Connector\Actions\Handlers\RobotsHandler;
 use SEOAutomation\Connector\Actions\Handlers\SchemaHandler;
 use SEOAutomation\Connector\Actions\Handlers\SitemapHandler;
+use SEOAutomation\Connector\Actions\Handlers\SocialTagsHandler;
 use SEOAutomation\Connector\Actions\Handlers\TechnicalFlagsHandler;
 use SEOAutomation\Connector\Actions\Handlers\TitleHandler;
 use SEOAutomation\Connector\SEO\SeoDetector;
@@ -70,6 +73,9 @@ final class ActionExecutor
             'submit_for_indexing' => new IndexingHandler($logger),
             'monitor_only' => new MonitorHandler($logger),
             'provider_connection_issue' => new ProviderConnectionIssueHandler($logger),
+            'set_social_tags' => new SocialTagsHandler($logger),
+            'set_post_dates' => new PostDatesHandler($logger),
+            'human_action_required' => new HumanActionRequiredHandler($repository, $logger),
         ];
     }
 
@@ -186,5 +192,27 @@ final class ActionExecutor
     private function resolveHandler(string $actionType): ?InterfaceActionHandler
     {
         return $this->handlers[$actionType] ?? null;
+    }
+
+    public function revertByLaravelId(int $laravelActionId): array
+    {
+        $action = $this->repository->findByLaravelId($laravelActionId);
+        if ($action === null) {
+            return ['status' => 'failed', 'error' => 'Action not found'];
+        }
+
+        $handler = $this->resolveHandler((string) ($action['action_type'] ?? ''));
+        if (!$handler instanceof InterfaceActionHandler) {
+            return ['status' => 'failed', 'error' => 'Unsupported action type'];
+        }
+
+        $result = $handler->rollback($action);
+        $status = (string) ($result['status'] ?? 'failed');
+
+        if ($status === 'rolled_back') {
+            $this->repository->markResult($laravelActionId, 'rolled_back', null);
+        }
+
+        return $result;
     }
 }

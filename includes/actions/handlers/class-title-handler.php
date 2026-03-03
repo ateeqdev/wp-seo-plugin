@@ -95,4 +95,41 @@ final class TitleHandler extends AbstractActionHandler
             'after' => $after,
         ];
     }
+
+    /**
+     * @param array<string, mixed> $action
+     * @return array<string, mixed>
+     */
+    public function rollback(array $action): array
+    {
+        $postId = $this->resolvePostId($action);
+        $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
+        $before = json_decode($rawBefore, true);
+
+        if (!is_array($before)) {
+            return ['status' => 'failed', 'error' => 'Missing before snapshot'];
+        }
+
+        $previousSeoTitle = isset($before['title']) ? (string) $before['title'] : '';
+        $previousPostTitle = isset($before['post_title']) ? (string) $before['post_title'] : '';
+
+        if ($previousSeoTitle !== '') {
+            $this->adapter->setTitle($postId, $previousSeoTitle);
+        } else {
+            delete_post_meta($postId, '_seoauto_title');
+            delete_post_meta($postId, '_yoast_wpseo_title');
+            delete_post_meta($postId, '_rank_math_title');
+            delete_post_meta($postId, 'rank_math_title');
+            delete_post_meta($postId, '_aioseo_title');
+        }
+
+        if ($previousPostTitle !== '') {
+            wp_update_post([
+                'ID' => $postId,
+                'post_title' => $previousPostTitle,
+            ]);
+        }
+
+        return ['status' => 'rolled_back'];
+    }
 }

@@ -19,7 +19,7 @@ define('SEOAUTO_VERSION', '2.0.0');
 define('SEOAUTO_PLUGIN_FILE', __FILE__);
 define('SEOAUTO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SEOAUTO_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('SEOAUTO_DB_VERSION', '1.0.0');
+define('SEOAUTO_DB_VERSION', '1.1.0');
 
 require_once SEOAUTO_PLUGIN_DIR . 'includes/class-autoloader.php';
 require_once SEOAUTO_PLUGIN_DIR . 'includes/class-activator.php';

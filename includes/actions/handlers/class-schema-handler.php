@@ -102,4 +102,38 @@ final class SchemaHandler extends AbstractActionHandler
             'after' => $after,
         ];
     }
+
+    /**
+     * @param array<string, mixed> $action
+     * @return array<string, mixed>
+     */
+    public function rollback(array $action): array
+    {
+        $postId = $this->resolvePostId($action);
+        $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
+        $before = json_decode($rawBefore, true);
+
+        if (!is_array($before)) {
+            return ['status' => 'failed', 'error' => 'Missing before snapshot'];
+        }
+
+        $schema = isset($before['schema']) && is_array($before['schema']) ? $before['schema'] : null;
+        $pluginSchema = isset($before['plugin_schema']) && is_array($before['plugin_schema']) ? $before['plugin_schema'] : null;
+
+        if (is_array($schema) && $schema !== []) {
+            $this->adapter->setSchema($postId, $schema);
+        } else {
+            delete_post_meta($postId, '_yoast_wpseo_schema');
+            delete_post_meta($postId, '_aioseo_schema');
+            delete_post_meta($postId, '_seoauto_schema_json_ld');
+        }
+
+        if (is_array($pluginSchema) && $pluginSchema !== []) {
+            update_post_meta($postId, '_seoauto_schema_json_ld', wp_json_encode($pluginSchema));
+        } else {
+            delete_post_meta($postId, '_seoauto_schema_json_ld');
+        }
+
+        return ['status' => 'rolled_back'];
+    }
 }
