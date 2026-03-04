@@ -13,6 +13,7 @@ final class Activator
     {
         Schema::createOrUpgrade();
         self::setDefaultOptions();
+        self::scheduleAutoRegistration();
         QueueManager::scheduleRecurringJobs();
 
         flush_rewrite_rules();
@@ -55,5 +56,13 @@ final class Activator
         add_option('seoauto_api_blocked', false, '', 'no');
         add_option('seoauto_api_last_error', '', '', 'no');
         add_option('seoauto_api_last_error_at', 0, '', 'no');
+        add_option('seoauto_auto_register_pending', true, '', 'no');
+    }
+
+    private static function scheduleAutoRegistration(): void
+    {
+        if (!wp_next_scheduled('seoauto_auto_register_site')) {
+            wp_schedule_single_event(time() + 15, 'seoauto_auto_register_site');
+        }
     }
 }

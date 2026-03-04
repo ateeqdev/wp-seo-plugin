@@ -608,13 +608,33 @@ final class MenuRegistrar
         check_admin_referer('seoauto_edit_action_payload');
         $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
         $payloadJson = isset($_POST['payload_json']) ? (string) wp_unslash($_POST['payload_json']) : '';
+        $payloadFields = isset($_POST['payload_fields']) && is_array($_POST['payload_fields']) ? wp_unslash($_POST['payload_fields']) : [];
         $payload = json_decode($payloadJson, true);
 
         $notice = 'action_edit_failed';
-        if ($actionId > 0 && is_array($payload)) {
-            $updated = $this->actionRepository->updatePayload($actionId, $payload, get_current_user_id());
-            if ($updated) {
-                $notice = 'action_edit_ok';
+        if ($actionId > 0) {
+            $action = $this->actionRepository->findByLaravelId($actionId);
+            $basePayload = [];
+            if (is_array($action)) {
+                $decoded = json_decode((string) ($action['action_payload'] ?? '{}'), true);
+                $basePayload = is_array($decoded) ? $decoded : [];
+            }
+
+            if (is_array($payloadFields) && !empty($payloadFields)) {
+                $payload = $this->applyPayloadFieldEdits($basePayload, $payloadFields);
+            }
+
+            if (is_array($payload)) {
+                $updated = $this->actionRepository->updatePayload($actionId, $payload, get_current_user_id());
+                if ($updated) {
+                    $notice = 'action_edit_ok';
+
+                    if (is_array($action) && ($action['status'] ?? '') === 'applied') {
+                        \SEOAutomation\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 10);
+                        $this->actionRepository->markQueued($actionId);
+                        $notice = 'action_edit_ok_reapply';
+                    }
+                }
             }
         }
 
@@ -623,6 +643,56 @@ final class MenuRegistrar
             'seoauto_notice' => $notice,
         ], admin_url('admin.php')));
         exit;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $fields
+     * @return array<string, mixed>
+     */
+    private function applyPayloadFieldEdits(array $payload, array $fields): array
+    {
+        foreach ($fields as $key => $value) {
+            $k = sanitize_text_field((string) $key);
+            $v = is_scalar($value) ? sanitize_textarea_field((string) $value) : '';
+
+            if ($k === 'meta_description') {
+                $payload['meta_description'] = $v;
+                $payload['recommended_meta_description'] = $v;
+                continue;
+            }
+
+            if ($k === 'alt_text') {
+                $payload['alt_text'] = $v;
+                $payload['suggested_alt'] = $v;
+                continue;
+            }
+
+            if ($k === 'seo_title') {
+                $payload['seo_title'] = $v;
+                $payload['title'] = $v;
+                continue;
+            }
+
+            if ($k === 'social_tags_og_title') {
+                $payload['social_tags']['og']['title'] = $v;
+                continue;
+            }
+
+            if ($k === 'social_tags_og_description') {
+                $payload['social_tags']['og']['description'] = $v;
+                continue;
+            }
+
+            if ($k === 'social_tags_twitter_site') {
+                $payload['social_tags']['twitter']['site'] = $v;
+                continue;
+            }
+
+            $payload[$k] = $v;
+        }
+
+        return $payload;
     }
 
     public function handleUpdateActionItem(): void
@@ -880,6 +950,8 @@ final class MenuRegistrar
                 <div class="notice notice-error"><p>Failed to revert action.</p></div>
             <?php elseif ($notice === 'action_edit_ok') : ?>
                 <div class="notice notice-success"><p>Action payload updated.</p></div>
+            <?php elseif ($notice === 'action_edit_ok_reapply') : ?>
+                <div class="notice notice-success"><p>Action payload updated and re-queued for re-application.</p></div>
             <?php elseif ($notice === 'action_edit_failed') : ?>
                 <div class="notice notice-error"><p>Failed to update action payload.</p></div>
             <?php endif; ?>
@@ -937,7 +1009,7 @@ final class MenuRegistrar
 
             <table class="wp-list-table widefat striped">
                 <thead>
-                    <tr><th>Laravel ID</th><th>Title</th><th>Type</th><th>Status</th><th>Auto</th><th>Received</th><th>Details</th><th>Actions</th></tr>
+                    <tr><th>Title</th><th>Type</th><th>Status</th><th>Auto</th><th>Received</th><th>Details</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                 <?php if (!empty($actions)) : ?>
@@ -957,24 +1029,28 @@ final class MenuRegistrar
                             $afterSnapshot = [];
                         }
                         $actionTitle = $this->buildActionDisplayTitle($row, $actionPayload);
+                        $editableFields = $this->buildEditableFields((string) ($row['action_type'] ?? ''), $actionPayload);
+                        $readOnlyFields = $this->buildReadOnlyFields((string) ($row['action_type'] ?? ''), $actionPayload, $beforeSnapshot, $afterSnapshot);
                         ?>
                         <tr>
-                            <td><?php echo esc_html((string) $laravelId); ?></td>
                             <td><?php echo esc_html($actionTitle); ?></td>
                             <td><code><?php echo esc_html((string) ($row['action_type'] ?? '')); ?></code></td>
                             <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($row['status'] ?? 'received'))); ?></td>
                             <td><?php echo !empty($row['auto_apply']) ? 'Yes' : 'No'; ?></td>
                             <td><?php echo esc_html((string) ($row['received_at'] ?? '')); ?></td>
-                            <td class="seoauto-json">
-                                <details>
-                                    <summary>See change</summary>
-                                    <strong>Payload</strong>
-                                    <pre><?php echo esc_html(wp_json_encode($actionPayload, JSON_PRETTY_PRINT)); ?></pre>
-                                    <strong>Before</strong>
-                                    <pre><?php echo esc_html($beforeSnapshot !== [] ? wp_json_encode($beforeSnapshot, JSON_PRETTY_PRINT) : '{}'); ?></pre>
-                                    <strong>After</strong>
-                                    <pre><?php echo esc_html($afterSnapshot !== [] ? wp_json_encode($afterSnapshot, JSON_PRETTY_PRINT) : '{}'); ?></pre>
-                                </details>
+                            <td>
+                                <div style="min-width:340px;">
+                                    <?php if (!empty($readOnlyFields)) : ?>
+                                        <?php foreach ($readOnlyFields as $field) : ?>
+                                            <div style="margin-bottom:8px;">
+                                                <strong><?php echo esc_html((string) ($field['label'] ?? '')); ?>:</strong>
+                                                <div><?php echo esc_html((string) ($field['value'] ?? '')); ?></div>
+                                            </div>
+                                        <?php endforeach; ?>
+                                    <?php else : ?>
+                                        <span class="description">No formatted details available.</span>
+                                    <?php endif; ?>
+                                </div>
                             </td>
                             <td>
                                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:6px;">
@@ -989,18 +1065,40 @@ final class MenuRegistrar
                                     <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
                                     <button class="button button-small" type="submit">Revert</button>
                                 </form>
-                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-edit-form" data-action-id="<?php echo esc_attr((string) $laravelId); ?>">
                                     <?php wp_nonce_field('seoauto_edit_action_payload'); ?>
                                     <input type="hidden" name="action" value="seoauto_edit_action_payload">
                                     <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
-                                    <textarea name="payload_json" rows="4" style="width:100%;"><?php echo esc_textarea(wp_json_encode($actionPayload, JSON_PRETTY_PRINT)); ?></textarea>
-                                    <button class="button button-small" type="submit">Edit Values</button>
+                                    <?php if (!empty($editableFields)) : ?>
+                                        <div style="margin-bottom:6px;">
+                                            <?php foreach ($editableFields as $field) : ?>
+                                                <?php
+                                                $fieldKey = (string) ($field['key'] ?? '');
+                                                $fieldLabel = (string) ($field['label'] ?? $fieldKey);
+                                                $fieldType = (string) ($field['type'] ?? 'text');
+                                                $fieldValue = (string) ($field['value'] ?? '');
+                                                ?>
+                                                <div style="margin-bottom:8px;">
+                                                    <label style="display:block;margin-bottom:4px;"><?php echo esc_html($fieldLabel); ?></label>
+                                                    <?php if ($fieldType === 'textarea') : ?>
+                                                        <textarea name="payload_fields[<?php echo esc_attr($fieldKey); ?>]" rows="2" style="width:100%;" data-seoauto-editable="1" disabled><?php echo esc_textarea($fieldValue); ?></textarea>
+                                                    <?php else : ?>
+                                                        <input type="text" name="payload_fields[<?php echo esc_attr($fieldKey); ?>]" value="<?php echo esc_attr($fieldValue); ?>" style="width:100%;" data-seoauto-editable="1" disabled>
+                                                    <?php endif; ?>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                        <button type="button" class="button button-small" data-seoauto-edit-toggle="1">Edit</button>
+                                        <button class="button button-small button-primary" type="submit" data-seoauto-save-button="1" style="display:none;">Save</button>
+                                    <?php else : ?>
+                                        <span class="description">No editable values.</span>
+                                    <?php endif; ?>
                                 </form>
                             </td>
                         </tr>
                     <?php endforeach; ?>
                 <?php else : ?>
-                    <tr><td colspan="8">No automated actions found.</td></tr>
+                    <tr><td colspan="7">No automated actions found.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -1008,14 +1106,13 @@ final class MenuRegistrar
             <h2 style="margin-top:20px;">Execution Timeline</h2>
             <table class="wp-list-table widefat striped">
                 <thead>
-                    <tr><th>Laravel ID</th><th>Title</th><th>Latest Status</th><th>Last Event At</th><th>Progression</th></tr>
+                    <tr><th>Title</th><th>Latest Status</th><th>Last Event At</th><th>Progression</th></tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($groupedChangeLogs)) : ?>
                         <?php foreach ($groupedChangeLogs as $group) : ?>
                             <?php $events = array_reverse($group['events']); ?>
                             <tr>
-                                <td class="seoauto-mono"><?php echo esc_html((string) ($group['laravel_action_id'] ?? 0)); ?></td>
                                 <td><?php echo esc_html((string) ($group['title'] ?? 'Action')); ?></td>
                                 <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($group['last_status'] ?? 'received'))); ?></td>
                                 <td><?php echo esc_html((string) ($group['last_at'] ?? '')); ?></td>
@@ -1024,34 +1121,15 @@ final class MenuRegistrar
                                         <summary>Show progression (<?php echo esc_html((string) count($events)); ?> events)</summary>
                                         <table class="widefat striped" style="margin-top:8px;">
                                             <thead>
-                                                <tr><th>Time</th><th>Event</th><th>Status</th><th>Note</th><th>Change Data</th></tr>
+                                                <tr><th>Time</th><th>Event</th><th>Status</th><th>Note</th></tr>
                                             </thead>
                                             <tbody>
                                                 <?php foreach ($events as $event) : ?>
-                                                    <?php
-                                                    $before = json_decode((string) ($event['before_snapshot'] ?? '{}'), true);
-                                                    $after = json_decode((string) ($event['after_snapshot'] ?? '{}'), true);
-                                                    if (!is_array($before)) {
-                                                        $before = [];
-                                                    }
-                                                    if (!is_array($after)) {
-                                                        $after = [];
-                                                    }
-                                                    ?>
                                                     <tr>
                                                         <td><?php echo esc_html((string) ($event['created_at'] ?? '')); ?></td>
                                                         <td><code><?php echo esc_html((string) ($event['event_type'] ?? '')); ?></code></td>
                                                         <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($event['status'] ?? 'received'))); ?></td>
                                                         <td><?php echo esc_html((string) ($event['note'] ?? '')); ?></td>
-                                                        <td class="seoauto-json">
-                                                            <details>
-                                                                <summary>Before/After</summary>
-                                                                <strong>Before</strong>
-                                                                <pre><?php echo esc_html($before !== [] ? wp_json_encode($before, JSON_PRETTY_PRINT) : '{}'); ?></pre>
-                                                                <strong>After</strong>
-                                                                <pre><?php echo esc_html($after !== [] ? wp_json_encode($after, JSON_PRETTY_PRINT) : '{}'); ?></pre>
-                                                            </details>
-                                                        </td>
                                                     </tr>
                                                 <?php endforeach; ?>
                                             </tbody>
@@ -1061,7 +1139,7 @@ final class MenuRegistrar
                             </tr>
                         <?php endforeach; ?>
                     <?php else : ?>
-                        <tr><td colspan="5">No execution timeline entries yet.</td></tr>
+                        <tr><td colspan="4">No execution timeline entries yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -1069,7 +1147,7 @@ final class MenuRegistrar
             <h2 style="margin-top:20px;">Human Action Activity</h2>
             <table class="wp-list-table widefat striped">
                 <thead>
-                    <tr><th>Time</th><th>Laravel ID</th><th>Title</th><th>Category</th><th>Status</th><th>Details</th></tr>
+                    <tr><th>Time</th><th>Title</th><th>Category</th><th>Status</th><th>Details</th></tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($humanActionLogs)) : ?>
@@ -1081,7 +1159,6 @@ final class MenuRegistrar
                             ?>
                             <tr>
                                 <td><?php echo esc_html((string) ($log['created_at'] ?? '')); ?></td>
-                                <td class="seoauto-mono"><?php echo esc_html((string) $laravelId); ?></td>
                                 <td><?php echo esc_html((string) ($primaryItem['title'] ?? 'Manual action required')); ?></td>
                                 <td><?php echo esc_html((string) ($primaryItem['category'] ?? 'general')); ?></td>
                                 <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($primaryItem['status'] ?? 'open'))); ?></td>
@@ -1097,11 +1174,32 @@ final class MenuRegistrar
                             </tr>
                         <?php endforeach; ?>
                     <?php else : ?>
-                        <tr><td colspan="6">No human action activity yet.</td></tr>
+                        <tr><td colspan="5">No human action activity yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
+        <script>
+            document.addEventListener('click', function (event) {
+                var trigger = event.target;
+                if (!trigger || trigger.getAttribute('data-seoauto-edit-toggle') !== '1') {
+                    return;
+                }
+                var form = trigger.closest('.seoauto-edit-form');
+                if (!form) {
+                    return;
+                }
+                var fields = form.querySelectorAll('[data-seoauto-editable="1"]');
+                fields.forEach(function (field) {
+                    field.disabled = false;
+                });
+                var saveButton = form.querySelector('[data-seoauto-save-button="1"]');
+                if (saveButton) {
+                    saveButton.style.display = 'inline-block';
+                }
+                trigger.style.display = 'none';
+            });
+        </script>
         <?php
     }
 
@@ -1156,6 +1254,135 @@ final class MenuRegistrar
         }
 
         return "{$targetLabel} - {$actionLabel}";
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<int, array{key:string,label:string,type:string,value:string}>
+     */
+    private function buildEditableFields(string $actionType, array $payload): array
+    {
+        return match ($actionType) {
+            'add-meta-description', 'update-meta-description' => [[
+                'key' => 'meta_description',
+                'label' => 'Meta Description',
+                'type' => 'textarea',
+                'value' => (string) ($payload['meta_description'] ?? $payload['recommended_meta_description'] ?? ''),
+            ]],
+            'add-alt-text' => [[
+                'key' => 'alt_text',
+                'label' => 'Image Alt Text',
+                'type' => 'text',
+                'value' => (string) ($payload['alt_text'] ?? $payload['suggested_alt'] ?? ''),
+            ]],
+            'update-title' => [[
+                'key' => 'seo_title',
+                'label' => 'SEO Title',
+                'type' => 'text',
+                'value' => (string) ($payload['seo_title'] ?? $payload['title'] ?? ''),
+            ]],
+            'set-social-tags' => [
+                [
+                    'key' => 'social_tags_og_title',
+                    'label' => 'OG Title',
+                    'type' => 'text',
+                    'value' => (string) ($payload['social_tags']['og']['title'] ?? ''),
+                ],
+                [
+                    'key' => 'social_tags_og_description',
+                    'label' => 'OG Description',
+                    'type' => 'textarea',
+                    'value' => (string) ($payload['social_tags']['og']['description'] ?? ''),
+                ],
+                [
+                    'key' => 'social_tags_twitter_site',
+                    'label' => 'Twitter Site',
+                    'type' => 'text',
+                    'value' => (string) ($payload['social_tags']['twitter']['site'] ?? ''),
+                ],
+            ],
+            default => [],
+        };
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @param array<string, mixed> $before
+     * @param array<string, mixed> $after
+     * @return array<int, array{label:string,value:string}>
+     */
+    private function buildReadOnlyFields(string $actionType, array $payload, array $before, array $after): array
+    {
+        if (in_array($actionType, ['add-meta-description', 'update-meta-description'], true)) {
+            return [[
+                'label' => 'Meta Description',
+                'value' => (string) ($payload['meta_description'] ?? $payload['recommended_meta_description'] ?? ''),
+            ]];
+        }
+
+        if ($actionType === 'add-alt-text') {
+            return [[
+                'label' => 'Image Alt Text',
+                'value' => (string) ($payload['alt_text'] ?? $payload['suggested_alt'] ?? ''),
+            ]];
+        }
+
+        if (in_array($actionType, ['add-schema', 'add-schema-markup'], true)) {
+            return [[
+                'label' => 'Schema Type',
+                'value' => (string) ($payload['schema_type'] ?? 'Article'),
+            ]];
+        }
+
+        if ($actionType === 'set-social-tags') {
+            return [
+                [
+                    'label' => 'OG Title',
+                    'value' => (string) ($payload['social_tags']['og']['title'] ?? ''),
+                ],
+                [
+                    'label' => 'Twitter Site',
+                    'value' => (string) ($payload['social_tags']['twitter']['site'] ?? ''),
+                ],
+            ];
+        }
+
+        if ($actionType === 'set-post-dates') {
+            return [
+                [
+                    'label' => 'Published At',
+                    'value' => (string) ($payload['published_at'] ?? ''),
+                ],
+                [
+                    'label' => 'Modified At',
+                    'value' => (string) ($payload['modified_at'] ?? ''),
+                ],
+            ];
+        }
+
+        if ($after !== []) {
+            $first = array_key_first($after);
+            if (is_string($first)) {
+                $value = $after[$first] ?? '';
+                return [[
+                    'label' => ucwords(str_replace(['_', '-'], ' ', $first)),
+                    'value' => is_scalar($value) ? (string) $value : 'Updated',
+                ]];
+            }
+        }
+
+        if ($before !== []) {
+            $first = array_key_first($before);
+            if (is_string($first)) {
+                $value = $before[$first] ?? '';
+                return [[
+                    'label' => ucwords(str_replace(['_', '-'], ' ', $first)),
+                    'value' => is_scalar($value) ? (string) $value : 'Available',
+                ]];
+            }
+        }
+
+        return [];
     }
 
     private function renderLocalLogsFallback(string $remoteError = '', string $notice = '', int $deletedCount = 0): void
@@ -2001,13 +2228,6 @@ final class MenuRegistrar
                 <?php settings_fields('seoauto_settings'); ?>
                 <table class="form-table">
                     <tr>
-                        <th scope="row"><label for="seoauto_base_url">Laravel Base URL</label></th>
-                        <td>
-                            <input type="url" class="regular-text" id="seoauto_base_url" name="seoauto_base_url" value="<?php echo esc_attr(rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/')); ?>" readonly>
-                            <p class="description">Managed by plugin configuration and not customer-editable.</p>
-                        </td>
-                    </tr>
-                    <tr>
                         <th scope="row"><label for="seoauto_primary_seo_adapter">Primary SEO Adapter</label></th>
                         <td>
                             <?php $adapter = (string) get_option('seoauto_primary_seo_adapter', 'auto'); ?>
@@ -2093,12 +2313,6 @@ final class MenuRegistrar
                     <tr><th scope="row">Last OAuth Error</th><td><?php echo esc_html($oauthError !== '' ? $oauthError : 'None'); ?></td></tr>
                 </tbody>
             </table>
-
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-right:12px;">
-                <?php wp_nonce_field('seoauto_register_site'); ?>
-                <input type="hidden" name="action" value="seoauto_register_site">
-                <button type="submit" class="button button-primary">Register/Update Site</button>
-            </form>
 
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
                 <?php wp_nonce_field('seoauto_health_check'); ?>

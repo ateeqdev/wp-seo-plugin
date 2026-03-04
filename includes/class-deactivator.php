@@ -11,6 +11,10 @@ final class Deactivator
     public static function deactivate(): void
     {
         QueueManager::unscheduleRecurringJobs();
+        $timestamp = wp_next_scheduled('seoauto_auto_register_site');
+        if ($timestamp) {
+            wp_unschedule_event($timestamp, 'seoauto_auto_register_site');
+        }
         flush_rewrite_rules();
     }
 }

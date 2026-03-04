@@ -242,6 +242,8 @@ final class Plugin
         $this->container->get('queue_manager')->registerHooks();
         $this->container->get('event_collector')->registerHooks();
         $this->container->get('menu_registrar')->registerHooks();
+        add_action('seoauto_auto_register_site', [$this, 'handleAutoRegisterSite']);
+        add_action('admin_init', [$this, 'maybeScheduleAutoRegister']);
 
         add_action('rest_api_init', function (): void {
             $this->container->get('pages_endpoint')->registerRoutes();
@@ -259,6 +261,35 @@ final class Plugin
         add_action('admin_init', [$this, 'checkCronHealth']);
         RedirectRuntime::registerHooks();
         RobotsRuntime::registerHooks();
+    }
+
+    public function maybeScheduleAutoRegister(): void
+    {
+        $siteId = (int) get_option('seoauto_site_id', 0);
+        $pending = (bool) get_option('seoauto_auto_register_pending', false);
+
+        if (!$pending && $siteId > 0) {
+            return;
+        }
+
+        if (!wp_next_scheduled('seoauto_auto_register_site')) {
+            wp_schedule_single_event(time() + 20, 'seoauto_auto_register_site');
+        }
+    }
+
+    public function handleAutoRegisterSite(): void
+    {
+        $result = $this->container->get('site_registrar')->registerOrUpdate(true);
+        $siteId = (int) get_option('seoauto_site_id', 0);
+        if (!isset($result['error']) && $siteId > 0) {
+            update_option('seoauto_auto_register_pending', false, false);
+            return;
+        }
+
+        update_option('seoauto_auto_register_pending', true, false);
+        if (!wp_next_scheduled('seoauto_auto_register_site')) {
+            wp_schedule_single_event(time() + 5 * MINUTE_IN_SECONDS, 'seoauto_auto_register_site');
+        }
     }
 
     public function checkCronHealth(): void
