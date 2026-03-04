@@ -568,8 +568,9 @@ final class MenuRegistrar
             $this->actionRepository->markQueued($actionId);
         }
 
+        $returnPage = $this->resolveActionRedirectPage();
         wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-logs',
+            'page' => $returnPage,
             'seoauto_notice' => 'action_apply_requested',
         ], admin_url('admin.php')));
         exit;
@@ -592,8 +593,9 @@ final class MenuRegistrar
             }
         }
 
+        $returnPage = $this->resolveActionRedirectPage();
         wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-logs',
+            'page' => $returnPage,
             'seoauto_notice' => $notice,
         ], admin_url('admin.php')));
         exit;
@@ -1212,12 +1214,20 @@ final class MenuRegistrar
                             <summary>Show progression</summary>
                             <div class="seoauto-timeline-list">
                                 <?php foreach ($events as $event) : ?>
+                                    <?php
+                                    $eventType = (string) ($event['event_type'] ?? '');
+                                    $eventStatus = (string) ($event['status'] ?? 'received');
+                                    $eventLabel = $this->resolveTimelineEventLabel($eventType, $eventStatus);
+                                    ?>
                                     <div class="seoauto-timeline-event">
                                         <div class="seoauto-mono"><?php echo esc_html((string) ($event['created_at'] ?? '')); ?></div>
-                                        <div><code><?php echo esc_html((string) ($event['event_type'] ?? '')); ?></code></div>
+                                        <div><code><?php echo esc_html($eventLabel); ?></code></div>
                                         <div>
-                                            <?php echo wp_kses_post($this->renderStatusBadge((string) ($event['status'] ?? 'received'))); ?>
-                                            <?php if ($this->shouldRenderTimelineNote((string) ($event['event_type'] ?? ''), (string) ($event['note'] ?? ''))) : ?>
+                                            <?php echo wp_kses_post($this->renderStatusBadge($eventStatus)); ?>
+                                            <?php if ($eventLabel !== $eventStatus && $eventType !== '') : ?>
+                                                <div class="seoauto-muted" style="margin-top:4px;">Raw event: <code><?php echo esc_html($eventType); ?></code></div>
+                                            <?php endif; ?>
+                                            <?php if ($this->shouldRenderTimelineNote($eventType, (string) ($event['note'] ?? ''))) : ?>
                                                 <div class="seoauto-muted" style="margin-top:4px;"><?php echo esc_html((string) $event['note']); ?></div>
                                             <?php endif; ?>
                                         </div>
@@ -1324,6 +1334,22 @@ final class MenuRegistrar
         }
 
         return true;
+    }
+
+    private function resolveTimelineEventLabel(string $eventType, string $status): string
+    {
+        $event = strtolower(trim($eventType));
+        $normalizedStatus = strtolower(trim($status));
+
+        if ($event === 'queued' && $normalizedStatus === 'running') {
+            return 'running';
+        }
+
+        if ($event !== '') {
+            return $event;
+        }
+
+        return $normalizedStatus !== '' ? $normalizedStatus : 'received';
     }
 
     /**
@@ -1763,13 +1789,62 @@ final class MenuRegistrar
         $table = $wpdb->prefix . 'seoauto_admin_action_items';
         $actionsTable = $wpdb->prefix . 'seoauto_actions';
         $siteId = (int) get_option('seoauto_site_id', 0);
-        $itemsQuery = $siteId > 0
-            ? $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE site_id = %d ORDER BY updated_at DESC LIMIT 200",
-                $siteId
-            )
-            : "SELECT * FROM {$table} WHERE 1=0";
+        $statusFilter = isset($_GET['status']) ? sanitize_text_field((string) $_GET['status']) : '';
+        $categoryFilter = isset($_GET['category']) ? sanitize_text_field((string) $_GET['category']) : '';
+        $targetTypeFilter = isset($_GET['target_type']) ? sanitize_text_field((string) $_GET['target_type']) : '';
+        $search = isset($_GET['q']) ? sanitize_text_field((string) $_GET['q']) : '';
+        $page = max(1, (int) ($_GET['paged'] ?? 1));
+        $perPage = min(100, max(10, (int) ($_GET['per_page'] ?? 25)));
+        $offset = ($page - 1) * $perPage;
         $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
+
+        $where = ['1=1'];
+        $params = [];
+        if ($siteId > 0) {
+            $where[] = 'i.site_id = %d';
+            $params[] = $siteId;
+        } else {
+            $where[] = '1=0';
+        }
+
+        if ($statusFilter !== '') {
+            $where[] = 'i.status = %s';
+            $params[] = $statusFilter;
+        }
+        if ($categoryFilter !== '') {
+            $where[] = 'i.category = %s';
+            $params[] = $categoryFilter;
+        }
+        if ($targetTypeFilter !== '') {
+            $where[] = 'a.target_type = %s';
+            $params[] = $targetTypeFilter;
+        }
+        if ($search !== '') {
+            $like = '%' . $wpdb->esc_like($search) . '%';
+            $where[] = '(i.title LIKE %s OR i.details LIKE %s OR i.recommended_value LIKE %s)';
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $itemsQuery = $wpdb->prepare(
+            "SELECT i.*, a.target_type, a.target_id, a.target_url, a.action_type AS linked_action_type, a.status AS linked_action_status
+             FROM {$table} i
+             LEFT JOIN {$actionsTable} a ON a.laravel_action_id = i.laravel_action_id
+             WHERE {$whereSql}
+             ORDER BY i.updated_at DESC
+             LIMIT %d OFFSET %d",
+            ...array_merge($params, [$perPage, $offset])
+        );
+
+        $countQuery = $wpdb->prepare(
+            "SELECT COUNT(*)
+             FROM {$table} i
+             LEFT JOIN {$actionsTable} a ON a.laravel_action_id = i.laravel_action_id
+             WHERE {$whereSql}",
+            ...$params
+        );
 
         $items = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $itemsQuery
@@ -1777,34 +1852,20 @@ final class MenuRegistrar
         if (!is_array($items)) {
             $items = [];
         }
+        $total = (int) $wpdb->get_var($countQuery); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $totalPages = max(1, (int) ceil($total / $perPage));
 
-        $actionRowsByLaravelId = [];
-        if (!empty($items)) {
-            $laravelIds = [];
-            foreach ($items as $item) {
-                $laravelId = isset($item->laravel_action_id) ? (int) $item->laravel_action_id : 0;
-                if ($laravelId > 0) {
-                    $laravelIds[] = $laravelId;
-                }
-            }
-            $laravelIds = array_values(array_unique($laravelIds));
-
-            if (!empty($laravelIds)) {
-                $placeholders = implode(',', array_fill(0, count($laravelIds), '%d'));
-                $query = $wpdb->prepare(
-                    "SELECT laravel_action_id, target_type, target_id, target_url FROM {$actionsTable} WHERE laravel_action_id IN ({$placeholders})",
-                    ...$laravelIds
-                );
-                $actionRows = $wpdb->get_results($query, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-                if (is_array($actionRows)) {
-                    foreach ($actionRows as $actionRow) {
-                        $laravelId = (int) ($actionRow['laravel_action_id'] ?? 0);
-                        if ($laravelId > 0) {
-                            $actionRowsByLaravelId[$laravelId] = $actionRow;
-                        }
-                    }
-                }
-            }
+        $categoryOptions = $siteId > 0
+            ? $wpdb->get_col($wpdb->prepare("SELECT DISTINCT category FROM {$table} WHERE site_id = %d ORDER BY category ASC", $siteId))
+            : [];
+        $targetTypeOptions = $siteId > 0
+            ? $wpdb->get_col($wpdb->prepare("SELECT DISTINCT a.target_type FROM {$table} i INNER JOIN {$actionsTable} a ON a.laravel_action_id = i.laravel_action_id WHERE i.site_id = %d AND a.target_type <> '' ORDER BY a.target_type ASC", $siteId))
+            : [];
+        if (!is_array($categoryOptions)) {
+            $categoryOptions = [];
+        }
+        if (!is_array($targetTypeOptions)) {
+            $targetTypeOptions = [];
         }
         ?>
         <div class="wrap">
@@ -1815,9 +1876,48 @@ final class MenuRegistrar
             <?php if ($siteId <= 0) : ?>
                 <div class="notice notice-warning"><p>Site is not registered yet. Action items are hidden until a site ID is available.</p></div>
             <?php endif; ?>
+            <form method="get" style="display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));gap:8px;align-items:end;margin-bottom:12px;">
+                <input type="hidden" name="page" value="seoauto-action-items">
+                <label>
+                    <span>Status</span>
+                    <select name="status" style="width:100%;">
+                        <option value="">All statuses</option>
+                        <option value="open" <?php selected($statusFilter, 'open'); ?>>Open</option>
+                        <option value="in_progress" <?php selected($statusFilter, 'in_progress'); ?>>In Progress</option>
+                        <option value="resolved" <?php selected($statusFilter, 'resolved'); ?>>Resolved</option>
+                    </select>
+                </label>
+                <label>
+                    <span>Category</span>
+                    <select name="category" style="width:100%;">
+                        <option value="">All categories</option>
+                        <?php foreach ($categoryOptions as $option) : ?>
+                            <option value="<?php echo esc_attr((string) $option); ?>" <?php selected($categoryFilter, (string) $option); ?>><?php echo esc_html((string) $option); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label>
+                    <span>Target Type</span>
+                    <select name="target_type" style="width:100%;">
+                        <option value="">All target types</option>
+                        <?php foreach ($targetTypeOptions as $option) : ?>
+                            <option value="<?php echo esc_attr((string) $option); ?>" <?php selected($targetTypeFilter, (string) $option); ?>><?php echo esc_html((string) $option); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+                <label>
+                    <span>Search</span>
+                    <input type="text" name="q" value="<?php echo esc_attr($search); ?>" style="width:100%;" placeholder="title/details">
+                </label>
+                <div>
+                    <input type="hidden" name="per_page" value="<?php echo esc_attr((string) $perPage); ?>">
+                    <button class="button button-primary" type="submit">Apply</button>
+                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-action-items')); ?>">Reset</a>
+                </div>
+            </form>
             <table class="wp-list-table widefat striped">
                 <thead>
-                    <tr><th>ID</th><th>Title</th><th>Category</th><th>Status</th><th>Target</th><th>Details</th><th>Update</th></tr>
+                    <tr><th>ID</th><th>Title</th><th>Category</th><th>Status</th><th>Target</th><th>Details</th><th>Update</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($items)) : ?>
@@ -1825,26 +1925,25 @@ final class MenuRegistrar
                             <?php
                             $laravelId = isset($item->laravel_action_id) ? (int) $item->laravel_action_id : 0;
                             $targetLabel = '';
-                            $actionRow = $actionRowsByLaravelId[$laravelId] ?? [];
-                            if (is_array($actionRow) && !empty($actionRow)) {
-                                $targetType = (string) ($actionRow['target_type'] ?? '');
-                                $targetId = (string) ($actionRow['target_id'] ?? '');
-                                $targetUrl = (string) ($actionRow['target_url'] ?? '');
+                            $targetType = (string) ($item->target_type ?? '');
+                            $targetId = (string) ($item->target_id ?? '');
+                            $targetUrl = (string) ($item->target_url ?? '');
+                            $linkedActionType = (string) ($item->linked_action_type ?? '');
+                            $linkedActionStatus = (string) ($item->linked_action_status ?? '');
 
-                                if ($targetType === 'post' && ctype_digit($targetId)) {
-                                    $postTitle = get_the_title((int) $targetId);
-                                    if (is_string($postTitle) && trim($postTitle) !== '') {
-                                        $targetLabel = trim($postTitle);
-                                    }
+                            if ($targetType === 'post' && ctype_digit($targetId)) {
+                                $postTitle = get_the_title((int) $targetId);
+                                if (is_string($postTitle) && trim($postTitle) !== '') {
+                                    $targetLabel = trim($postTitle);
                                 }
+                            }
 
-                                if ($targetLabel === '' && $targetUrl !== '') {
-                                    $targetLabel = $targetUrl;
-                                }
+                            if ($targetLabel === '' && $targetUrl !== '') {
+                                $targetLabel = $targetUrl;
+                            }
 
-                                if ($targetLabel === '' && $targetId !== '') {
-                                    $targetLabel = "{$targetType}:{$targetId}";
-                                }
+                            if ($targetLabel === '' && $targetId !== '') {
+                                $targetLabel = "{$targetType}:{$targetId}";
                             }
 
                             $displayTitle = (string) $item->title;
@@ -1872,15 +1971,67 @@ final class MenuRegistrar
                                         <button class="button button-small" type="submit">Save</button>
                                     </form>
                                 </td>
+                                <td>
+                                    <?php if ($targetUrl !== '') : ?>
+                                        <a class="button button-small" href="<?php echo esc_url($targetUrl); ?>" target="_blank" rel="noopener noreferrer">Open</a>
+                                    <?php endif; ?>
+                                    <?php if ($targetType === 'post' && ctype_digit($targetId)) : ?>
+                                        <a class="button button-small" href="<?php echo esc_url(admin_url('post.php?post=' . (int) $targetId . '&action=edit')); ?>">Edit</a>
+                                    <?php endif; ?>
+                                    <?php if ($laravelId > 0 && $linkedActionType !== '' && $linkedActionType !== 'human-action-required') : ?>
+                                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
+                                            <?php wp_nonce_field('seoauto_apply_action'); ?>
+                                            <input type="hidden" name="action" value="seoauto_apply_action">
+                                            <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
+                                            <input type="hidden" name="return_page" value="seoauto-action-items">
+                                            <button class="button button-small" type="submit">Apply</button>
+                                        </form>
+                                        <?php if ($linkedActionStatus === 'applied') : ?>
+                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
+                                                <?php wp_nonce_field('seoauto_revert_action'); ?>
+                                                <input type="hidden" name="action" value="seoauto_revert_action">
+                                                <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
+                                                <input type="hidden" name="return_page" value="seoauto-action-items">
+                                                <button class="button button-small" type="submit">Revert</button>
+                                            </form>
+                                        <?php endif; ?>
+                                    <?php endif; ?>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else : ?>
-                        <tr><td colspan="7">No human action items found.</td></tr>
+                        <tr><td colspan="8">No human action items found.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
+            <div class="tablenav bottom">
+                <div class="tablenav-pages">
+                    <?php
+                    echo wp_kses_post(
+                        paginate_links([
+                            'base' => add_query_arg('paged', '%#%'),
+                            'format' => '',
+                            'current' => $page,
+                            'total' => $totalPages,
+                        ])
+                    );
+                    ?>
+                </div>
+            </div>
         </div>
         <?php
+    }
+
+    private function resolveActionRedirectPage(): string
+    {
+        $returnPage = isset($_POST['return_page']) ? sanitize_text_field((string) $_POST['return_page']) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+        $allowed = ['seoauto-logs', 'seoauto-action-items'];
+
+        if (in_array($returnPage, $allowed, true)) {
+            return $returnPage;
+        }
+
+        return 'seoauto-logs';
     }
 
     private function renderLocalErrorsToolbar(string $notice, int $deletedCount, string $severity): void
