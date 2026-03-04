@@ -736,16 +736,16 @@ final class MenuRegistrar
             'SEO Automation',
             'manage_options',
             'seoauto',
-            [$this, 'renderDashboardPage'],
+            [$this, 'renderSettingsPage'],
             'dashicons-performance',
             80
         );
 
-        add_submenu_page('seoauto', 'Dashboard', 'Dashboard', 'manage_options', 'seoauto', [$this, 'renderDashboardPage']);
+        add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto', [$this, 'renderSettingsPage']);
         add_submenu_page('seoauto', 'Change Center', 'Change Center', 'manage_options', 'seoauto-logs', [$this, 'renderLogsPage']);
         add_submenu_page('seoauto', 'Action Items', 'Action Items', 'manage_options', 'seoauto-action-items', [$this, 'renderActionItemsPage']);
-        add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
-        add_submenu_page(null, 'Activity Logs', 'Activity Logs', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
+        add_submenu_page('seoauto', 'Debug Logs', 'Debug Logs', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
+        add_submenu_page(null, 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
         add_submenu_page(null, 'Schedules', 'Schedules', 'manage_options', 'seoauto-schedules', [$this, 'renderSchedulesPage']);
         add_submenu_page(null, 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
         add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seoauto-oauth-callback', [$this, 'renderOauthCallbackPage']);
@@ -2312,6 +2312,23 @@ final class MenuRegistrar
                     <?php endif; ?>
                 </div>
             <?php endif; ?>
+            <?php
+            $siteId = (int) get_option('seoauto_site_id', 0);
+            $baseUrl = (string) get_option('seoauto_base_url', '');
+            $lastUserSync = (int) get_option('seoauto_last_user_sync', 0);
+            $lastBriefSync = (int) get_option('seoauto_last_brief_sync', 0);
+            $lastCron = (int) get_option('seoauto_last_cron_run', 0);
+            ?>
+            <h2>Site Status</h2>
+            <table class="widefat striped" style="max-width:900px;margin-bottom:16px;">
+                <tbody>
+                    <tr><th scope="row">Laravel Base URL</th><td><?php echo esc_html($baseUrl !== '' ? $baseUrl : 'Not configured'); ?></td></tr>
+                    <tr><th scope="row">Site ID</th><td><?php echo esc_html($siteId > 0 ? (string) $siteId : 'Not registered'); ?></td></tr>
+                    <tr><th scope="row">Last User Sync</th><td><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i:s', $lastUserSync) : 'Never'); ?></td></tr>
+                    <tr><th scope="row">Last Brief Sync</th><td><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i:s', $lastBriefSync) : 'Never'); ?></td></tr>
+                    <tr><th scope="row">Last Queue Heartbeat</th><td><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i:s', $lastCron) : 'Never'); ?></td></tr>
+                </tbody>
+            </table>
             <form method="post" action="options.php">
                 <?php settings_fields('seoauto_settings'); ?>
                 <table class="form-table">
