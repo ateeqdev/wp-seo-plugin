@@ -307,23 +307,34 @@ final class ActionRepository
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function listChangeLogs(int $laravelActionId = 0, int $limit = 200): array
+    public function listChangeLogs(int $laravelActionId = 0, int $limit = 200, array $filters = []): array
     {
         global $wpdb;
         $table = $wpdb->prefix . 'seoauto_change_logs';
+        $where = ['1=1'];
+        $params = [];
 
         if ($laravelActionId > 0) {
-            $query = $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE laravel_action_id = %d ORDER BY created_at DESC LIMIT %d",
-                $laravelActionId,
-                $limit
-            );
-        } else {
-            $query = $wpdb->prepare(
-                "SELECT * FROM {$table} ORDER BY created_at DESC LIMIT %d",
-                $limit
-            );
+            $where[] = 'laravel_action_id = %d';
+            $params[] = $laravelActionId;
         }
+
+        if (!empty($filters['exclude_event_type'])) {
+            $where[] = 'event_type != %s';
+            $params[] = (string) $filters['exclude_event_type'];
+        }
+
+        if (!empty($filters['event_type'])) {
+            $where[] = 'event_type = %s';
+            $params[] = (string) $filters['event_type'];
+        }
+
+        $params[] = max(1, $limit);
+        $whereSql = implode(' AND ', $where);
+        $query = $wpdb->prepare(
+            "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC LIMIT %d",
+            ...$params
+        );
 
         $rows = $wpdb->get_results($query, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 

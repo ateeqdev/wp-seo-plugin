@@ -779,6 +779,47 @@ final class MenuRegistrar
         }
 
         $actions = $this->actionRepository->listActions($filters, 200);
+        $changeLogs = $this->actionRepository->listChangeLogs(0, 200, [
+            'exclude_event_type' => 'human_action_created',
+        ]);
+        $humanActionLogs = $this->actionRepository->listChangeLogs(0, 100, [
+            'event_type' => 'human_action_created',
+        ]);
+
+        global $wpdb;
+        $siteId = (int) get_option('seoauto_site_id', 0);
+        $itemsTable = $wpdb->prefix . 'seoauto_admin_action_items';
+        $itemQuery = $siteId > 0
+            ? $wpdb->prepare(
+                "SELECT * FROM {$itemsTable} WHERE site_id = %d OR site_id = 0 OR site_id IS NULL ORDER BY updated_at DESC LIMIT 200",
+                $siteId
+            )
+            : "SELECT * FROM {$itemsTable} ORDER BY updated_at DESC LIMIT 200";
+        $humanItems = $wpdb->get_results($itemQuery, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        if (!is_array($humanItems)) {
+            $humanItems = [];
+        }
+
+        $humanItemsByLaravelId = [];
+        foreach ($humanItems as $item) {
+            $itemLaravelId = (int) ($item['laravel_action_id'] ?? 0);
+            if ($itemLaravelId <= 0) {
+                continue;
+            }
+
+            if (!isset($humanItemsByLaravelId[$itemLaravelId])) {
+                $humanItemsByLaravelId[$itemLaravelId] = [];
+            }
+
+            $humanItemsByLaravelId[$itemLaravelId][] = $item;
+        }
+
+        $openHumanItems = 0;
+        foreach ($humanItems as $item) {
+            if (($item['status'] ?? '') !== 'resolved') {
+                $openHumanItems++;
+            }
+        }
         ?>
         <div class="wrap">
             <h1>Change Center</h1>
@@ -793,7 +834,44 @@ final class MenuRegistrar
             <?php elseif ($notice === 'action_edit_failed') : ?>
                 <div class="notice notice-error"><p>Failed to update action payload.</p></div>
             <?php endif; ?>
-            <p>Use this table to review, edit, apply, and revert changes.</p>
+            <style>
+                .seoauto-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin:10px 0 18px; }
+                .seoauto-kpi-card { border:1px solid #dcdcde; border-radius:8px; background:#fff; padding:12px; }
+                .seoauto-kpi-label { display:block; color:#50575e; font-size:12px; margin-bottom:6px; }
+                .seoauto-kpi-value { font-size:20px; font-weight:600; line-height:1.2; }
+                .seoauto-badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:600; text-transform:uppercase; }
+                .seoauto-status-received, .seoauto-status-pending { background:#f0f0f1; color:#1d2327; }
+                .seoauto-status-queued, .seoauto-status-running, .seoauto-status-in-progress { background:#cff4fc; color:#055160; }
+                .seoauto-status-applied, .seoauto-status-resolved, .seoauto-status-provider-applied { background:#d1e7dd; color:#0f5132; }
+                .seoauto-status-failed, .seoauto-status-rejected, .seoauto-status-provider-error { background:#f8d7da; color:#842029; }
+                .seoauto-status-rolled_back { background:#fff3cd; color:#664d03; }
+                .seoauto-mono { font-family:Menlo,Consolas,Monaco,monospace; font-size:12px; }
+                .seoauto-json pre { max-height:220px; overflow:auto; background:#f6f7f7; border:1px solid #dcdcde; padding:8px; border-radius:4px; }
+            </style>
+
+            <div class="seoauto-kpi-grid">
+                <div class="seoauto-kpi-card">
+                    <span class="seoauto-kpi-label">Automated Actions</span>
+                    <span class="seoauto-kpi-value"><?php echo esc_html((string) count($actions)); ?></span>
+                </div>
+                <div class="seoauto-kpi-card">
+                    <span class="seoauto-kpi-label">Execution Events</span>
+                    <span class="seoauto-kpi-value"><?php echo esc_html((string) count($changeLogs)); ?></span>
+                </div>
+                <div class="seoauto-kpi-card">
+                    <span class="seoauto-kpi-label">Human Action Items</span>
+                    <span class="seoauto-kpi-value"><?php echo esc_html((string) count($humanItems)); ?></span>
+                </div>
+                <div class="seoauto-kpi-card">
+                    <span class="seoauto-kpi-label">Open Human Items</span>
+                    <span class="seoauto-kpi-value"><?php echo esc_html((string) $openHumanItems); ?></span>
+                </div>
+            </div>
+
+            <p style="margin-bottom:12px;">
+                Change Center shows machine-applied changes and their execution timeline. Human-only tasks are listed separately below.
+                <a href="<?php echo esc_url(admin_url('admin.php?page=seoauto-action-items')); ?>">Open Admin Action Items</a>
+            </p>
             <form method="get" style="margin-bottom:12px;">
                 <input type="hidden" name="page" value="seoauto-logs">
                 <select name="status">
@@ -810,7 +888,7 @@ final class MenuRegistrar
 
             <table class="wp-list-table widefat striped">
                 <thead>
-                    <tr><th>Laravel ID</th><th>Type</th><th>Status</th><th>Auto</th><th>Received</th><th>Actions</th></tr>
+                    <tr><th>Laravel ID</th><th>Type</th><th>Status</th><th>Auto</th><th>Received</th><th>Details</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                 <?php if (!empty($actions)) : ?>
@@ -832,20 +910,22 @@ final class MenuRegistrar
                         ?>
                         <tr>
                             <td><?php echo esc_html((string) $laravelId); ?></td>
-                            <td><?php echo esc_html((string) ($row['action_type'] ?? '')); ?></td>
-                            <td><?php echo esc_html((string) ($row['status'] ?? '')); ?></td>
+                            <td><code><?php echo esc_html((string) ($row['action_type'] ?? '')); ?></code></td>
+                            <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($row['status'] ?? 'received'))); ?></td>
                             <td><?php echo !empty($row['auto_apply']) ? 'Yes' : 'No'; ?></td>
                             <td><?php echo esc_html((string) ($row['received_at'] ?? '')); ?></td>
-                            <td>
-                                <details style="margin-bottom:8px;">
+                            <td class="seoauto-json">
+                                <details>
                                     <summary>See change</summary>
                                     <strong>Payload</strong>
-                                    <pre style="white-space:pre-wrap;"><?php echo esc_html(wp_json_encode($actionPayload, JSON_PRETTY_PRINT)); ?></pre>
+                                    <pre><?php echo esc_html(wp_json_encode($actionPayload, JSON_PRETTY_PRINT)); ?></pre>
                                     <strong>Before</strong>
-                                    <pre style="white-space:pre-wrap;"><?php echo esc_html(wp_json_encode($beforeSnapshot, JSON_PRETTY_PRINT)); ?></pre>
+                                    <pre><?php echo esc_html($beforeSnapshot !== [] ? wp_json_encode($beforeSnapshot, JSON_PRETTY_PRINT) : '{}'); ?></pre>
                                     <strong>After</strong>
-                                    <pre style="white-space:pre-wrap;"><?php echo esc_html(wp_json_encode($afterSnapshot, JSON_PRETTY_PRINT)); ?></pre>
+                                    <pre><?php echo esc_html($afterSnapshot !== [] ? wp_json_encode($afterSnapshot, JSON_PRETTY_PRINT) : '{}'); ?></pre>
                                 </details>
+                            </td>
+                            <td>
                                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:6px;">
                                     <?php wp_nonce_field('seoauto_apply_action'); ?>
                                     <input type="hidden" name="action" value="seoauto_apply_action">
@@ -869,35 +949,101 @@ final class MenuRegistrar
                         </tr>
                     <?php endforeach; ?>
                 <?php else : ?>
-                    <tr><td colspan="6">No actions found.</td></tr>
+                    <tr><td colspan="7">No automated actions found.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
 
-            <h2 style="margin-top:20px;">Change Log</h2>
-            <?php $changeLogs = $this->actionRepository->listChangeLogs(0, 200); ?>
+            <h2 style="margin-top:20px;">Execution Timeline</h2>
             <table class="wp-list-table widefat striped">
                 <thead>
-                    <tr><th>Time</th><th>Laravel ID</th><th>Event</th><th>Status</th><th>Note</th></tr>
+                    <tr><th>Time</th><th>Laravel ID</th><th>Event</th><th>Status</th><th>Note</th><th>Change Data</th></tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($changeLogs)) : ?>
                         <?php foreach ($changeLogs as $log) : ?>
+                            <?php
+                            $before = json_decode((string) ($log['before_snapshot'] ?? '{}'), true);
+                            $after = json_decode((string) ($log['after_snapshot'] ?? '{}'), true);
+                            if (!is_array($before)) {
+                                $before = [];
+                            }
+                            if (!is_array($after)) {
+                                $after = [];
+                            }
+                            ?>
                             <tr>
                                 <td><?php echo esc_html((string) ($log['created_at'] ?? '')); ?></td>
                                 <td><?php echo esc_html((string) ($log['laravel_action_id'] ?? '')); ?></td>
-                                <td><?php echo esc_html((string) ($log['event_type'] ?? '')); ?></td>
-                                <td><?php echo esc_html((string) ($log['status'] ?? '')); ?></td>
+                                <td><code><?php echo esc_html((string) ($log['event_type'] ?? '')); ?></code></td>
+                                <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($log['status'] ?? 'received'))); ?></td>
                                 <td><?php echo esc_html((string) ($log['note'] ?? '')); ?></td>
+                                <td class="seoauto-json">
+                                    <details>
+                                        <summary>Before/After</summary>
+                                        <strong>Before</strong>
+                                        <pre><?php echo esc_html($before !== [] ? wp_json_encode($before, JSON_PRETTY_PRINT) : '{}'); ?></pre>
+                                        <strong>After</strong>
+                                        <pre><?php echo esc_html($after !== [] ? wp_json_encode($after, JSON_PRETTY_PRINT) : '{}'); ?></pre>
+                                    </details>
+                                </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else : ?>
-                        <tr><td colspan="5">No change log entries yet.</td></tr>
+                        <tr><td colspan="6">No execution timeline entries yet.</td></tr>
+                    <?php endif; ?>
+                </tbody>
+            </table>
+
+            <h2 style="margin-top:20px;">Human Action Activity</h2>
+            <table class="wp-list-table widefat striped">
+                <thead>
+                    <tr><th>Time</th><th>Laravel ID</th><th>Title</th><th>Category</th><th>Status</th><th>Details</th></tr>
+                </thead>
+                <tbody>
+                    <?php if (!empty($humanActionLogs)) : ?>
+                        <?php foreach ($humanActionLogs as $log) : ?>
+                            <?php
+                            $laravelId = (int) ($log['laravel_action_id'] ?? 0);
+                            $linkedItems = $humanItemsByLaravelId[$laravelId] ?? [];
+                            $primaryItem = !empty($linkedItems) ? $linkedItems[0] : null;
+                            ?>
+                            <tr>
+                                <td><?php echo esc_html((string) ($log['created_at'] ?? '')); ?></td>
+                                <td class="seoauto-mono"><?php echo esc_html((string) $laravelId); ?></td>
+                                <td><?php echo esc_html((string) ($primaryItem['title'] ?? 'Manual action required')); ?></td>
+                                <td><?php echo esc_html((string) ($primaryItem['category'] ?? 'general')); ?></td>
+                                <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($primaryItem['status'] ?? 'open'))); ?></td>
+                                <td>
+                                    <details>
+                                        <summary>Open details</summary>
+                                        <p style="margin-top:8px;"><?php echo esc_html((string) ($primaryItem['details'] ?? (string) ($log['note'] ?? ''))); ?></p>
+                                        <?php if (!empty($primaryItem['recommended_value'])) : ?>
+                                            <p><strong>Recommended Value:</strong> <code><?php echo esc_html((string) $primaryItem['recommended_value']); ?></code></p>
+                                        <?php endif; ?>
+                                    </details>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else : ?>
+                        <tr><td colspan="6">No human action activity yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
         <?php
+    }
+
+    private function renderStatusBadge(string $status): string
+    {
+        $normalized = sanitize_html_class(str_replace('_', '-', strtolower(trim($status))));
+        $label = ucwords(str_replace(['-', '_'], ' ', $status));
+
+        return sprintf(
+            '<span class="seoauto-badge seoauto-status-%s">%s</span>',
+            esc_attr($normalized),
+            esc_html($label)
+        );
     }
 
     private function renderLocalLogsFallback(string $remoteError = '', string $notice = '', int $deletedCount = 0): void
