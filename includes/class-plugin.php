@@ -27,6 +27,7 @@ use SEOAutomation\Connector\REST\ActionsEndpoint;
 use SEOAutomation\Connector\REST\MediaEndpoint;
 use SEOAutomation\Connector\REST\OwnershipProofEndpoint;
 use SEOAutomation\Connector\REST\PagesEndpoint;
+use SEOAutomation\Connector\REST\RestAccessCompatibility;
 use SEOAutomation\Connector\SEO\SeoDetector;
 use SEOAutomation\Connector\Storage\Schema;
 use SEOAutomation\Connector\Sync\BriefSyncer;
@@ -229,6 +230,14 @@ final class Plugin
             true
         );
         $this->container->register(
+            'rest_access_compatibility',
+            fn (ServiceContainer $c): RestAccessCompatibility => new RestAccessCompatibility(
+                $c->get('site_token_manager'),
+                $c->get('logger')
+            ),
+            true
+        );
+        $this->container->register(
             'queue_manager',
             fn (ServiceContainer $c): QueueManager => new QueueManager(
                 $c->get('event_dispatcher'),
@@ -245,6 +254,7 @@ final class Plugin
 
     private function registerHooks(): void
     {
+        $this->container->get('rest_access_compatibility')->registerHooks();
         $this->container->get('queue_manager')->registerHooks();
         $this->container->get('event_collector')->registerHooks();
         $this->container->get('menu_registrar')->registerHooks();

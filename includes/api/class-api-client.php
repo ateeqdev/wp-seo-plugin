@@ -96,6 +96,13 @@ final class ApiClient
         }
 
         if (is_wp_error($response)) {
+            $curlFallbackResponse = $this->attemptCurlFallback($url, $args, $response);
+            if ($curlFallbackResponse !== null) {
+                $response = $curlFallbackResponse;
+            }
+        }
+
+        if (is_wp_error($response)) {
             update_option('seoauto_api_blocked', true, false);
             update_option('seoauto_api_last_error', $response->get_error_message(), false);
             update_option('seoauto_api_last_error_at', time(), false);
@@ -184,5 +191,125 @@ final class ApiClient
         }
 
         return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+    }
+
+    /**
+     * @param array<string, mixed> $args
+     * @return array<string, mixed>|null
+     */
+    private function attemptCurlFallback(string $url, array $args, \WP_Error $initialError): ?array
+    {
+        if (!function_exists('curl_init') || !function_exists('curl_exec')) {
+            return null;
+        }
+
+        $host = strtolower((string) wp_parse_url($url, PHP_URL_HOST));
+        $expectedHost = strtolower((string) wp_parse_url((string) SEOAUTO_LARAVEL_BASE_URL, PHP_URL_HOST));
+        if ($host === '' || $expectedHost === '' || $host !== $expectedHost) {
+            return null;
+        }
+
+        $curl = curl_init($url);
+        if ($curl === false) {
+            return null;
+        }
+
+        $method = strtoupper((string) ($args['method'] ?? 'GET'));
+        $body = isset($args['body']) ? (string) $args['body'] : '';
+        $timeout = max(1, (int) ($args['timeout'] ?? 15));
+        $sslVerify = (bool) ($args['sslverify'] ?? true);
+        $headers = $this->flattenHeaders($args['headers'] ?? []);
+        $responseHeaders = [];
+
+        curl_setopt($curl, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($curl, CURLOPT_CUSTOMREQUEST, $method);
+        curl_setopt($curl, CURLOPT_TIMEOUT, $timeout);
+        curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, $sslVerify);
+        curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, $sslVerify ? 2 : 0);
+        curl_setopt(
+            $curl,
+            CURLOPT_HEADERFUNCTION,
+            static function ($handle, string $headerLine) use (&$responseHeaders): int {
+                $length = strlen($headerLine);
+                $line = trim($headerLine);
+                if ($line === '' || strpos($line, ':') === false) {
+                    return $length;
+                }
+
+                [$name, $value] = explode(':', $line, 2);
+                $responseHeaders[trim($name)] = trim($value);
+
+                return $length;
+            }
+        );
+
+        if ($body !== '' && in_array($method, ['POST', 'PUT', 'PATCH', 'DELETE'], true)) {
+            curl_setopt($curl, CURLOPT_POSTFIELDS, $body);
+        }
+
+        $rawBody = curl_exec($curl);
+        $curlError = curl_error($curl);
+        $statusCode = (int) curl_getinfo($curl, CURLINFO_HTTP_CODE);
+        curl_close($curl);
+
+        if (!is_string($rawBody)) {
+            $rawBody = '';
+        }
+
+        if ($curlError !== '') {
+            $this->logger->warning('api_curl_fallback_failed', [
+                'entity_type' => 'url',
+                'entity_id' => $url,
+                'error' => $curlError,
+                'initial_error' => $initialError->get_error_message(),
+            ], 'outbound');
+
+            return null;
+        }
+
+        $this->logger->warning('api_curl_fallback_used', [
+            'entity_type' => 'url',
+            'entity_id' => $url,
+            'status_code' => $statusCode,
+            'initial_error' => $initialError->get_error_message(),
+        ], 'outbound');
+
+        return [
+            'headers' => $responseHeaders,
+            'body' => $rawBody,
+            'response' => [
+                'code' => $statusCode,
+                'message' => '',
+            ],
+            'cookies' => [],
+            'filename' => null,
+        ];
+    }
+
+    /**
+     * @param mixed $headers
+     * @return array<int, string>
+     */
+    private function flattenHeaders($headers): array
+    {
+        if (!is_array($headers)) {
+            return [];
+        }
+
+        $result = [];
+        foreach ($headers as $name => $value) {
+            if (!is_string($name) || $name === '') {
+                continue;
+            }
+
+            if (is_array($value)) {
+                $value = implode(', ', array_map('strval', $value));
+            }
+
+            $result[] = $name . ': ' . (string) $value;
+        }
+
+        return $result;
     }
 }
