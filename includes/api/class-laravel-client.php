@@ -51,6 +51,17 @@ final class LaravelClient
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
+    public function createOwnershipChallenge(array $payload): array
+    {
+        $response = $this->apiClient->request('POST', '/api/sites/ownership/challenge', [], $payload, [], false, 8);
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
     public function updateSiteRegistration(int $siteId, array $payload): array
     {
         $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {
@@ -208,6 +219,69 @@ final class LaravelClient
             return $this->apiClient->request(
                 'PATCH',
                 '/api/sites/' . $siteId . '/profile',
+                [],
+                $payload,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function createSiteOwnershipChallenge(int $siteId, array $payload): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {
+            return $this->apiClient->request(
+                'POST',
+                '/api/sites/' . $siteId . '/ownership/challenge',
+                [],
+                $payload,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function deactivateSite(int $siteId, array $payload): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {
+            return $this->apiClient->request(
+                'POST',
+                '/api/sites/' . $siteId . '/deactivate',
+                [],
+                $payload,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function reactivateSite(int $siteId, array $payload): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {
+            return $this->apiClient->request(
+                'POST',
+                '/api/sites/' . $siteId . '/reactivate',
                 [],
                 $payload,
                 [],

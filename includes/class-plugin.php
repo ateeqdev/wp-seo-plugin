@@ -25,6 +25,7 @@ use SEOAutomation\Connector\Events\EventOutbox;
 use SEOAutomation\Connector\Queue\QueueManager;
 use SEOAutomation\Connector\REST\ActionsEndpoint;
 use SEOAutomation\Connector\REST\MediaEndpoint;
+use SEOAutomation\Connector\REST\OwnershipProofEndpoint;
 use SEOAutomation\Connector\REST\PagesEndpoint;
 use SEOAutomation\Connector\SEO\SeoDetector;
 use SEOAutomation\Connector\Storage\Schema;
@@ -223,6 +224,11 @@ final class Plugin
             true
         );
         $this->container->register(
+            'ownership_proof_endpoint',
+            fn (): OwnershipProofEndpoint => new OwnershipProofEndpoint(),
+            true
+        );
+        $this->container->register(
             'queue_manager',
             fn (ServiceContainer $c): QueueManager => new QueueManager(
                 $c->get('event_dispatcher'),
@@ -249,6 +255,7 @@ final class Plugin
             $this->container->get('pages_endpoint')->registerRoutes();
             $this->container->get('media_endpoint')->registerRoutes();
             $this->container->get('actions_endpoint')->registerRoutes();
+            $this->container->get('ownership_proof_endpoint')->registerRoutes();
         });
 
         add_action('wp_head', function (): void {

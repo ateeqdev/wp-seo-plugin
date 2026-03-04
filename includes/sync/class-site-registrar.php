@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace SEOAutomation\Connector\Sync;
 
 use SEOAutomation\Connector\API\LaravelClient;
+use SEOAutomation\Connector\Auth\OwnershipProofStore;
 use SEOAutomation\Connector\Auth\SiteTokenManager;
 use SEOAutomation\Connector\Utils\Logger;
 
@@ -46,10 +47,25 @@ final class SiteRegistrar
 
         try {
             if ($siteId > 0 && $this->tokenManager->hasToken()) {
+                $this->reactivateSiteWithOwnershipProof($siteId, $payload);
                 $response = $fast
                     ? $this->client->updateSiteRegistrationFast($siteId, $payload)
                     : $this->client->updateSiteRegistration($siteId, $payload);
             } else {
+                $challenge = $this->client->createOwnershipChallenge([
+                    'domain' => (string) $payload['domain'],
+                    'intent' => 'register',
+                ]);
+                $challengeId = (string) ($challenge['challenge_id'] ?? '');
+                $challengeToken = (string) ($challenge['challenge_token'] ?? '');
+                $expiresAt = strtotime((string) ($challenge['expires_at'] ?? '')) ?: (time() + 600);
+                if ($challengeId === '' || $challengeToken === '') {
+                    throw new \RuntimeException('Failed to issue ownership challenge.');
+                }
+                OwnershipProofStore::put($challengeId, $challengeToken, $expiresAt);
+                $payload['ownership_challenge_id'] = $challengeId;
+                $payload['ownership_proof_url'] = $this->buildOwnershipProofUrl($challengeId);
+
                 $response = $fast
                     ? $this->client->registerSiteFast($payload)
                     : $this->client->registerSite($payload);
@@ -59,6 +75,7 @@ final class SiteRegistrar
                 if (!empty($response['api_key'])) {
                     $this->tokenManager->storeToken((string) $response['api_key']);
                 }
+                OwnershipProofStore::delete($challengeId);
             }
 
             return $response;
@@ -108,5 +125,41 @@ final class SiteRegistrar
         }
 
         return $mapped;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function reactivateSiteWithOwnershipProof(int $siteId, array $payload): void
+    {
+        try {
+            $challenge = $this->client->createSiteOwnershipChallenge($siteId, ['intent' => 'reactivate']);
+            $challengeId = (string) ($challenge['challenge_id'] ?? '');
+            $challengeToken = (string) ($challenge['challenge_token'] ?? '');
+            $expiresAt = strtotime((string) ($challenge['expires_at'] ?? '')) ?: (time() + 600);
+            if ($challengeId === '' || $challengeToken === '') {
+                return;
+            }
+
+            OwnershipProofStore::put($challengeId, $challengeToken, $expiresAt);
+            $this->client->reactivateSite($siteId, [
+                'ownership_challenge_id' => $challengeId,
+                'ownership_proof_url' => $this->buildOwnershipProofUrl($challengeId),
+            ]);
+            OwnershipProofStore::delete($challengeId);
+        } catch (\Throwable $exception) {
+            $this->logger->warning('site_reactivate_with_ownership_proof_failed', [
+                'error' => $exception->getMessage(),
+                'site_id' => $siteId,
+                'domain' => $payload['domain'] ?? '',
+            ], 'outbound');
+        }
+    }
+
+    private function buildOwnershipProofUrl(string $challengeId): string
+    {
+        $base = home_url('/wp-json/seoauto/v1/ownership-proof');
+
+        return add_query_arg(['challenge_id' => $challengeId], $base);
     }
 }
