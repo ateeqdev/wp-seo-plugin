@@ -968,6 +968,15 @@ final class MenuRegistrar
                 .seoauto-status-rolled_back { background:#fff3cd; color:#664d03; }
                 .seoauto-mono { font-family:Menlo,Consolas,Monaco,monospace; font-size:12px; }
                 .seoauto-json pre { max-height:220px; overflow:auto; background:#f6f7f7; border:1px solid #dcdcde; padding:8px; border-radius:4px; }
+                .seoauto-actions-table { table-layout:fixed; }
+                .seoauto-actions-table th:nth-child(6),
+                .seoauto-actions-table td:nth-child(6) { width:22%; }
+                .seoauto-actions-table th:nth-child(7),
+                .seoauto-actions-table td:nth-child(7) { width:30%; }
+                .seoauto-action-details { max-width:320px; font-size:12px; line-height:1.35; }
+                .seoauto-action-details > div { margin-bottom:6px !important; }
+                .seoauto-action-actions { min-width:360px; }
+                .seoauto-action-actions .button { margin-right:6px; margin-bottom:6px; }
             </style>
 
             <div class="seoauto-kpi-grid">
@@ -1007,7 +1016,7 @@ final class MenuRegistrar
                 <button class="button" type="submit">Filter</button>
             </form>
 
-            <table class="wp-list-table widefat striped">
+            <table class="wp-list-table widefat striped seoauto-actions-table">
                 <thead>
                     <tr><th>Title</th><th>Type</th><th>Status</th><th>Auto</th><th>Received</th><th>Details</th><th>Actions</th></tr>
                 </thead>
@@ -1039,10 +1048,10 @@ final class MenuRegistrar
                             <td><?php echo !empty($row['auto_apply']) ? 'Yes' : 'No'; ?></td>
                             <td><?php echo esc_html((string) ($row['received_at'] ?? '')); ?></td>
                             <td>
-                                <div style="min-width:340px;">
+                                <div class="seoauto-action-details">
                                     <?php if (!empty($readOnlyFields)) : ?>
                                         <?php foreach ($readOnlyFields as $field) : ?>
-                                            <div style="margin-bottom:8px;">
+                                            <div>
                                                 <strong><?php echo esc_html((string) ($field['label'] ?? '')); ?>:</strong>
                                                 <div><?php echo esc_html((string) ($field['value'] ?? '')); ?></div>
                                             </div>
@@ -1052,7 +1061,7 @@ final class MenuRegistrar
                                     <?php endif; ?>
                                 </div>
                             </td>
-                            <td>
+                            <td class="seoauto-action-actions">
                                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:6px;">
                                     <?php wp_nonce_field('seoauto_apply_action'); ?>
                                     <input type="hidden" name="action" value="seoauto_apply_action">
@@ -1090,6 +1099,7 @@ final class MenuRegistrar
                                         </div>
                                         <button type="button" class="button button-small" data-seoauto-edit-toggle="1">Edit</button>
                                         <button class="button button-small button-primary" type="submit" data-seoauto-save-button="1" style="display:none;">Save</button>
+                                        <button type="button" class="button button-small" data-seoauto-cancel-button="1" style="display:none;">Cancel</button>
                                     <?php else : ?>
                                         <span class="description">No editable values.</span>
                                     <?php endif; ?>
@@ -1180,24 +1190,60 @@ final class MenuRegistrar
             </table>
         </div>
         <script>
+            function seoautoSetEditMode(form, editing) {
+                var fields = form.querySelectorAll('[data-seoauto-editable="1"]');
+                var editButton = form.querySelector('[data-seoauto-edit-toggle="1"]');
+                var saveButton = form.querySelector('[data-seoauto-save-button="1"]');
+                var cancelButton = form.querySelector('[data-seoauto-cancel-button="1"]');
+
+                fields.forEach(function (field) {
+                    field.disabled = !editing;
+
+                    if (editing && typeof field.dataset.originalValue === 'undefined') {
+                        field.dataset.originalValue = field.value;
+                    }
+
+                    if (!editing && typeof field.dataset.originalValue !== 'undefined') {
+                        field.value = field.dataset.originalValue;
+                    }
+                });
+
+                if (editButton) {
+                    editButton.style.display = editing ? 'none' : 'inline-block';
+                }
+                if (saveButton) {
+                    saveButton.style.display = editing ? 'inline-block' : 'none';
+                }
+                if (cancelButton) {
+                    cancelButton.style.display = editing ? 'inline-block' : 'none';
+                }
+            }
+
             document.addEventListener('click', function (event) {
                 var trigger = event.target;
-                if (!trigger || trigger.getAttribute('data-seoauto-edit-toggle') !== '1') {
+                if (!trigger) {
                     return;
                 }
+
+                var isEdit = trigger.getAttribute('data-seoauto-edit-toggle') === '1';
+                var isCancel = trigger.getAttribute('data-seoauto-cancel-button') === '1';
+                if (!isEdit && !isCancel) {
+                    return;
+                }
+
                 var form = trigger.closest('.seoauto-edit-form');
                 if (!form) {
                     return;
                 }
-                var fields = form.querySelectorAll('[data-seoauto-editable="1"]');
-                fields.forEach(function (field) {
-                    field.disabled = false;
-                });
-                var saveButton = form.querySelector('[data-seoauto-save-button="1"]');
-                if (saveButton) {
-                    saveButton.style.display = 'inline-block';
+
+                if (isEdit) {
+                    seoautoSetEditMode(form, true);
+                    return;
                 }
-                trigger.style.display = 'none';
+
+                if (isCancel) {
+                    seoautoSetEditMode(form, false);
+                }
             });
         </script>
         <?php
