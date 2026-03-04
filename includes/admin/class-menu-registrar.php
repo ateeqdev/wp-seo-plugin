@@ -790,9 +790,10 @@ final class MenuRegistrar
         $lastCron = (int) get_option('seoauto_last_cron_run', 0);
 
         ?>
-        <div class="wrap">
-            <h1>SEO Automation Dashboard</h1>
-            <table class="widefat striped" style="max-width:900px;">
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('SEO Automation Dashboard', 'seoauto', 'High-level status snapshot for this site.'); ?>
+            <div class="seoauto-card" style="max-width:900px;">
+            <table class="widefat striped">
                 <tbody>
                     <tr><th scope="row">Laravel Base URL</th><td><?php echo esc_html($baseUrl !== '' ? $baseUrl : 'Not configured'); ?></td></tr>
                     <tr><th scope="row">Site ID</th><td><?php echo esc_html($siteId > 0 ? (string) $siteId : 'Not registered'); ?></td></tr>
@@ -801,6 +802,7 @@ final class MenuRegistrar
                     <tr><th scope="row">Last Queue Heartbeat</th><td><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i:s', $lastCron) : 'Never'); ?></td></tr>
                 </tbody>
             </table>
+            </div>
             <p style="margin-top:16px;">
                 <a class="button button-primary" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-settings')); ?>">Open Settings</a>
             </p>
@@ -934,8 +936,8 @@ final class MenuRegistrar
             }
         }
         ?>
-        <div class="wrap">
-            <h1>Change Center</h1>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Change Center', 'seoauto-logs', 'Review automated SEO updates and their progression timeline.'); ?>
             <?php if ($notice === 'action_apply_requested') : ?>
                 <div class="notice notice-success"><p>Action queued for execution.</p></div>
             <?php elseif ($notice === 'action_revert_ok') : ?>
@@ -949,35 +951,6 @@ final class MenuRegistrar
             <?php elseif ($notice === 'action_edit_failed') : ?>
                 <div class="notice notice-error"><p>Failed to update action payload.</p></div>
             <?php endif; ?>
-            <style>
-                .seoauto-kpi-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin:10px 0 18px; }
-                .seoauto-kpi-card { border:1px solid #dcdcde; border-radius:8px; background:#fff; padding:12px; }
-                .seoauto-kpi-label { display:block; color:#50575e; font-size:12px; margin-bottom:6px; }
-                .seoauto-kpi-value { font-size:20px; font-weight:600; line-height:1.2; }
-                .seoauto-badge { display:inline-block; border-radius:999px; padding:2px 8px; font-size:11px; font-weight:600; text-transform:uppercase; }
-                .seoauto-status-received, .seoauto-status-pending { background:#f0f0f1; color:#1d2327; }
-                .seoauto-status-queued, .seoauto-status-running, .seoauto-status-in-progress { background:#cff4fc; color:#055160; }
-                .seoauto-status-applied, .seoauto-status-resolved, .seoauto-status-provider-applied { background:#d1e7dd; color:#0f5132; }
-                .seoauto-status-failed, .seoauto-status-rejected, .seoauto-status-provider-error { background:#f8d7da; color:#842029; }
-                .seoauto-status-rolled_back { background:#fff3cd; color:#664d03; }
-                .seoauto-mono { font-family:Menlo,Consolas,Monaco,monospace; font-size:12px; }
-                .seoauto-json pre { max-height:220px; overflow:auto; background:#f6f7f7; border:1px solid #dcdcde; padding:8px; border-radius:4px; }
-                .seoauto-actions-table { table-layout:fixed; }
-                .seoauto-actions-table th:nth-child(6),
-                .seoauto-actions-table td:nth-child(6) { width:22%; }
-                .seoauto-actions-table th:nth-child(7),
-                .seoauto-actions-table td:nth-child(7) { width:30%; }
-                .seoauto-action-details { max-width:320px; font-size:12px; line-height:1.35; }
-                .seoauto-action-details > div { margin-bottom:6px !important; }
-                .seoauto-action-actions { min-width:360px; }
-                .seoauto-action-actions .button { margin-right:6px; margin-bottom:6px; }
-                .seoauto-filter-grid { display:grid; grid-template-columns:repeat(5,minmax(120px,1fr)); gap:8px; margin-bottom:12px; align-items:end; }
-                .seoauto-filter-grid .button { margin-bottom:1px; }
-                .seoauto-timeline-list { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
-                .seoauto-timeline-event { display:grid; grid-template-columns:160px 130px 1fr; gap:10px; align-items:start; border:1px solid #dcdcde; border-radius:6px; padding:8px; background:#fff; }
-                .seoauto-muted { color:#646970; font-size:12px; }
-            </style>
-
             <div class="seoauto-kpi-grid">
                 <div class="seoauto-kpi-card">
                     <span class="seoauto-kpi-label">Automated Actions</span>
@@ -1044,6 +1017,7 @@ final class MenuRegistrar
                 </div>
             </form>
 
+            <div class="seoauto-card">
             <table class="wp-list-table widefat striped seoauto-actions-table">
                 <thead>
                     <tr><th>Title</th><th>Type</th><th>Status</th><th>Auto</th><th>Received</th><th>Details</th><th>Actions</th></tr>
@@ -1140,6 +1114,7 @@ final class MenuRegistrar
                 <?php endif; ?>
                 </tbody>
             </table>
+            </div>
             <?php
             $baseArgs = [
                 'page' => 'seoauto-logs',
@@ -1164,6 +1139,7 @@ final class MenuRegistrar
             </div>
 
             <h2 style="margin-top:20px;">Execution Timeline</h2>
+            <div class="seoauto-card">
             <?php if (!empty($groupedChangeLogs)) : ?>
                 <?php foreach ($groupedChangeLogs as $group) : ?>
                     <?php $events = array_reverse($group['events']); ?>
@@ -1205,6 +1181,7 @@ final class MenuRegistrar
             <?php else : ?>
                 <p class="seoauto-muted">No execution timeline entries for the current filtered page.</p>
             <?php endif; ?>
+            </div>
         </div>
         <script>
             function seoautoSetEditMode(form, editing) {
@@ -1529,13 +1506,13 @@ final class MenuRegistrar
         $totalPages = max(1, (int) ceil($total / $perPage));
 
         ?>
-        <div class="wrap">
-            <h1>Activity Logs</h1>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Activity Logs', 'seoauto-logs', 'Fallback local activity stream when remote logs are unavailable.'); ?>
             <?php $this->renderLogsToolbar($notice, $deletedCount); ?>
             <?php if ($remoteError !== '') : ?>
                 <div class="notice notice-warning"><p>Remote execution logs unavailable. Showing local logs. <?php echo esc_html($remoteError); ?></p></div>
             <?php endif; ?>
-            <form method="get">
+            <form method="get" class="seoauto-filter-grid seoauto-filter-grid-compact">
                 <input type="hidden" name="page" value="seoauto-logs">
                 <select name="severity">
                     <option value="">All Severities</option>
@@ -1549,6 +1526,7 @@ final class MenuRegistrar
                 <button class="button" type="submit">Filter</button>
             </form>
 
+            <div class="seoauto-card">
             <table class="wp-list-table widefat striped" style="margin-top:12px;">
                 <thead>
                     <tr><th>Time</th><th>Correlation</th><th>Event</th><th>Severity</th><th>Entity</th><th>Error</th></tr>
@@ -1570,6 +1548,7 @@ final class MenuRegistrar
                     <?php endif; ?>
                 </tbody>
             </table>
+            </div>
 
             <div class="tablenav bottom">
                 <div class="tablenav-pages">
@@ -1601,14 +1580,12 @@ final class MenuRegistrar
             <?php
         }
         ?>
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:12px;">
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-button-row" style="margin-bottom:12px;">
             <?php wp_nonce_field('seoauto_delete_logs'); ?>
             <input type="hidden" name="action" value="seoauto_delete_logs">
             <button type="submit" class="button" onclick="return confirm('Delete all local execution logs?');">Delete Local Logs</button>
-        </form>
-        <p style="margin-bottom:12px;">
             <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-local-errors')); ?>">Open Local Errors</a>
-        </p>
+        </form>
         <?php
     }
 
@@ -1679,11 +1656,11 @@ final class MenuRegistrar
         $totalPages = max(1, (int) ceil($total / $perPage));
 
         ?>
-        <div class="wrap">
-            <h1>Local Errors</h1>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Debug Logs', 'seoauto-local-errors', 'Inspect local warnings and errors emitted by plugin workflows.'); ?>
             <?php $this->renderLocalErrorsToolbar($notice, $deletedCount, $severity); ?>
 
-            <form method="get">
+            <form method="get" class="seoauto-filter-grid seoauto-filter-grid-compact">
                 <input type="hidden" name="page" value="seoauto-local-errors">
                 <select name="severity">
                     <option value="all" <?php selected($severity, 'all'); ?>>Warning + Error</option>
@@ -1703,6 +1680,7 @@ final class MenuRegistrar
                 <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-local-errors')); ?>">Reset</a>
             </form>
 
+            <div class="seoauto-card">
             <table class="wp-list-table widefat striped" style="margin-top:12px;">
                 <thead>
                     <tr><th>Time</th><th>Severity</th><th>Source</th><th>Correlation</th><th>Event</th><th>Entity</th><th>Error</th></tr>
@@ -1725,6 +1703,7 @@ final class MenuRegistrar
                     <?php endif; ?>
                 </tbody>
             </table>
+            </div>
 
             <div class="tablenav bottom">
                 <div class="tablenav-pages">
@@ -1833,15 +1812,15 @@ final class MenuRegistrar
             $targetTypeOptions = [];
         }
         ?>
-        <div class="wrap">
-            <h1>Admin Action Items</h1>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Action Items', 'seoauto-action-items', 'Track tasks requiring manual admin input and resolve them quickly.'); ?>
             <?php if ($notice === 'action_item_updated') : ?>
                 <div class="notice notice-success"><p>Action item updated.</p></div>
             <?php endif; ?>
             <?php if ($siteId <= 0) : ?>
                 <div class="notice notice-warning"><p>Site is not registered yet. Action items are hidden until a site ID is available.</p></div>
             <?php endif; ?>
-            <form method="get" style="display:grid;grid-template-columns:repeat(5,minmax(140px,1fr));gap:8px;align-items:end;margin-bottom:12px;">
+            <form method="get" class="seoauto-filter-grid">
                 <input type="hidden" name="page" value="seoauto-action-items">
                 <label>
                     <span>Status</span>
@@ -1880,6 +1859,7 @@ final class MenuRegistrar
                     <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-action-items')); ?>">Reset</a>
                 </div>
             </form>
+            <div class="seoauto-card">
             <table class="wp-list-table widefat striped">
                 <thead>
                     <tr><th>ID</th><th>Title</th><th>Category</th><th>Status</th><th>Target</th><th>Details</th><th>Update</th><th>Actions</th></tr>
@@ -1969,6 +1949,7 @@ final class MenuRegistrar
                     <?php endif; ?>
                 </tbody>
             </table>
+            </div>
             <div class="tablenav bottom">
                 <div class="tablenav-pages">
                     <?php
@@ -2011,7 +1992,7 @@ final class MenuRegistrar
             <?php
         }
         ?>
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:12px;">
+        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-button-row" style="margin-bottom:12px;">
             <?php wp_nonce_field('seoauto_delete_local_errors'); ?>
             <input type="hidden" name="action" value="seoauto_delete_local_errors">
             <input type="hidden" name="severity" value="<?php echo esc_attr($severity); ?>">
@@ -2049,8 +2030,8 @@ final class MenuRegistrar
         }
 
         ?>
-        <div class="wrap">
-            <h1>Schedules</h1>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Schedules', 'seoauto-schedules', 'Manage background task configuration and scheduled executions.'); ?>
             <?php if ($notice === 'task_update_ok') : ?>
                 <div class="notice notice-success"><p>Task configuration updated.</p></div>
             <?php elseif ($notice === 'task_update_failed') : ?>
@@ -2067,6 +2048,7 @@ final class MenuRegistrar
             <?php endif; ?>
 
             <h2>Configured Tasks</h2>
+            <div class="seoauto-card">
             <table class="wp-list-table widefat striped">
                 <thead><tr><th>Task ID</th><th>Name</th><th>Category</th><th>Frequency</th><th>Enabled</th><th>Timezone</th><th>Actions</th></tr></thead>
                 <tbody>
@@ -2119,8 +2101,10 @@ final class MenuRegistrar
                 <?php endif; ?>
                 </tbody>
             </table>
+            </div>
 
             <h2 style="margin-top:24px;">Scheduled Runs</h2>
+            <div class="seoauto-card">
             <table class="wp-list-table widefat striped">
                 <thead><tr><th>ID</th><th>Task</th><th>Status</th><th>Trigger</th><th>Scheduled For</th></tr></thead>
                 <tbody>
@@ -2139,6 +2123,7 @@ final class MenuRegistrar
                 <?php endif; ?>
                 </tbody>
             </table>
+            </div>
         </div>
         <?php
     }
@@ -2160,13 +2145,14 @@ final class MenuRegistrar
         );
 
         ?>
-        <div class="wrap">
-            <h1>Content Briefs</h1>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Content Briefs', 'seoauto-briefs', 'Review synced briefs and link them to WordPress posts.'); ?>
             <?php if ($notice === 'brief_link_ok') : ?>
                 <div class="notice notice-success"><p>Content brief linked to article.</p></div>
             <?php elseif ($notice === 'brief_link_failed') : ?>
                 <div class="notice notice-error"><p>Failed to link content brief.</p></div>
             <?php endif; ?>
+            <div class="seoauto-card">
             <table class="wp-list-table widefat striped">
                 <thead><tr><th>ID</th><th>Title</th><th>Focus Keyword</th><th>Brief Details</th><th>Article Status</th><th>Assignment</th><th>Linked Post</th><th>Link Article</th></tr></thead>
                 <tbody>
@@ -2207,6 +2193,7 @@ final class MenuRegistrar
                     <?php endif; ?>
                 </tbody>
             </table>
+            </div>
         </div>
         <?php
     }
@@ -2335,8 +2322,8 @@ final class MenuRegistrar
         }
 
         ?>
-        <div class="wrap">
-            <h1>OAuth Connection</h1>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('OAuth Connection', 'seoauto', 'Authentication status for provider integrations.'); ?>
             <?php if ($status === 'active') : ?>
                 <div class="notice notice-success"><p>OAuth connected successfully.</p></div>
             <?php elseif ($status === 'error') : ?>
@@ -2347,7 +2334,8 @@ final class MenuRegistrar
                 <div class="notice notice-error"><p>OAuth callback failed.</p></div>
             <?php endif; ?>
 
-            <table class="widefat striped" style="max-width:900px;">
+            <div class="seoauto-card" style="max-width:900px;">
+            <table class="widefat striped">
                 <tbody>
                     <tr><th scope="row">Status</th><td><?php echo esc_html($status); ?></td></tr>
                     <tr><th scope="row">Provider</th><td><?php echo esc_html($provider); ?></td></tr>
@@ -2356,6 +2344,7 @@ final class MenuRegistrar
                     <tr><th scope="row">Health Connected</th><td><?php echo !empty($health['connected']) ? 'Yes' : 'No'; ?></td></tr>
                 </tbody>
             </table>
+            </div>
 
             <p style="margin-top:16px;">
                 <a class="button button-primary" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-settings')); ?>">Back to Settings</a>
@@ -2377,8 +2366,8 @@ final class MenuRegistrar
         }
 
         ?>
-        <div class="wrap">
-            <h1>SEO Automation Settings</h1>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('SEO Automation Settings', 'seoauto', 'Core plugin preferences, connection state, and profile sync.'); ?>
             <?php settings_errors('seoauto_base_url'); ?>
             <?php if ($notice === 'register_ok') : ?>
                 <div class="notice notice-success"><p>Site registration updated successfully.</p></div>
@@ -2671,5 +2660,35 @@ final class MenuRegistrar
         }
 
         return is_string($host) && $host !== '';
+    }
+
+    private function renderAdminShellHeader(string $title, string $activePage, string $description = ''): void
+    {
+        $tabs = [
+            'seoauto' => ['label' => 'Settings', 'cap' => 'manage_options'],
+            'seoauto-logs' => ['label' => 'Change Center', 'cap' => 'manage_options'],
+            'seoauto-action-items' => ['label' => 'Action Items', 'cap' => 'manage_options'],
+            'seoauto-briefs' => ['label' => 'Content Briefs', 'cap' => 'edit_posts'],
+            'seoauto-local-errors' => ['label' => 'Debug Logs', 'cap' => 'manage_options'],
+            'seoauto-schedules' => ['label' => 'Schedules', 'cap' => 'manage_options'],
+        ];
+        ?>
+        <div class="seoauto-shell-header">
+            <h1><?php echo esc_html($title); ?></h1>
+            <?php if ($description !== '') : ?>
+                <p><?php echo esc_html($description); ?></p>
+            <?php endif; ?>
+            <div class="seoauto-shell-tabs">
+                <?php foreach ($tabs as $slug => $tab) : ?>
+                    <?php if (!current_user_can((string) $tab['cap'])) {
+                        continue;
+                    } ?>
+                    <a class="seoauto-shell-tab <?php echo $slug === $activePage ? 'is-active' : ''; ?>" href="<?php echo esc_url(admin_url('admin.php?page=' . $slug)); ?>">
+                        <?php echo esc_html((string) $tab['label']); ?>
+                    </a>
+                <?php endforeach; ?>
+            </div>
+        </div>
+        <?php
     }
 }
