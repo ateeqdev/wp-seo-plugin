@@ -1386,7 +1386,7 @@ final class MenuRegistrar
                 <div class="notice notice-error"><p>Failed to link content brief.</p></div>
             <?php endif; ?>
             <table class="wp-list-table widefat striped">
-                <thead><tr><th>ID</th><th>Title</th><th>Focus Keyword</th><th>Article Status</th><th>Assignment</th><th>Linked Post</th><th>Link Article</th></tr></thead>
+                <thead><tr><th>ID</th><th>Title</th><th>Focus Keyword</th><th>Brief Details</th><th>Article Status</th><th>Assignment</th><th>Linked Post</th><th>Link Article</th></tr></thead>
                 <tbody>
                     <?php if (!empty($rows)) : ?>
                         <?php foreach ($rows as $row) : ?>
@@ -1395,6 +1395,7 @@ final class MenuRegistrar
                                 <td><?php echo esc_html((string) $row->laravel_content_brief_id); ?></td>
                                 <td><?php echo esc_html((string) ($payload['brief_title'] ?? 'Untitled')); ?></td>
                                 <td><?php echo esc_html((string) ($payload['focus_keyword'] ?? '')); ?></td>
+                                <td><?php echo wp_kses_post($this->buildBriefDetailsHtml(is_array($payload) ? $payload : [])); ?></td>
                                 <td><?php echo esc_html((string) $row->article_status); ?></td>
                                 <td><?php echo esc_html((string) $row->assignment_status); ?></td>
                                 <td>
@@ -1420,12 +1421,119 @@ final class MenuRegistrar
                             </tr>
                         <?php endforeach; ?>
                     <?php else : ?>
-                        <tr><td colspan="7">No briefs synced yet.</td></tr>
+                        <tr><td colspan="8">No briefs synced yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
         </div>
         <?php
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     */
+    private function buildBriefDetailsHtml(array $payload): string
+    {
+        $keyword_type = trim((string) ($payload['keyword_type'] ?? ''));
+        $search_intent = trim((string) ($payload['search_intent'] ?? ''));
+        $topic_cluster_id = trim((string) ($payload['topic_cluster_id'] ?? ''));
+        $search_volume = isset($payload['search_volume']) ? (string) $payload['search_volume'] : '';
+        $keyword_difficulty = isset($payload['keyword_difficulty']) ? (string) $payload['keyword_difficulty'] : '';
+        $topic_priority_score = isset($payload['topic_priority_score']) ? (string) $payload['topic_priority_score'] : '';
+        $brief_summary = trim((string) ($payload['brief_summary'] ?? ''));
+        $writer_notes = trim((string) ($payload['writer_notes'] ?? ''));
+        $topic_reason = trim((string) ($payload['topic_reason'] ?? ''));
+
+        $keywords = [];
+        foreach ((array) ($payload['keywords'] ?? []) as $keyword_row) {
+            if (!is_array($keyword_row)) {
+                continue;
+            }
+
+            $role = trim((string) ($keyword_row['keyword_role'] ?? ''));
+            $keyword = trim((string) ($keyword_row['keyword'] ?? ''));
+            if ($keyword === '') {
+                continue;
+            }
+
+            $keywords[] = $role !== '' ? "{$role}: {$keyword}" : $keyword;
+        }
+
+        $insights = [];
+        foreach ((array) ($payload['insights'] ?? []) as $insight_row) {
+            if (!is_array($insight_row)) {
+                continue;
+            }
+
+            $insight_type = trim((string) ($insight_row['insight_type'] ?? ''));
+            $headline = trim((string) ($insight_row['headline'] ?? ''));
+            $details = trim((string) ($insight_row['details'] ?? ''));
+            $label = trim($insight_type !== '' ? $insight_type : 'insight');
+            $value = trim($headline !== '' ? $headline : $details);
+            if ($value === '') {
+                continue;
+            }
+
+            $insights[] = "{$label}: {$value}";
+        }
+
+        $threads = [];
+        foreach ((array) ($payload['threads'] ?? []) as $thread_row) {
+            if (!is_array($thread_row)) {
+                continue;
+            }
+
+            $title = trim((string) ($thread_row['thread_title'] ?? ''));
+            $subreddit = trim((string) ($thread_row['subreddit'] ?? ''));
+            $url = trim((string) ($thread_row['thread_url'] ?? ''));
+
+            if ($title === '' && $url === '') {
+                continue;
+            }
+
+            $thread_label = $title !== '' ? $title : $url;
+            if ($subreddit !== '') {
+                $thread_label .= " ({$subreddit})";
+            }
+
+            $threads[] = $thread_label;
+        }
+
+        $lines = [
+            '<strong>Keyword Type:</strong> ' . esc_html($keyword_type !== '' ? $keyword_type : '—'),
+            '<br><strong>Search Intent:</strong> ' . esc_html($search_intent !== '' ? $search_intent : '—'),
+            '<br><strong>Topic Cluster:</strong> ' . esc_html($topic_cluster_id !== '' ? $topic_cluster_id : '—'),
+            '<br><strong>Search Volume:</strong> ' . esc_html($search_volume !== '' ? $search_volume : '—'),
+            '<br><strong>Keyword Difficulty:</strong> ' . esc_html($keyword_difficulty !== '' ? $keyword_difficulty : '—'),
+            '<br><strong>Priority Score:</strong> ' . esc_html($topic_priority_score !== '' ? $topic_priority_score : '—'),
+            '<br><strong>Summary:</strong> ' . esc_html($brief_summary !== '' ? $brief_summary : '—'),
+            '<br><strong>Writer Notes:</strong> ' . esc_html($writer_notes !== '' ? $writer_notes : '—'),
+            '<br><strong>Topic Reason:</strong> ' . esc_html($topic_reason !== '' ? $topic_reason : '—'),
+            '<br><strong>Keywords:</strong> ' . $this->renderInlineList($keywords),
+            '<br><strong>Insights:</strong> ' . $this->renderInlineList($insights),
+            '<br><strong>Threads:</strong> ' . $this->renderInlineList($threads),
+        ];
+
+        return implode('', $lines);
+    }
+
+    /**
+     * @param list<string> $items
+     */
+    private function renderInlineList(array $items): string
+    {
+        $clean = array_values(
+            array_filter(
+                array_map(static fn ($item): string => trim((string) $item), $items),
+                static fn (string $item): bool => $item !== ''
+            )
+        );
+
+        if ($clean === []) {
+            return esc_html('—');
+        }
+
+        return esc_html(implode(' | ', $clean));
     }
 
     public function renderOauthCallbackPage(): void
