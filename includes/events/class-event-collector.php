@@ -58,6 +58,10 @@ final class EventCollector
             return;
         }
 
+        if ($this->isPostExcludedFromChangeAudit($post)) {
+            return;
+        }
+
         $this->outbox->queue($this->mapper->mapPostEvent('post_published', $post));
     }
 
@@ -153,6 +157,10 @@ final class EventCollector
             return;
         }
 
+        if ($this->isPostExcludedFromChangeAudit($post)) {
+            return;
+        }
+
         $eventType = '';
 
         if ($type === 'page') {
@@ -188,5 +196,46 @@ final class EventCollector
         $features = (array) get_option('seoauto_features', []);
 
         return (bool) ($features['send_events'] ?? true);
+    }
+
+    private function isPostExcludedFromChangeAudit(\WP_Post $post): bool
+    {
+        $raw = (string) get_option('seoauto_excluded_change_audit_pages', '');
+        if (trim($raw) === '') {
+            return false;
+        }
+
+        $entries = preg_split('/[\r\n,]+/', $raw) ?: [];
+        if ($entries === []) {
+            return false;
+        }
+
+        $postId = (int) $post->ID;
+        $postSlug = strtolower(trim((string) $post->post_name));
+        $postUrl = rtrim((string) get_permalink($postId), '/');
+
+        foreach ($entries as $entry) {
+            $candidate = trim((string) $entry);
+            if ($candidate === '') {
+                continue;
+            }
+
+            if (ctype_digit($candidate) && (int) $candidate === $postId) {
+                return true;
+            }
+
+            $normalized = strtolower($candidate);
+            if ($postSlug !== '' && $normalized === $postSlug) {
+                return true;
+            }
+
+            if (str_starts_with($normalized, 'http://') || str_starts_with($normalized, 'https://')) {
+                if (rtrim($candidate, '/') === $postUrl) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }

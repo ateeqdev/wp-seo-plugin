@@ -732,6 +732,12 @@ final class MenuRegistrar
             'sanitize_callback' => 'sanitize_textarea_field',
             'default' => '',
         ]);
+
+        register_setting('seoauto_settings', 'seoauto_excluded_change_audit_pages', [
+            'type' => 'string',
+            'sanitize_callback' => [$this, 'sanitizeExcludedChangeAuditPages'],
+            'default' => '',
+        ]);
     }
 
     public function renderDashboardPage(): void
@@ -826,10 +832,7 @@ final class MenuRegistrar
                 $payload = [];
             }
 
-            $title = trim((string) ($payload['title'] ?? ''));
-            if ($title === '') {
-                $title = trim((string) ($actionRow['action_type'] ?? 'Action'));
-            }
+            $title = $this->buildActionDisplayTitle($actionRow, $payload);
 
             $actionTitlesByLaravelId[$laravelId] = $title;
         }
@@ -934,7 +937,7 @@ final class MenuRegistrar
 
             <table class="wp-list-table widefat striped">
                 <thead>
-                    <tr><th>Laravel ID</th><th>Type</th><th>Status</th><th>Auto</th><th>Received</th><th>Details</th><th>Actions</th></tr>
+                    <tr><th>Laravel ID</th><th>Title</th><th>Type</th><th>Status</th><th>Auto</th><th>Received</th><th>Details</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                 <?php if (!empty($actions)) : ?>
@@ -953,9 +956,11 @@ final class MenuRegistrar
                         if (!is_array($afterSnapshot)) {
                             $afterSnapshot = [];
                         }
+                        $actionTitle = $this->buildActionDisplayTitle($row, $actionPayload);
                         ?>
                         <tr>
                             <td><?php echo esc_html((string) $laravelId); ?></td>
+                            <td><?php echo esc_html($actionTitle); ?></td>
                             <td><code><?php echo esc_html((string) ($row['action_type'] ?? '')); ?></code></td>
                             <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($row['status'] ?? 'received'))); ?></td>
                             <td><?php echo !empty($row['auto_apply']) ? 'Yes' : 'No'; ?></td>
@@ -995,7 +1000,7 @@ final class MenuRegistrar
                         </tr>
                     <?php endforeach; ?>
                 <?php else : ?>
-                    <tr><td colspan="7">No automated actions found.</td></tr>
+                    <tr><td colspan="8">No automated actions found.</td></tr>
                 <?php endif; ?>
                 </tbody>
             </table>
@@ -1110,6 +1115,47 @@ final class MenuRegistrar
             esc_attr($normalized),
             esc_html($label)
         );
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     * @param array<string, mixed> $payload
+     */
+    private function buildActionDisplayTitle(array $row, array $payload): string
+    {
+        $title = trim((string) ($payload['title'] ?? ''));
+        if ($title !== '') {
+            return $title;
+        }
+
+        $targetType = (string) ($row['target_type'] ?? '');
+        $targetId = (string) ($row['target_id'] ?? '');
+        $targetUrl = (string) ($row['target_url'] ?? '');
+
+        $targetLabel = '';
+        if ($targetType === 'post' && ctype_digit($targetId)) {
+            $postTitle = get_the_title((int) $targetId);
+            if (is_string($postTitle) && trim($postTitle) !== '') {
+                $targetLabel = trim($postTitle);
+            }
+        }
+
+        if ($targetLabel === '' && $targetUrl !== '') {
+            $targetLabel = $targetUrl;
+        }
+
+        if ($targetLabel === '' && $targetType !== '' && $targetId !== '') {
+            $targetLabel = "{$targetType}:{$targetId}";
+        }
+
+        $actionType = (string) ($row['action_type'] ?? 'action');
+        $actionLabel = ucwords(str_replace(['-', '_'], ' ', $actionType));
+
+        if ($targetLabel === '') {
+            return $actionLabel;
+        }
+
+        return "{$targetLabel} - {$actionLabel}";
     }
 
     private function renderLocalLogsFallback(string $remoteError = '', string $notice = '', int $deletedCount = 0): void
@@ -2006,6 +2052,18 @@ final class MenuRegistrar
                             </label>
                         </td>
                     </tr>
+                    <tr>
+                        <th scope="row"><label for="seoauto_excluded_change_audit_pages">Excluded Pages From Change-Triggered Audits</label></th>
+                        <td>
+                            <textarea
+                                id="seoauto_excluded_change_audit_pages"
+                                name="seoauto_excluded_change_audit_pages"
+                                rows="5"
+                                class="large-text"
+                                placeholder="123&#10;about-us&#10;https://example.com/privacy-policy/"><?php echo esc_textarea((string) get_option('seoauto_excluded_change_audit_pages', '')); ?></textarea>
+                            <p class="description">One value per line (or comma-separated): post ID, slug, or full URL. Matching pages will not trigger Laravel audits on create/update/publish events.</p>
+                        </td>
+                    </tr>
                 </table>
                 <?php submit_button('Save Settings'); ?>
             </form>
@@ -2138,6 +2196,31 @@ final class MenuRegistrar
         $allowed = ['dangerous_auto_apply', 'review_before_apply'];
 
         return in_array($mode, $allowed, true) ? $mode : 'dangerous_auto_apply';
+    }
+
+    /**
+     * @param mixed $value
+     */
+    public function sanitizeExcludedChangeAuditPages($value): string
+    {
+        $raw = trim((string) $value);
+        if ($raw === '') {
+            return '';
+        }
+
+        $tokens = preg_split('/[\r\n,]+/', $raw) ?: [];
+        $clean = [];
+        foreach ($tokens as $token) {
+            $normalized = trim((string) $token);
+            if ($normalized === '') {
+                continue;
+            }
+            $clean[] = sanitize_text_field($normalized);
+        }
+
+        $clean = array_values(array_unique($clean));
+
+        return implode("\n", $clean);
     }
 
     private function isBaseUrlSyntaxValid(string $url): bool
