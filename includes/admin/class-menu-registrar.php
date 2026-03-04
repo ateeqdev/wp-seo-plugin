@@ -1167,7 +1167,10 @@ final class MenuRegistrar
         $table = $wpdb->prefix . 'seoauto_admin_action_items';
         $siteId = (int) get_option('seoauto_site_id', 0);
         $itemsQuery = $siteId > 0
-            ? $wpdb->prepare("SELECT * FROM {$table} WHERE site_id = %d ORDER BY updated_at DESC LIMIT 200", $siteId)
+            ? $wpdb->prepare(
+                "SELECT * FROM {$table} WHERE site_id = %d OR site_id = 0 OR site_id IS NULL ORDER BY updated_at DESC LIMIT 200",
+                $siteId
+            )
             : "SELECT * FROM {$table} ORDER BY updated_at DESC LIMIT 200";
         $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
 
