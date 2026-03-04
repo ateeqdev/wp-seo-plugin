@@ -71,7 +71,6 @@ final class MenuRegistrar
         add_action('admin_post_seoauto_update_task', [$this, 'handleUpdateTask']);
         add_action('admin_post_seoauto_schedule_task', [$this, 'handleScheduleTask']);
         add_action('admin_post_seoauto_link_brief', [$this, 'handleLinkBrief']);
-        add_action('admin_post_seoauto_dispatch_action', [$this, 'handleDispatchAction']);
         add_action('admin_post_seoauto_delete_logs', [$this, 'handleDeleteLogs']);
         add_action('admin_post_seoauto_delete_local_errors', [$this, 'handleDeleteLocalErrors']);
         add_action('admin_post_seoauto_apply_action', [$this, 'handleApplyAction']);
@@ -454,40 +453,6 @@ final class MenuRegistrar
         exit;
     }
 
-    public function handleDispatchAction(): void
-    {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
-        check_admin_referer('seoauto_dispatch_action');
-
-        $siteId = (int) get_option('seoauto_site_id', 0);
-        $actionId = isset($_POST['dispatch_action_id']) ? (int) $_POST['dispatch_action_id'] : 0;
-
-        if ($siteId <= 0 || $actionId <= 0) {
-            wp_safe_redirect(add_query_arg([
-                'page' => 'seoauto-settings',
-                'seoauto_notice' => 'dispatch_failed',
-            ], admin_url('admin.php')));
-            exit;
-        }
-
-        try {
-            $this->client->dispatchAction($siteId, $actionId);
-            $notice = 'dispatch_ok';
-        } catch (\Throwable $exception) {
-            $this->logger->warning('admin_dispatch_action_failed', ['error' => $exception->getMessage()], 'admin');
-            $notice = 'dispatch_failed';
-        }
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-settings',
-            'seoauto_notice' => $notice,
-        ], admin_url('admin.php')));
-        exit;
-    }
-
     public function handleDeleteLogs(): void
     {
         if (!current_user_can('manage_options')) {
@@ -746,10 +711,10 @@ final class MenuRegistrar
         add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto', [$this, 'renderSettingsPage']);
         add_submenu_page('seoauto', 'Change Center', 'Change Center', 'manage_options', 'seoauto-logs', [$this, 'renderLogsPage']);
         add_submenu_page('seoauto', 'Action Items', 'Action Items', 'manage_options', 'seoauto-action-items', [$this, 'renderActionItemsPage']);
+        add_submenu_page('seoauto', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
         add_submenu_page('seoauto', 'Debug Logs', 'Debug Logs', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
         add_submenu_page(null, 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
         add_submenu_page(null, 'Schedules', 'Schedules', 'manage_options', 'seoauto-schedules', [$this, 'renderSchedulesPage']);
-        add_submenu_page(null, 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
         add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seoauto-oauth-callback', [$this, 'renderOauthCallbackPage']);
         // Backward-compatible callback slug kept accessible but hidden from sidebar menu.
         add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seo-platform-oauth-complete', [$this, 'renderOauthCallbackPage']);
@@ -2439,10 +2404,6 @@ final class MenuRegistrar
                 <div class="notice notice-success"><p>Site profile updated.</p></div>
             <?php elseif ($notice === 'profile_failed') : ?>
                 <div class="notice notice-error"><p>Site profile update failed.</p></div>
-            <?php elseif ($notice === 'dispatch_ok') : ?>
-                <div class="notice notice-success"><p>Action dispatch requested.</p></div>
-            <?php elseif ($notice === 'dispatch_failed') : ?>
-                <div class="notice notice-error"><p>Action dispatch failed.</p></div>
             <?php endif; ?>
             <?php foreach ($providerAlerts as $key => $alert) : ?>
                 <?php if (!is_array($alert)) {
@@ -2505,83 +2466,9 @@ final class MenuRegistrar
             $lastBriefSync = (int) get_option('seoauto_last_brief_sync', 0);
             $lastCron = (int) get_option('seoauto_last_cron_run', 0);
             ?>
-            <h2>Site Status</h2>
-            <table class="widefat striped" style="max-width:900px;margin-bottom:16px;">
-                <tbody>
-                    <tr><th scope="row">Laravel Base URL</th><td><?php echo esc_html($baseUrl !== '' ? $baseUrl : 'Not configured'); ?></td></tr>
-                    <tr><th scope="row">Site ID</th><td><?php echo esc_html($siteId > 0 ? (string) $siteId : 'Not registered'); ?></td></tr>
-                    <tr><th scope="row">Last User Sync</th><td><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i:s', $lastUserSync) : 'Never'); ?></td></tr>
-                    <tr><th scope="row">Last Brief Sync</th><td><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i:s', $lastBriefSync) : 'Never'); ?></td></tr>
-                    <tr><th scope="row">Last Queue Heartbeat</th><td><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i:s', $lastCron) : 'Never'); ?></td></tr>
-                </tbody>
-            </table>
-            <form method="post" action="options.php">
-                <?php settings_fields('seoauto_settings'); ?>
-                <table class="form-table">
-                    <tr>
-                        <th scope="row"><label for="seoauto_primary_seo_adapter">Primary SEO Adapter</label></th>
-                        <td>
-                            <?php $adapter = (string) get_option('seoauto_primary_seo_adapter', 'auto'); ?>
-                            <select name="seoauto_primary_seo_adapter" id="seoauto_primary_seo_adapter">
-                                <option value="auto" <?php selected($adapter, 'auto'); ?>>Auto Detect</option>
-                                <option value="yoast" <?php selected($adapter, 'yoast'); ?>>Yoast</option>
-                                <option value="rankmath" <?php selected($adapter, 'rankmath'); ?>>Rank Math</option>
-                                <option value="aioseo" <?php selected($adapter, 'aioseo'); ?>>AIOSEO</option>
-                                <option value="core" <?php selected($adapter, 'core'); ?>>Core Fallback</option>
-                            </select>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Change Application Mode</th>
-                        <td>
-                            <?php $mode = (string) get_option('seoauto_change_application_mode', 'dangerous_auto_apply'); ?>
-                            <label style="display:block;margin-bottom:6px;">
-                                <input type="radio" name="seoauto_change_application_mode" value="dangerous_auto_apply" <?php checked($mode, 'dangerous_auto_apply'); ?>>
-                                Dangerously apply all suggestions
-                            </label>
-                            <label style="display:block;">
-                                <input type="radio" name="seoauto_change_application_mode" value="review_before_apply" <?php checked($mode, 'review_before_apply'); ?>>
-                                Review every change before application
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Debug Logging</th>
-                        <td>
-                            <label>
-                                <input type="checkbox" name="seoauto_debug_enabled" value="1" <?php checked((bool) get_option('seoauto_debug_enabled', false)); ?>>
-                                Enabled
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row">Allow Insecure SSL (Dev)</th>
-                        <td>
-                            <label>
-                                <input type="checkbox" name="seoauto_allow_insecure_ssl" value="1" <?php checked((bool) get_option('seoauto_allow_insecure_ssl', false)); ?>>
-                                Disable TLS cert verification for Laravel API calls
-                            </label>
-                        </td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="seoauto_excluded_change_audit_pages">Excluded Pages From Change-Triggered Audits</label></th>
-                        <td>
-                            <textarea
-                                id="seoauto_excluded_change_audit_pages"
-                                name="seoauto_excluded_change_audit_pages"
-                                rows="5"
-                                class="large-text"
-                                placeholder="123&#10;about-us&#10;https://example.com/privacy-policy/"><?php echo esc_textarea((string) get_option('seoauto_excluded_change_audit_pages', '')); ?></textarea>
-                            <p class="description">One value per line (or comma-separated): post ID, slug, or full URL. Matching pages will not trigger Laravel audits on create/update/publish events.</p>
-                        </td>
-                    </tr>
-                </table>
-                <?php submit_button('Save Settings'); ?>
-            </form>
-
-            <hr>
-            <h2>Connection</h2>
             <?php
+            $adapter = (string) get_option('seoauto_primary_seo_adapter', 'auto');
+            $mode = (string) get_option('seoauto_change_application_mode', 'dangerous_auto_apply');
             $oauthStatus = (string) get_option('seoauto_oauth_status', 'pending');
             $oauthProvider = (string) get_option('seoauto_oauth_provider', '');
             $oauthScopes = get_option('seoauto_oauth_scopes', []);
@@ -2595,69 +2482,115 @@ final class MenuRegistrar
             $siteTaste = (string) get_option('seoauto_site_profile_taste', '');
             ?>
 
-            <table class="widefat striped" style="max-width:900px;margin-bottom:16px;">
-                <tbody>
-                    <tr><th scope="row">OAuth Status</th><td><?php echo esc_html($oauthStatus); ?></td></tr>
-                    <tr><th scope="row">Connected Provider</th><td><?php echo esc_html($oauthProvider !== '' ? $oauthProvider : 'Not connected'); ?></td></tr>
-                    <tr><th scope="row">Connected Scopes</th><td><?php echo esc_html(!empty($oauthScopes) ? implode(', ', array_map('strval', $oauthScopes)) : 'None'); ?></td></tr>
-                    <tr><th scope="row">Connected At</th><td><?php echo esc_html($oauthConnectedAt > 0 ? wp_date('Y-m-d H:i:s', $oauthConnectedAt) : 'Never'); ?></td></tr>
-                    <tr><th scope="row">Last OAuth Error</th><td><?php echo esc_html($oauthError !== '' ? $oauthError : 'None'); ?></td></tr>
-                </tbody>
-            </table>
+            <div class="seoauto-settings-grid">
+                <section class="seoauto-card seoauto-card-wide">
+                    <div class="seoauto-card-head">
+                        <h2>Site Status</h2>
+                        <a class="button button-secondary" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-briefs')); ?>">Open Content Briefs</a>
+                    </div>
+                    <div class="seoauto-stat-grid">
+                        <div class="seoauto-stat"><span>Laravel URL</span><strong><?php echo esc_html($baseUrl !== '' ? $baseUrl : 'Not configured'); ?></strong></div>
+                        <div class="seoauto-stat"><span>Site Registration</span><strong><?php echo esc_html($siteId > 0 ? 'Registered #' . $siteId : 'Not registered'); ?></strong></div>
+                        <div class="seoauto-stat"><span>Queue Heartbeat</span><strong><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i:s', $lastCron) : 'Never'); ?></strong></div>
+                        <div class="seoauto-stat"><span>User Sync</span><strong><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i:s', $lastUserSync) : 'Never'); ?></strong></div>
+                        <div class="seoauto-stat"><span>Brief Sync</span><strong><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i:s', $lastBriefSync) : 'Never'); ?></strong></div>
+                    </div>
+                </section>
 
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
-                <?php wp_nonce_field('seoauto_health_check'); ?>
-                <input type="hidden" name="action" value="seoauto_health_check">
-                <button type="submit" class="button">Run Health Check</button>
-            </form>
+                <section class="seoauto-card">
+                    <h2>Automation Preferences</h2>
+                    <form method="post" action="options.php">
+                        <?php settings_fields('seoauto_settings'); ?>
+                        <div class="seoauto-form-field">
+                            <label for="seoauto_primary_seo_adapter">Primary SEO Adapter</label>
+                            <select name="seoauto_primary_seo_adapter" id="seoauto_primary_seo_adapter">
+                                <option value="auto" <?php selected($adapter, 'auto'); ?>>Auto Detect</option>
+                                <option value="yoast" <?php selected($adapter, 'yoast'); ?>>Yoast</option>
+                                <option value="rankmath" <?php selected($adapter, 'rankmath'); ?>>Rank Math</option>
+                                <option value="aioseo" <?php selected($adapter, 'aioseo'); ?>>AIOSEO</option>
+                                <option value="core" <?php selected($adapter, 'core'); ?>>Core Fallback</option>
+                            </select>
+                        </div>
+                        <div class="seoauto-form-field">
+                            <label>Change Application Mode</label>
+                            <label><input type="radio" name="seoauto_change_application_mode" value="dangerous_auto_apply" <?php checked($mode, 'dangerous_auto_apply'); ?>> Dangerously apply all suggestions</label>
+                            <label><input type="radio" name="seoauto_change_application_mode" value="review_before_apply" <?php checked($mode, 'review_before_apply'); ?>> Review every change before application</label>
+                        </div>
+                        <div class="seoauto-form-field">
+                            <label><input type="checkbox" name="seoauto_debug_enabled" value="1" <?php checked((bool) get_option('seoauto_debug_enabled', false)); ?>> Debug logging enabled</label>
+                        </div>
+                        <div class="seoauto-form-field">
+                            <label><input type="checkbox" name="seoauto_allow_insecure_ssl" value="1" <?php checked((bool) get_option('seoauto_allow_insecure_ssl', false)); ?>> Allow insecure SSL for Laravel API calls (dev only)</label>
+                        </div>
+                        <div class="seoauto-form-field">
+                            <label for="seoauto_excluded_change_audit_pages">Excluded Pages From Change-Triggered Audits</label>
+                            <textarea
+                                id="seoauto_excluded_change_audit_pages"
+                                name="seoauto_excluded_change_audit_pages"
+                                rows="6"
+                                class="large-text"
+                                placeholder="123&#10;about-us&#10;https://example.com/privacy-policy/"><?php echo esc_textarea((string) get_option('seoauto_excluded_change_audit_pages', '')); ?></textarea>
+                            <p class="description">One value per line (or comma-separated): post ID, slug, or full URL. Matching pages will not trigger Laravel audits on create/update/publish events.</p>
+                        </div>
+                        <?php submit_button('Save Settings', 'primary', 'submit', false); ?>
+                    </form>
+                </section>
 
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-left:12px;">
-                <?php wp_nonce_field('seoauto_start_oauth'); ?>
-                <input type="hidden" name="action" value="seoauto_start_oauth">
-                <button type="submit" class="button button-secondary">Connect Google (via Laravel OAuth)</button>
-            </form>
+                <section class="seoauto-card">
+                    <h2>Connection</h2>
+                    <div class="seoauto-kv-list">
+                        <div><span>OAuth Status</span><strong><?php echo esc_html($oauthStatus); ?></strong></div>
+                        <div><span>Connected Provider</span><strong><?php echo esc_html($oauthProvider !== '' ? $oauthProvider : 'Not connected'); ?></strong></div>
+                        <div><span>Connected Scopes</span><strong><?php echo esc_html(!empty($oauthScopes) ? implode(', ', array_map('strval', $oauthScopes)) : 'None'); ?></strong></div>
+                        <div><span>Connected At</span><strong><?php echo esc_html($oauthConnectedAt > 0 ? wp_date('Y-m-d H:i:s', $oauthConnectedAt) : 'Never'); ?></strong></div>
+                        <div><span>Last OAuth Error</span><strong><?php echo esc_html($oauthError !== '' ? $oauthError : 'None'); ?></strong></div>
+                    </div>
+                    <div class="seoauto-button-row">
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                            <?php wp_nonce_field('seoauto_health_check'); ?>
+                            <input type="hidden" name="action" value="seoauto_health_check">
+                            <button type="submit" class="button">Run Health Check</button>
+                        </form>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                            <?php wp_nonce_field('seoauto_start_oauth'); ?>
+                            <input type="hidden" name="action" value="seoauto_start_oauth">
+                            <button type="submit" class="button button-secondary">Connect Google</button>
+                        </form>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                            <?php wp_nonce_field('seoauto_rotate_token'); ?>
+                            <input type="hidden" name="action" value="seoauto_rotate_token">
+                            <button type="submit" class="button">Rotate Site Token</button>
+                        </form>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-inline-input-form">
+                            <?php wp_nonce_field('seoauto_revoke_oauth'); ?>
+                            <input type="hidden" name="action" value="seoauto_revoke_oauth">
+                            <input type="text" name="revocation_reason" placeholder="Revocation reason">
+                            <button type="submit" class="button">Revoke Google OAuth</button>
+                        </form>
+                    </div>
+                </section>
 
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-left:12px;">
-                <?php wp_nonce_field('seoauto_rotate_token'); ?>
-                <input type="hidden" name="action" value="seoauto_rotate_token">
-                <button type="submit" class="button">Rotate Site Token</button>
-            </form>
-
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;margin-left:12px;">
-                <?php wp_nonce_field('seoauto_revoke_oauth'); ?>
-                <input type="hidden" name="action" value="seoauto_revoke_oauth">
-                <input type="text" name="revocation_reason" placeholder="Revocation reason" style="margin-right:6px;">
-                <button type="submit" class="button">Revoke Google OAuth</button>
-            </form>
-
-            <h3 style="margin-top:20px;">Update Site Profile (Laravel)</h3>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="max-width:900px;">
-                <?php wp_nonce_field('seoauto_update_site_profile'); ?>
-                <input type="hidden" name="action" value="seoauto_update_site_profile">
-                <table class="form-table" role="presentation">
-                    <tr>
-                        <th scope="row"><label for="platform_user_id">Owner Platform User ID</label></th>
-                        <td><input id="platform_user_id" name="platform_user_id" type="text" class="regular-text" value="<?php echo esc_attr($ownerPlatformUserId); ?>"></td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="site_description">Description</label></th>
-                        <td><textarea id="site_description" name="site_description" rows="3" class="large-text"><?php echo esc_textarea($siteDescription); ?></textarea></td>
-                    </tr>
-                    <tr>
-                        <th scope="row"><label for="site_taste">Taste</label></th>
-                        <td><textarea id="site_taste" name="site_taste" rows="3" class="large-text"><?php echo esc_textarea($siteTaste); ?></textarea></td>
-                    </tr>
-                </table>
-                <button type="submit" class="button button-secondary">Update Profile</button>
-            </form>
-
-            <h3 style="margin-top:20px;">Manual Action Dispatch</h3>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                <?php wp_nonce_field('seoauto_dispatch_action'); ?>
-                <input type="hidden" name="action" value="seoauto_dispatch_action">
-                <input type="number" min="1" name="dispatch_action_id" placeholder="Action ID" style="width:140px;margin-right:6px;">
-                <button type="submit" class="button">Dispatch Action</button>
-            </form>
+                <section class="seoauto-card seoauto-card-wide">
+                    <h2>Site Profile (Laravel)</h2>
+                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                        <?php wp_nonce_field('seoauto_update_site_profile'); ?>
+                        <input type="hidden" name="action" value="seoauto_update_site_profile">
+                        <div class="seoauto-form-field">
+                            <label for="platform_user_id">Owner Platform User ID</label>
+                            <input id="platform_user_id" name="platform_user_id" type="text" class="regular-text" value="<?php echo esc_attr($ownerPlatformUserId); ?>">
+                        </div>
+                        <div class="seoauto-form-field">
+                            <label for="site_description">Description</label>
+                            <textarea id="site_description" name="site_description" rows="3" class="large-text"><?php echo esc_textarea($siteDescription); ?></textarea>
+                        </div>
+                        <div class="seoauto-form-field">
+                            <label for="site_taste">Taste</label>
+                            <textarea id="site_taste" name="site_taste" rows="3" class="large-text"><?php echo esc_textarea($siteTaste); ?></textarea>
+                        </div>
+                        <button type="submit" class="button button-secondary">Update Profile</button>
+                    </form>
+                </section>
+            </div>
         </div>
         <?php
     }

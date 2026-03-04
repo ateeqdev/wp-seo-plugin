@@ -11,3 +11,122 @@
 .seoauto-severity-info {
     color: #0369a1;
 }
+
+.seoauto-settings-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(360px, 1fr));
+    gap: 16px;
+    margin-top: 16px;
+    max-width: 1200px;
+}
+
+.seoauto-card {
+    background: #fff;
+    border: 1px solid #dcdcde;
+    border-radius: 8px;
+    padding: 16px;
+}
+
+.seoauto-card h2 {
+    margin-top: 0;
+    margin-bottom: 14px;
+    font-size: 18px;
+}
+
+.seoauto-card-wide {
+    grid-column: 1 / -1;
+}
+
+.seoauto-card-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 10px;
+}
+
+.seoauto-card-head h2 {
+    margin: 0;
+}
+
+.seoauto-stat-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.seoauto-stat {
+    border: 1px solid #e2e8f0;
+    background: #f8fafc;
+    border-radius: 6px;
+    padding: 10px;
+}
+
+.seoauto-stat span {
+    display: block;
+    color: #475569;
+    font-size: 12px;
+    margin-bottom: 4px;
+}
+
+.seoauto-stat strong {
+    display: block;
+    font-size: 13px;
+    word-break: break-word;
+}
+
+.seoauto-form-field {
+    margin-bottom: 12px;
+}
+
+.seoauto-form-field > label {
+    display: block;
+    margin-bottom: 6px;
+    font-weight: 600;
+}
+
+.seoauto-form-field label + label {
+    margin-top: 6px;
+}
+
+.seoauto-form-field select,
+.seoauto-form-field textarea,
+.seoauto-form-field input[type="text"] {
+    width: 100%;
+    max-width: 100%;
+}
+
+.seoauto-kv-list {
+    display: grid;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+
+.seoauto-kv-list > div {
+    border: 1px solid #e2e8f0;
+    border-radius: 6px;
+    padding: 8px 10px;
+    display: flex;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.seoauto-kv-list span {
+    color: #475569;
+}
+
+.seoauto-button-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+}
+
+.seoauto-inline-input-form {
+    display: flex;
+    gap: 8px;
+}
+
+.seoauto-inline-input-form input[type="text"] {
+    min-width: 180px;
+}
