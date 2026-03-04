@@ -2216,12 +2216,24 @@ final class MenuRegistrar
                 <?php
                 $apiError = (string) get_option('seoauto_api_last_error', '');
                 $apiErrorAt = (int) get_option('seoauto_api_last_error_at', 0);
+                $apiErrorLower = strtolower($apiError);
+                $isOwnershipProofError = strpos($apiErrorLower, 'ownership proof verification failed') !== false;
+                $isValidationError = strpos($apiErrorLower, 'http 422') !== false;
+                $isAuthError = strpos($apiErrorLower, 'http 401') !== false || strpos($apiErrorLower, 'http 403') !== false;
                 ?>
                 <div class="notice notice-error">
-                    <p><strong>Laravel API connectivity issue detected.</strong> Outbound calls from WordPress to the Laravel endpoint are failing.</p>
+                    <p><strong>Laravel API request failed.</strong> WordPress could reach Laravel, but the API call was rejected or failed.</p>
                     <p><?php echo esc_html($apiError !== '' ? $apiError : 'Unknown transport error'); ?></p>
                     <p><?php echo esc_html($apiErrorAt > 0 ? 'Last failure: ' . wp_date('Y-m-d H:i:s', $apiErrorAt) : ''); ?></p>
-                    <p>Recommended: verify firewall/WAF rules, DNS, TLS certs, and outbound HTTP availability from this host. No automatic firewall exception is applied.</p>
+                    <?php if ($isOwnershipProofError) : ?>
+                        <p>Ownership proof could not be verified from Laravel. Ensure this site domain is publicly reachable by Laravel (not localhost/private-only mapping).</p>
+                    <?php elseif ($isValidationError) : ?>
+                        <p>This is a validation error (422). Inspect payload fields and endpoint requirements rather than firewall/TLS.</p>
+                    <?php elseif ($isAuthError) : ?>
+                        <p>This is an authorization error. Verify site token, ownership challenge flow, and plugin registration state.</p>
+                    <?php else : ?>
+                        <p>Recommended: verify firewall/WAF rules, DNS, TLS certs, and outbound HTTP availability from this host. No automatic firewall exception is applied.</p>
+                    <?php endif; ?>
                 </div>
             <?php endif; ?>
             <form method="post" action="options.php">

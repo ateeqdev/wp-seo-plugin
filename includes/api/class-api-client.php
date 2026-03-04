@@ -126,8 +126,8 @@ final class ApiClient
         ];
 
         if ($statusCode >= 400) {
-            $message = sprintf('HTTP %d for %s', $statusCode, $path);
-            update_option('seoauto_api_blocked', true, false);
+            $message = $this->buildHttpErrorMessage($statusCode, $path, $result['body']);
+            update_option('seoauto_api_blocked', $statusCode >= 500, false);
             update_option('seoauto_api_last_error', $message, false);
             update_option('seoauto_api_last_error_at', time(), false);
             $this->logger->warning('api_http_error', [
@@ -191,6 +191,43 @@ final class ApiClient
         }
 
         return filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false;
+    }
+
+    /**
+     * @param array<string, mixed> $body
+     */
+    private function buildHttpErrorMessage(int $statusCode, string $path, array $body): string
+    {
+        $parts = [sprintf('HTTP %d for %s', $statusCode, $path)];
+
+        $topLevelMessage = isset($body['message']) ? trim((string) $body['message']) : '';
+        if ($topLevelMessage !== '') {
+            $parts[] = $topLevelMessage;
+        }
+
+        if (isset($body['errors']) && is_array($body['errors'])) {
+            $validationParts = [];
+            foreach ($body['errors'] as $field => $messages) {
+                if (!is_array($messages)) {
+                    continue;
+                }
+
+                foreach ($messages as $rawMessage) {
+                    $message = trim((string) $rawMessage);
+                    if ($message === '') {
+                        continue;
+                    }
+
+                    $validationParts[] = (string) $field . ': ' . $message;
+                }
+            }
+
+            if (!empty($validationParts)) {
+                $parts[] = 'Validation: ' . implode(' | ', $validationParts);
+            }
+        }
+
+        return implode(' - ', $parts);
     }
 
     /**
