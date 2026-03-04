@@ -349,6 +349,26 @@ final class ActionRepository
         global $wpdb;
         $table = $wpdb->prefix . 'seoauto_admin_action_items';
         $action = $this->findByLaravelId($laravelActionId);
+        $payloadTitle = sanitize_text_field((string) ($payload['title'] ?? 'Manual action required'));
+        $contextPrefix = '';
+        $targetType = (string) ($action['target_type'] ?? '');
+        $targetId = (string) ($action['target_id'] ?? '');
+
+        if ($targetType === 'post' && ctype_digit($targetId)) {
+            $postTitle = get_the_title((int) $targetId);
+            if (is_string($postTitle) && trim($postTitle) !== '') {
+                $contextPrefix = trim($postTitle);
+            }
+        }
+
+        if ($contextPrefix === '' && isset($payload['page_title'])) {
+            $contextPrefix = trim((string) $payload['page_title']);
+        }
+
+        $itemTitle = $payloadTitle;
+        if ($contextPrefix !== '' && stripos($itemTitle, $contextPrefix) === false) {
+            $itemTitle = "{$contextPrefix} - {$itemTitle}";
+        }
 
         $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $table,
@@ -356,7 +376,7 @@ final class ActionRepository
                 'action_id' => isset($action['id']) ? (int) $action['id'] : null,
                 'laravel_action_id' => $laravelActionId,
                 'site_id' => (int) get_option('seoauto_site_id', 0),
-                'title' => sanitize_text_field((string) ($payload['title'] ?? 'Manual action required')),
+                'title' => sanitize_text_field($itemTitle),
                 'details' => sanitize_textarea_field((string) ($payload['details'] ?? '')),
                 'recommended_value' => sanitize_text_field((string) ($payload['recommended_value'] ?? '')),
                 'category' => sanitize_text_field((string) ($payload['category'] ?? 'general')),

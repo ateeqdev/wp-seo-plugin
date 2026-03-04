@@ -791,10 +791,10 @@ final class MenuRegistrar
         $itemsTable = $wpdb->prefix . 'seoauto_admin_action_items';
         $itemQuery = $siteId > 0
             ? $wpdb->prepare(
-                "SELECT * FROM {$itemsTable} WHERE site_id = %d OR site_id = 0 OR site_id IS NULL ORDER BY updated_at DESC LIMIT 200",
+                "SELECT * FROM {$itemsTable} WHERE site_id = %d ORDER BY updated_at DESC LIMIT 200",
                 $siteId
             )
-            : "SELECT * FROM {$itemsTable} ORDER BY updated_at DESC LIMIT 200";
+            : "SELECT * FROM {$itemsTable} WHERE 1=0";
         $humanItems = $wpdb->get_results($itemQuery, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
         if (!is_array($humanItems)) {
             $humanItems = [];
@@ -812,6 +812,52 @@ final class MenuRegistrar
             }
 
             $humanItemsByLaravelId[$itemLaravelId][] = $item;
+        }
+
+        $actionTitlesByLaravelId = [];
+        foreach ($actions as $actionRow) {
+            $laravelId = (int) ($actionRow['laravel_action_id'] ?? 0);
+            if ($laravelId <= 0) {
+                continue;
+            }
+
+            $payload = json_decode((string) ($actionRow['action_payload'] ?? '{}'), true);
+            if (!is_array($payload)) {
+                $payload = [];
+            }
+
+            $title = trim((string) ($payload['title'] ?? ''));
+            if ($title === '') {
+                $title = trim((string) ($actionRow['action_type'] ?? 'Action'));
+            }
+
+            $actionTitlesByLaravelId[$laravelId] = $title;
+        }
+
+        foreach ($humanItemsByLaravelId as $laravelId => $items) {
+            if (!isset($actionTitlesByLaravelId[$laravelId]) && !empty($items[0]['title'])) {
+                $actionTitlesByLaravelId[$laravelId] = (string) $items[0]['title'];
+            }
+        }
+
+        $groupedChangeLogs = [];
+        foreach ($changeLogs as $log) {
+            $laravelId = (int) ($log['laravel_action_id'] ?? 0);
+            if ($laravelId <= 0) {
+                continue;
+            }
+
+            if (!isset($groupedChangeLogs[$laravelId])) {
+                $groupedChangeLogs[$laravelId] = [
+                    'laravel_action_id' => $laravelId,
+                    'title' => $actionTitlesByLaravelId[$laravelId] ?? 'Action',
+                    'last_status' => (string) ($log['status'] ?? ''),
+                    'last_at' => (string) ($log['created_at'] ?? ''),
+                    'events' => [],
+                ];
+            }
+
+            $groupedChangeLogs[$laravelId]['events'][] = $log;
         }
 
         $openHumanItems = 0;
@@ -957,40 +1003,60 @@ final class MenuRegistrar
             <h2 style="margin-top:20px;">Execution Timeline</h2>
             <table class="wp-list-table widefat striped">
                 <thead>
-                    <tr><th>Time</th><th>Laravel ID</th><th>Event</th><th>Status</th><th>Note</th><th>Change Data</th></tr>
+                    <tr><th>Laravel ID</th><th>Title</th><th>Latest Status</th><th>Last Event At</th><th>Progression</th></tr>
                 </thead>
                 <tbody>
-                    <?php if (!empty($changeLogs)) : ?>
-                        <?php foreach ($changeLogs as $log) : ?>
-                            <?php
-                            $before = json_decode((string) ($log['before_snapshot'] ?? '{}'), true);
-                            $after = json_decode((string) ($log['after_snapshot'] ?? '{}'), true);
-                            if (!is_array($before)) {
-                                $before = [];
-                            }
-                            if (!is_array($after)) {
-                                $after = [];
-                            }
-                            ?>
+                    <?php if (!empty($groupedChangeLogs)) : ?>
+                        <?php foreach ($groupedChangeLogs as $group) : ?>
+                            <?php $events = array_reverse($group['events']); ?>
                             <tr>
-                                <td><?php echo esc_html((string) ($log['created_at'] ?? '')); ?></td>
-                                <td><?php echo esc_html((string) ($log['laravel_action_id'] ?? '')); ?></td>
-                                <td><code><?php echo esc_html((string) ($log['event_type'] ?? '')); ?></code></td>
-                                <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($log['status'] ?? 'received'))); ?></td>
-                                <td><?php echo esc_html((string) ($log['note'] ?? '')); ?></td>
-                                <td class="seoauto-json">
+                                <td class="seoauto-mono"><?php echo esc_html((string) ($group['laravel_action_id'] ?? 0)); ?></td>
+                                <td><?php echo esc_html((string) ($group['title'] ?? 'Action')); ?></td>
+                                <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($group['last_status'] ?? 'received'))); ?></td>
+                                <td><?php echo esc_html((string) ($group['last_at'] ?? '')); ?></td>
+                                <td style="min-width:420px;">
                                     <details>
-                                        <summary>Before/After</summary>
-                                        <strong>Before</strong>
-                                        <pre><?php echo esc_html($before !== [] ? wp_json_encode($before, JSON_PRETTY_PRINT) : '{}'); ?></pre>
-                                        <strong>After</strong>
-                                        <pre><?php echo esc_html($after !== [] ? wp_json_encode($after, JSON_PRETTY_PRINT) : '{}'); ?></pre>
+                                        <summary>Show progression (<?php echo esc_html((string) count($events)); ?> events)</summary>
+                                        <table class="widefat striped" style="margin-top:8px;">
+                                            <thead>
+                                                <tr><th>Time</th><th>Event</th><th>Status</th><th>Note</th><th>Change Data</th></tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($events as $event) : ?>
+                                                    <?php
+                                                    $before = json_decode((string) ($event['before_snapshot'] ?? '{}'), true);
+                                                    $after = json_decode((string) ($event['after_snapshot'] ?? '{}'), true);
+                                                    if (!is_array($before)) {
+                                                        $before = [];
+                                                    }
+                                                    if (!is_array($after)) {
+                                                        $after = [];
+                                                    }
+                                                    ?>
+                                                    <tr>
+                                                        <td><?php echo esc_html((string) ($event['created_at'] ?? '')); ?></td>
+                                                        <td><code><?php echo esc_html((string) ($event['event_type'] ?? '')); ?></code></td>
+                                                        <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($event['status'] ?? 'received'))); ?></td>
+                                                        <td><?php echo esc_html((string) ($event['note'] ?? '')); ?></td>
+                                                        <td class="seoauto-json">
+                                                            <details>
+                                                                <summary>Before/After</summary>
+                                                                <strong>Before</strong>
+                                                                <pre><?php echo esc_html($before !== [] ? wp_json_encode($before, JSON_PRETTY_PRINT) : '{}'); ?></pre>
+                                                                <strong>After</strong>
+                                                                <pre><?php echo esc_html($after !== [] ? wp_json_encode($after, JSON_PRETTY_PRINT) : '{}'); ?></pre>
+                                                            </details>
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
                                     </details>
                                 </td>
                             </tr>
                         <?php endforeach; ?>
                     <?php else : ?>
-                        <tr><td colspan="6">No execution timeline entries yet.</td></tr>
+                        <tr><td colspan="5">No execution timeline entries yet.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
@@ -1311,36 +1377,103 @@ final class MenuRegistrar
 
         global $wpdb;
         $table = $wpdb->prefix . 'seoauto_admin_action_items';
+        $actionsTable = $wpdb->prefix . 'seoauto_actions';
         $siteId = (int) get_option('seoauto_site_id', 0);
         $itemsQuery = $siteId > 0
             ? $wpdb->prepare(
-                "SELECT * FROM {$table} WHERE site_id = %d OR site_id = 0 OR site_id IS NULL ORDER BY updated_at DESC LIMIT 200",
+                "SELECT * FROM {$table} WHERE site_id = %d ORDER BY updated_at DESC LIMIT 200",
                 $siteId
             )
-            : "SELECT * FROM {$table} ORDER BY updated_at DESC LIMIT 200";
+            : "SELECT * FROM {$table} WHERE 1=0";
         $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
 
         $items = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $itemsQuery
         );
+        if (!is_array($items)) {
+            $items = [];
+        }
+
+        $actionRowsByLaravelId = [];
+        if (!empty($items)) {
+            $laravelIds = [];
+            foreach ($items as $item) {
+                $laravelId = isset($item->laravel_action_id) ? (int) $item->laravel_action_id : 0;
+                if ($laravelId > 0) {
+                    $laravelIds[] = $laravelId;
+                }
+            }
+            $laravelIds = array_values(array_unique($laravelIds));
+
+            if (!empty($laravelIds)) {
+                $placeholders = implode(',', array_fill(0, count($laravelIds), '%d'));
+                $query = $wpdb->prepare(
+                    "SELECT laravel_action_id, target_type, target_id, target_url FROM {$actionsTable} WHERE laravel_action_id IN ({$placeholders})",
+                    ...$laravelIds
+                );
+                $actionRows = $wpdb->get_results($query, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+                if (is_array($actionRows)) {
+                    foreach ($actionRows as $actionRow) {
+                        $laravelId = (int) ($actionRow['laravel_action_id'] ?? 0);
+                        if ($laravelId > 0) {
+                            $actionRowsByLaravelId[$laravelId] = $actionRow;
+                        }
+                    }
+                }
+            }
+        }
         ?>
         <div class="wrap">
             <h1>Admin Action Items</h1>
             <?php if ($notice === 'action_item_updated') : ?>
                 <div class="notice notice-success"><p>Action item updated.</p></div>
             <?php endif; ?>
+            <?php if ($siteId <= 0) : ?>
+                <div class="notice notice-warning"><p>Site is not registered yet. Action items are hidden until a site ID is available.</p></div>
+            <?php endif; ?>
             <table class="wp-list-table widefat striped">
                 <thead>
-                    <tr><th>ID</th><th>Title</th><th>Category</th><th>Status</th><th>Details</th><th>Update</th></tr>
+                    <tr><th>ID</th><th>Title</th><th>Category</th><th>Status</th><th>Target</th><th>Details</th><th>Update</th></tr>
                 </thead>
                 <tbody>
                     <?php if (!empty($items)) : ?>
                         <?php foreach ($items as $item) : ?>
+                            <?php
+                            $laravelId = isset($item->laravel_action_id) ? (int) $item->laravel_action_id : 0;
+                            $targetLabel = '';
+                            $actionRow = $actionRowsByLaravelId[$laravelId] ?? [];
+                            if (is_array($actionRow) && !empty($actionRow)) {
+                                $targetType = (string) ($actionRow['target_type'] ?? '');
+                                $targetId = (string) ($actionRow['target_id'] ?? '');
+                                $targetUrl = (string) ($actionRow['target_url'] ?? '');
+
+                                if ($targetType === 'post' && ctype_digit($targetId)) {
+                                    $postTitle = get_the_title((int) $targetId);
+                                    if (is_string($postTitle) && trim($postTitle) !== '') {
+                                        $targetLabel = trim($postTitle);
+                                    }
+                                }
+
+                                if ($targetLabel === '' && $targetUrl !== '') {
+                                    $targetLabel = $targetUrl;
+                                }
+
+                                if ($targetLabel === '' && $targetId !== '') {
+                                    $targetLabel = "{$targetType}:{$targetId}";
+                                }
+                            }
+
+                            $displayTitle = (string) $item->title;
+                            if ($targetLabel !== '' && stripos($displayTitle, $targetLabel) === false) {
+                                $displayTitle = "{$targetLabel} - {$displayTitle}";
+                            }
+                            ?>
                             <tr>
                                 <td><?php echo esc_html((string) $item->id); ?></td>
-                                <td><?php echo esc_html((string) $item->title); ?></td>
+                                <td><?php echo esc_html($displayTitle); ?></td>
                                 <td><?php echo esc_html((string) $item->category); ?></td>
                                 <td><?php echo esc_html((string) $item->status); ?></td>
+                                <td><?php echo esc_html($targetLabel !== '' ? $targetLabel : 'N/A'); ?></td>
                                 <td><?php echo esc_html((string) $item->details); ?></td>
                                 <td>
                                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
@@ -1358,7 +1491,7 @@ final class MenuRegistrar
                             </tr>
                         <?php endforeach; ?>
                     <?php else : ?>
-                        <tr><td colspan="6">No human action items found.</td></tr>
+                        <tr><td colspan="7">No human action items found.</td></tr>
                     <?php endif; ?>
                 </tbody>
             </table>
