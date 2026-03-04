@@ -1434,48 +1434,12 @@ final class MenuRegistrar
      */
     private function buildBriefDetailsHtml(array $payload): string
     {
-        $keyword_type = trim((string) ($payload['keyword_type'] ?? ''));
         $search_intent = trim((string) ($payload['search_intent'] ?? ''));
-        $topic_cluster_id = trim((string) ($payload['topic_cluster_id'] ?? ''));
-        $search_volume = isset($payload['search_volume']) ? (string) $payload['search_volume'] : '';
-        $keyword_difficulty = isset($payload['keyword_difficulty']) ? (string) $payload['keyword_difficulty'] : '';
-        $topic_priority_score = isset($payload['topic_priority_score']) ? (string) $payload['topic_priority_score'] : '';
         $brief_summary = trim((string) ($payload['brief_summary'] ?? ''));
         $writer_notes = trim((string) ($payload['writer_notes'] ?? ''));
-        $topic_reason = trim((string) ($payload['topic_reason'] ?? ''));
-
-        $keywords = [];
-        foreach ((array) ($payload['keywords'] ?? []) as $keyword_row) {
-            if (!is_array($keyword_row)) {
-                continue;
-            }
-
-            $role = trim((string) ($keyword_row['keyword_role'] ?? ''));
-            $keyword = trim((string) ($keyword_row['keyword'] ?? ''));
-            if ($keyword === '') {
-                continue;
-            }
-
-            $keywords[] = $role !== '' ? "{$role}: {$keyword}" : $keyword;
-        }
-
-        $insights = [];
-        foreach ((array) ($payload['insights'] ?? []) as $insight_row) {
-            if (!is_array($insight_row)) {
-                continue;
-            }
-
-            $insight_type = trim((string) ($insight_row['insight_type'] ?? ''));
-            $headline = trim((string) ($insight_row['headline'] ?? ''));
-            $details = trim((string) ($insight_row['details'] ?? ''));
-            $label = trim($insight_type !== '' ? $insight_type : 'insight');
-            $value = trim($headline !== '' ? $headline : $details);
-            if ($value === '') {
-                continue;
-            }
-
-            $insights[] = "{$label}: {$value}";
-        }
+        $outline_items = $this->collectInsightItemsByType($payload, 'outline-item', 10);
+        $pain_points = $this->collectInsightItemsByType($payload, 'pain-point', 6);
+        $content_ideas = $this->collectInsightItemsByType($payload, 'content-idea', 6);
 
         $threads = [];
         foreach ((array) ($payload['threads'] ?? []) as $thread_row) {
@@ -1485,42 +1449,62 @@ final class MenuRegistrar
 
             $title = trim((string) ($thread_row['thread_title'] ?? ''));
             $subreddit = trim((string) ($thread_row['subreddit'] ?? ''));
-            $url = trim((string) ($thread_row['thread_url'] ?? ''));
-
-            if ($title === '' && $url === '') {
+            if ($title === '') {
                 continue;
             }
 
-            $thread_label = $title !== '' ? $title : $url;
-            if ($subreddit !== '') {
-                $thread_label .= " ({$subreddit})";
+            $threads[] = $subreddit !== '' ? "{$title} ({$subreddit})" : $title;
+            if (count($threads) >= 5) {
+                break;
             }
-
-            $threads[] = $thread_label;
         }
 
-        $lines = [
-            '<strong>Keyword Type:</strong> ' . esc_html($keyword_type !== '' ? $keyword_type : '—'),
-            '<br><strong>Search Intent:</strong> ' . esc_html($search_intent !== '' ? $search_intent : '—'),
-            '<br><strong>Topic Cluster:</strong> ' . esc_html($topic_cluster_id !== '' ? $topic_cluster_id : '—'),
-            '<br><strong>Search Volume:</strong> ' . esc_html($search_volume !== '' ? $search_volume : '—'),
-            '<br><strong>Keyword Difficulty:</strong> ' . esc_html($keyword_difficulty !== '' ? $keyword_difficulty : '—'),
-            '<br><strong>Priority Score:</strong> ' . esc_html($topic_priority_score !== '' ? $topic_priority_score : '—'),
-            '<br><strong>Summary:</strong> ' . esc_html($brief_summary !== '' ? $brief_summary : '—'),
-            '<br><strong>Writer Notes:</strong> ' . esc_html($writer_notes !== '' ? $writer_notes : '—'),
-            '<br><strong>Topic Reason:</strong> ' . esc_html($topic_reason !== '' ? $topic_reason : '—'),
-            '<br><strong>Keywords:</strong> ' . $this->renderInlineList($keywords),
-            '<br><strong>Insights:</strong> ' . $this->renderInlineList($insights),
-            '<br><strong>Threads:</strong> ' . $this->renderInlineList($threads),
-        ];
+        $html = '<strong>Search Intent:</strong> ' . esc_html($search_intent !== '' ? $search_intent : '—');
+        $html .= '<br><strong>Brief Summary:</strong> ' . esc_html($brief_summary !== '' ? $brief_summary : '—');
+        $html .= '<br><strong>Writer Notes:</strong> ' . esc_html($writer_notes !== '' ? $writer_notes : '—');
+        $html .= '<br><strong>Recommended Outline</strong>' . $this->renderBulletList($outline_items);
+        $html .= '<strong>Reader Pain Points</strong>' . $this->renderBulletList($pain_points);
+        $html .= '<strong>Content Angles</strong>' . $this->renderBulletList($content_ideas);
+        $html .= '<strong>Source Threads</strong>' . $this->renderBulletList($threads);
 
-        return implode('', $lines);
+        return $html;
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return list<string>
+     */
+    private function collectInsightItemsByType(array $payload, string $type, int $limit): array
+    {
+        $items = [];
+
+        foreach ((array) ($payload['insights'] ?? []) as $insight_row) {
+            if (!is_array($insight_row)) {
+                continue;
+            }
+
+            if ((string) ($insight_row['insight_type'] ?? '') !== $type) {
+                continue;
+            }
+
+            $value = trim((string) ($insight_row['details'] ?? $insight_row['headline'] ?? ''));
+            if ($value === '') {
+                continue;
+            }
+
+            $items[] = $value;
+            if (count($items) >= $limit) {
+                break;
+            }
+        }
+
+        return $items;
     }
 
     /**
      * @param list<string> $items
      */
-    private function renderInlineList(array $items): string
+    private function renderBulletList(array $items): string
     {
         $clean = array_values(
             array_filter(
@@ -1530,10 +1514,16 @@ final class MenuRegistrar
         );
 
         if ($clean === []) {
-            return esc_html('—');
+            return '<br>—';
         }
 
-        return esc_html(implode(' | ', $clean));
+        $html = '<ul style="margin:4px 0 10px 18px;list-style:disc;">';
+        foreach ($clean as $item) {
+            $html .= '<li>' . esc_html($item) . '</li>';
+        }
+        $html .= '</ul>';
+
+        return $html;
     }
 
     public function renderOauthCallbackPage(): void
