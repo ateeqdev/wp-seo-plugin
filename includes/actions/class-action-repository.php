@@ -275,7 +275,7 @@ final class ActionRepository
     /**
      * @return array<int, array<string, mixed>>
      */
-    public function listActions(array $filters = [], int $limit = 100): array
+    public function listActions(array $filters = [], int $limit = 100, int $offset = 0): array
     {
         global $wpdb;
 
@@ -287,6 +287,24 @@ final class ActionRepository
             $params[] = (string) $filters['status'];
         }
 
+        if (!empty($filters['action_type'])) {
+            $where[] = 'action_type = %s';
+            $params[] = (string) $filters['action_type'];
+        }
+
+        if (!empty($filters['target_type'])) {
+            $where[] = 'target_type = %s';
+            $params[] = (string) $filters['target_type'];
+        }
+
+        if (!empty($filters['search'])) {
+            $search = '%' . $wpdb->esc_like((string) $filters['search']) . '%';
+            $where[] = '(target_url LIKE %s OR target_id LIKE %s OR action_payload LIKE %s)';
+            $params[] = $search;
+            $params[] = $search;
+            $params[] = $search;
+        }
+
         if (!isset($filters['include_human_actions']) || !$filters['include_human_actions']) {
             $where[] = 'action_type != %s';
             $params[] = 'human-action-required';
@@ -294,14 +312,59 @@ final class ActionRepository
 
         $whereSql = implode(' AND ', $where);
         $params[] = max(1, $limit);
+        $params[] = max(0, $offset);
 
         $query = $wpdb->prepare(
-            "SELECT * FROM {$this->table} WHERE {$whereSql} ORDER BY received_at DESC LIMIT %d",
+            "SELECT * FROM {$this->table} WHERE {$whereSql} ORDER BY received_at DESC LIMIT %d OFFSET %d",
             ...$params
         );
         $rows = $wpdb->get_results($query, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 
         return is_array($rows) ? $rows : [];
+    }
+
+    public function countActions(array $filters = []): int
+    {
+        global $wpdb;
+
+        $where = ['1=1'];
+        $params = [];
+
+        if (!empty($filters['status'])) {
+            $where[] = 'status = %s';
+            $params[] = (string) $filters['status'];
+        }
+
+        if (!empty($filters['action_type'])) {
+            $where[] = 'action_type = %s';
+            $params[] = (string) $filters['action_type'];
+        }
+
+        if (!empty($filters['target_type'])) {
+            $where[] = 'target_type = %s';
+            $params[] = (string) $filters['target_type'];
+        }
+
+        if (!empty($filters['search'])) {
+            $search = '%' . $wpdb->esc_like((string) $filters['search']) . '%';
+            $where[] = '(target_url LIKE %s OR target_id LIKE %s OR action_payload LIKE %s)';
+            $params[] = $search;
+            $params[] = $search;
+            $params[] = $search;
+        }
+
+        if (!isset($filters['include_human_actions']) || !$filters['include_human_actions']) {
+            $where[] = 'action_type != %s';
+            $params[] = 'human-action-required';
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $query = $wpdb->prepare(
+            "SELECT COUNT(*) FROM {$this->table} WHERE {$whereSql}",
+            ...$params
+        );
+
+        return (int) $wpdb->get_var($query); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
     }
 
     /**
@@ -336,6 +399,45 @@ final class ActionRepository
             ...$params
         );
 
+        $rows = $wpdb->get_results($query, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+
+        return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * @param array<int, int> $laravelActionIds
+     * @return array<int, array<string, mixed>>
+     */
+    public function listChangeLogsForLaravelIds(array $laravelActionIds, int $limit = 500, array $filters = []): array
+    {
+        global $wpdb;
+
+        $ids = array_values(array_filter(array_map('intval', $laravelActionIds), static fn (int $id): bool => $id > 0));
+        if ($ids === []) {
+            return [];
+        }
+
+        $table = $wpdb->prefix . 'seoauto_change_logs';
+        $where = ['laravel_action_id IN (' . implode(',', array_fill(0, count($ids), '%d')) . ')'];
+        $params = $ids;
+
+        if (!empty($filters['exclude_event_type'])) {
+            $where[] = 'event_type != %s';
+            $params[] = (string) $filters['exclude_event_type'];
+        }
+
+        if (!empty($filters['event_type'])) {
+            $where[] = 'event_type = %s';
+            $params[] = (string) $filters['event_type'];
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $params[] = max(1, $limit);
+
+        $query = $wpdb->prepare(
+            "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC LIMIT %d",
+            ...$params
+        );
         $rows = $wpdb->get_results($query, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 
         return is_array($rows) ? $rows : [];

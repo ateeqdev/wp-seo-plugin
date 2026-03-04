@@ -40,6 +40,7 @@ final class SiteRegistrar
             'admin_email' => get_option('admin_email'),
             'users' => $this->collectUsers(),
         ];
+        $payload = array_merge($payload, $this->collectSiteProfile());
 
         if ($token !== null && $token !== '') {
             $payload['api_key'] = $token;
@@ -77,6 +78,8 @@ final class SiteRegistrar
                 }
                 OwnershipProofStore::delete($challengeId);
             }
+
+            $this->syncLocalSiteProfileFromResponse($response);
 
             return $response;
         } catch (\Throwable $exception) {
@@ -161,5 +164,56 @@ final class SiteRegistrar
         $base = home_url('/wp-json/seoauto/v1/ownership-proof');
 
         return add_query_arg(['challenge_id' => $challengeId], $base);
+    }
+
+    /**
+     * @return array{description:string,taste:string}
+     */
+    private function collectSiteProfile(): array
+    {
+        $siteName = trim((string) get_bloginfo('name'));
+        $tagline = trim((string) get_bloginfo('description'));
+        $host = wp_parse_url(home_url('/'), PHP_URL_HOST);
+        $host = is_string($host) ? trim($host) : '';
+
+        $description = trim((string) get_option('seoauto_site_profile_description', ''));
+        if ($description === '') {
+            if ($tagline !== '') {
+                $description = $tagline;
+            } elseif ($siteName !== '') {
+                $description = "{$siteName} website content and resources.";
+            } elseif ($host !== '') {
+                $description = "Website content and resources for {$host}.";
+            } else {
+                $description = 'Website content and resources.';
+            }
+        }
+
+        $taste = trim((string) get_option('seoauto_site_profile_taste', ''));
+        if ($taste === '') {
+            $taste = 'Use a clear, factual, SEO-first writing style: concise headings, plain language, and actionable recommendations.';
+        }
+
+        return [
+            'description' => $description,
+            'taste' => $taste,
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     */
+    private function syncLocalSiteProfileFromResponse(array $response): void
+    {
+        $description = trim((string) ($response['description'] ?? ''));
+        $taste = trim((string) ($response['taste'] ?? ''));
+
+        if ($description !== '') {
+            update_option('seoauto_site_profile_description', $description, false);
+        }
+
+        if ($taste !== '') {
+            update_option('seoauto_site_profile_taste', $taste, false);
+        }
     }
 }

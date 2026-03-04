@@ -744,11 +744,11 @@ final class MenuRegistrar
         add_submenu_page('seoauto', 'Dashboard', 'Dashboard', 'manage_options', 'seoauto', [$this, 'renderDashboardPage']);
         add_submenu_page('seoauto', 'Change Center', 'Change Center', 'manage_options', 'seoauto-logs', [$this, 'renderLogsPage']);
         add_submenu_page('seoauto', 'Action Items', 'Action Items', 'manage_options', 'seoauto-action-items', [$this, 'renderActionItemsPage']);
-        add_submenu_page('seoauto', 'Activity Logs', 'Activity Logs', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
-        add_submenu_page('seoauto', 'Schedules', 'Schedules', 'manage_options', 'seoauto-schedules', [$this, 'renderSchedulesPage']);
-        add_submenu_page('seoauto', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
         add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
-        add_submenu_page('seoauto', 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seoauto-oauth-callback', [$this, 'renderOauthCallbackPage']);
+        add_submenu_page(null, 'Activity Logs', 'Activity Logs', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
+        add_submenu_page(null, 'Schedules', 'Schedules', 'manage_options', 'seoauto-schedules', [$this, 'renderSchedulesPage']);
+        add_submenu_page(null, 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
+        add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seoauto-oauth-callback', [$this, 'renderOauthCallbackPage']);
         // Backward-compatible callback slug kept accessible but hidden from sidebar menu.
         add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seo-platform-oauth-complete', [$this, 'renderOauthCallbackPage']);
     }
@@ -849,18 +849,35 @@ final class MenuRegistrar
 
         $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
         $status = isset($_GET['status']) ? sanitize_text_field((string) $_GET['status']) : '';
+        $actionType = isset($_GET['action_type']) ? sanitize_text_field((string) $_GET['action_type']) : '';
+        $targetType = isset($_GET['target_type']) ? sanitize_text_field((string) $_GET['target_type']) : '';
+        $search = isset($_GET['q']) ? sanitize_text_field((string) $_GET['q']) : '';
+        $page = max(1, (int) ($_GET['paged'] ?? 1));
+        $perPage = min(100, max(10, (int) ($_GET['per_page'] ?? 25)));
+        $offset = ($page - 1) * $perPage;
+
         $filters = [];
         if ($status !== '') {
             $filters['status'] = $status;
         }
+        if ($actionType !== '') {
+            $filters['action_type'] = $actionType;
+        }
+        if ($targetType !== '') {
+            $filters['target_type'] = $targetType;
+        }
+        if ($search !== '') {
+            $filters['search'] = $search;
+        }
 
-        $actions = $this->actionRepository->listActions($filters, 200);
-        $changeLogs = $this->actionRepository->listChangeLogs(0, 200, [
-            'exclude_event_type' => 'human_action_created',
-        ]);
-        $humanActionLogs = $this->actionRepository->listChangeLogs(0, 100, [
-            'event_type' => 'human_action_created',
-        ]);
+        $totalActions = $this->actionRepository->countActions($filters);
+        $totalPages = max(1, (int) ceil($totalActions / $perPage));
+        if ($page > $totalPages) {
+            $page = $totalPages;
+            $offset = ($page - 1) * $perPage;
+        }
+
+        $actions = $this->actionRepository->listActions($filters, $perPage, $offset);
 
         global $wpdb;
         $siteId = (int) get_option('seoauto_site_id', 0);
@@ -912,6 +929,14 @@ final class MenuRegistrar
                 $actionTitlesByLaravelId[$laravelId] = (string) $items[0]['title'];
             }
         }
+
+        $actionIdsOnPage = array_values(array_filter(array_map(
+            static fn (array $row): int => (int) ($row['laravel_action_id'] ?? 0),
+            $actions
+        ), static fn (int $id): bool => $id > 0));
+        $changeLogs = $this->actionRepository->listChangeLogsForLaravelIds($actionIdsOnPage, 500, [
+            'exclude_event_type' => 'human_action_created',
+        ]);
 
         $groupedChangeLogs = [];
         foreach ($changeLogs as $log) {
@@ -977,6 +1002,11 @@ final class MenuRegistrar
                 .seoauto-action-details > div { margin-bottom:6px !important; }
                 .seoauto-action-actions { min-width:360px; }
                 .seoauto-action-actions .button { margin-right:6px; margin-bottom:6px; }
+                .seoauto-filter-grid { display:grid; grid-template-columns:repeat(5,minmax(120px,1fr)); gap:8px; margin-bottom:12px; align-items:end; }
+                .seoauto-filter-grid .button { margin-bottom:1px; }
+                .seoauto-timeline-list { display:flex; flex-direction:column; gap:10px; margin-top:8px; }
+                .seoauto-timeline-event { display:grid; grid-template-columns:160px 130px 1fr; gap:10px; align-items:start; border:1px solid #dcdcde; border-radius:6px; padding:8px; background:#fff; }
+                .seoauto-muted { color:#646970; font-size:12px; }
             </style>
 
             <div class="seoauto-kpi-grid">
@@ -1002,18 +1032,37 @@ final class MenuRegistrar
                 Change Center shows machine-applied changes and their execution timeline. Human-only tasks are listed separately below.
                 <a href="<?php echo esc_url(admin_url('admin.php?page=seoauto-action-items')); ?>">Open Admin Action Items</a>
             </p>
-            <form method="get" style="margin-bottom:12px;">
+            <form method="get" class="seoauto-filter-grid">
                 <input type="hidden" name="page" value="seoauto-logs">
-                <select name="status">
-                    <option value="">All statuses</option>
+                <label>
+                    <span class="seoauto-muted">Status</span>
+                    <select name="status" style="width:100%;">
+                        <option value="">All statuses</option>
                     <option value="received" <?php selected($status, 'received'); ?>>Received</option>
                     <option value="queued" <?php selected($status, 'queued'); ?>>Queued</option>
                     <option value="running" <?php selected($status, 'running'); ?>>Running</option>
                     <option value="applied" <?php selected($status, 'applied'); ?>>Applied</option>
                     <option value="failed" <?php selected($status, 'failed'); ?>>Failed</option>
                     <option value="rolled_back" <?php selected($status, 'rolled_back'); ?>>Rolled Back</option>
-                </select>
-                <button class="button" type="submit">Filter</button>
+                    </select>
+                </label>
+                <label>
+                    <span class="seoauto-muted">Action Type</span>
+                    <input type="text" name="action_type" value="<?php echo esc_attr($actionType); ?>" placeholder="e.g. add-meta-description" style="width:100%;">
+                </label>
+                <label>
+                    <span class="seoauto-muted">Target Type</span>
+                    <input type="text" name="target_type" value="<?php echo esc_attr($targetType); ?>" placeholder="post / image" style="width:100%;">
+                </label>
+                <label>
+                    <span class="seoauto-muted">Search</span>
+                    <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="URL, ID, payload" style="width:100%;">
+                </label>
+                <div>
+                    <input type="hidden" name="per_page" value="<?php echo esc_attr((string) $perPage); ?>">
+                    <button class="button button-primary" type="submit">Apply</button>
+                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-logs')); ?>">Reset</a>
+                </div>
             </form>
 
             <table class="wp-list-table widefat striped seoauto-actions-table">
@@ -1112,82 +1161,63 @@ final class MenuRegistrar
                 <?php endif; ?>
                 </tbody>
             </table>
+            <?php
+            $baseArgs = [
+                'page' => 'seoauto-logs',
+                'status' => $status,
+                'action_type' => $actionType,
+                'target_type' => $targetType,
+                'q' => $search,
+                'per_page' => $perPage,
+            ];
+            $prevPage = max(1, $page - 1);
+            $nextPage = min($totalPages, $page + 1);
+            ?>
+            <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 18px;">
+                <div class="seoauto-muted">
+                    Showing <?php echo esc_html((string) count($actions)); ?> of <?php echo esc_html((string) $totalActions); ?> records
+                    (page <?php echo esc_html((string) $page); ?> of <?php echo esc_html((string) $totalPages); ?>)
+                </div>
+                <div>
+                    <a class="button <?php echo $page <= 1 ? 'disabled' : ''; ?>" href="<?php echo esc_url(add_query_arg(array_merge($baseArgs, ['paged' => $prevPage]), admin_url('admin.php'))); ?>">Previous</a>
+                    <a class="button <?php echo $page >= $totalPages ? 'disabled' : ''; ?>" href="<?php echo esc_url(add_query_arg(array_merge($baseArgs, ['paged' => $nextPage]), admin_url('admin.php'))); ?>">Next</a>
+                </div>
+            </div>
 
             <h2 style="margin-top:20px;">Execution Timeline</h2>
-            <table class="wp-list-table widefat striped">
-                <thead>
-                    <tr><th>Title</th><th>Latest Status</th><th>Last Event At</th><th>Progression</th></tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($groupedChangeLogs)) : ?>
-                        <?php foreach ($groupedChangeLogs as $group) : ?>
-                            <?php $events = array_reverse($group['events']); ?>
-                            <tr>
-                                <td><?php echo esc_html((string) ($group['title'] ?? 'Action')); ?></td>
-                                <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($group['last_status'] ?? 'received'))); ?></td>
-                                <td><?php echo esc_html((string) ($group['last_at'] ?? '')); ?></td>
-                                <td style="min-width:420px;">
-                                    <details>
-                                        <summary>Show progression (<?php echo esc_html((string) count($events)); ?> events)</summary>
-                                        <table class="widefat striped" style="margin-top:8px;">
-                                            <thead>
-                                                <tr><th>Time</th><th>Event</th><th>Status</th><th>Note</th></tr>
-                                            </thead>
-                                            <tbody>
-                                                <?php foreach ($events as $event) : ?>
-                                                    <tr>
-                                                        <td><?php echo esc_html((string) ($event['created_at'] ?? '')); ?></td>
-                                                        <td><code><?php echo esc_html((string) ($event['event_type'] ?? '')); ?></code></td>
-                                                        <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($event['status'] ?? 'received'))); ?></td>
-                                                        <td><?php echo esc_html((string) ($event['note'] ?? '')); ?></td>
-                                                    </tr>
-                                                <?php endforeach; ?>
-                                            </tbody>
-                                        </table>
-                                    </details>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else : ?>
-                        <tr><td colspan="4">No execution timeline entries yet.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-
-            <h2 style="margin-top:20px;">Human Action Activity</h2>
-            <table class="wp-list-table widefat striped">
-                <thead>
-                    <tr><th>Time</th><th>Title</th><th>Category</th><th>Status</th><th>Details</th></tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($humanActionLogs)) : ?>
-                        <?php foreach ($humanActionLogs as $log) : ?>
-                            <?php
-                            $laravelId = (int) ($log['laravel_action_id'] ?? 0);
-                            $linkedItems = $humanItemsByLaravelId[$laravelId] ?? [];
-                            $primaryItem = !empty($linkedItems) ? $linkedItems[0] : null;
-                            ?>
-                            <tr>
-                                <td><?php echo esc_html((string) ($log['created_at'] ?? '')); ?></td>
-                                <td><?php echo esc_html((string) ($primaryItem['title'] ?? 'Manual action required')); ?></td>
-                                <td><?php echo esc_html((string) ($primaryItem['category'] ?? 'general')); ?></td>
-                                <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($primaryItem['status'] ?? 'open'))); ?></td>
-                                <td>
-                                    <details>
-                                        <summary>Open details</summary>
-                                        <p style="margin-top:8px;"><?php echo esc_html((string) ($primaryItem['details'] ?? (string) ($log['note'] ?? ''))); ?></p>
-                                        <?php if (!empty($primaryItem['recommended_value'])) : ?>
-                                            <p><strong>Recommended Value:</strong> <code><?php echo esc_html((string) $primaryItem['recommended_value']); ?></code></p>
-                                        <?php endif; ?>
-                                    </details>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else : ?>
-                        <tr><td colspan="5">No human action activity yet.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+            <?php if (!empty($groupedChangeLogs)) : ?>
+                <?php foreach ($groupedChangeLogs as $group) : ?>
+                    <?php $events = array_reverse($group['events']); ?>
+                    <div style="border:1px solid #dcdcde;border-radius:8px;background:#fff;padding:10px;margin-bottom:12px;">
+                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
+                            <strong><?php echo esc_html((string) ($group['title'] ?? 'Action')); ?></strong>
+                            <span><?php echo wp_kses_post($this->renderStatusBadge((string) ($group['last_status'] ?? 'received'))); ?></span>
+                        </div>
+                        <div class="seoauto-muted" style="margin-top:4px;">
+                            Last event: <?php echo esc_html((string) ($group['last_at'] ?? '')); ?> • <?php echo esc_html((string) count($events)); ?> timeline events
+                        </div>
+                        <details style="margin-top:8px;">
+                            <summary>Show progression</summary>
+                            <div class="seoauto-timeline-list">
+                                <?php foreach ($events as $event) : ?>
+                                    <div class="seoauto-timeline-event">
+                                        <div class="seoauto-mono"><?php echo esc_html((string) ($event['created_at'] ?? '')); ?></div>
+                                        <div><code><?php echo esc_html((string) ($event['event_type'] ?? '')); ?></code></div>
+                                        <div>
+                                            <?php echo wp_kses_post($this->renderStatusBadge((string) ($event['status'] ?? 'received'))); ?>
+                                            <?php if (!empty($event['note'])) : ?>
+                                                <div class="seoauto-muted" style="margin-top:4px;"><?php echo esc_html((string) $event['note']); ?></div>
+                                            <?php endif; ?>
+                                        </div>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </details>
+                    </div>
+                <?php endforeach; ?>
+            <?php else : ?>
+                <p class="seoauto-muted">No execution timeline entries for the current filtered page.</p>
+            <?php endif; ?>
         </div>
         <script>
             function seoautoSetEditMode(form, editing) {
