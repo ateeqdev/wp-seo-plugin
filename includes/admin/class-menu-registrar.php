@@ -878,6 +878,8 @@ final class MenuRegistrar
         }
 
         $actions = $this->actionRepository->listActions($filters, $perPage, $offset);
+        $actionTypeOptions = $this->actionRepository->listDistinctActionTypes();
+        $targetTypeOptions = $this->actionRepository->listDistinctTargetTypes();
 
         global $wpdb;
         $siteId = (int) get_option('seoauto_site_id', 0);
@@ -1048,11 +1050,21 @@ final class MenuRegistrar
                 </label>
                 <label>
                     <span class="seoauto-muted">Action Type</span>
-                    <input type="text" name="action_type" value="<?php echo esc_attr($actionType); ?>" placeholder="e.g. add-meta-description" style="width:100%;">
+                    <select name="action_type" style="width:100%;">
+                        <option value="">All action types</option>
+                        <?php foreach ($actionTypeOptions as $option) : ?>
+                            <option value="<?php echo esc_attr($option); ?>" <?php selected($actionType, $option); ?>><?php echo esc_html($option); ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </label>
                 <label>
                     <span class="seoauto-muted">Target Type</span>
-                    <input type="text" name="target_type" value="<?php echo esc_attr($targetType); ?>" placeholder="post / image" style="width:100%;">
+                    <select name="target_type" style="width:100%;">
+                        <option value="">All target types</option>
+                        <?php foreach ($targetTypeOptions as $option) : ?>
+                            <option value="<?php echo esc_attr($option); ?>" <?php selected($targetType, $option); ?>><?php echo esc_html($option); ?></option>
+                        <?php endforeach; ?>
+                    </select>
                 </label>
                 <label>
                     <span class="seoauto-muted">Search</span>
@@ -1205,7 +1217,7 @@ final class MenuRegistrar
                                         <div><code><?php echo esc_html((string) ($event['event_type'] ?? '')); ?></code></div>
                                         <div>
                                             <?php echo wp_kses_post($this->renderStatusBadge((string) ($event['status'] ?? 'received'))); ?>
-                                            <?php if (!empty($event['note'])) : ?>
+                                            <?php if ($this->shouldRenderTimelineNote((string) ($event['event_type'] ?? ''), (string) ($event['note'] ?? ''))) : ?>
                                                 <div class="seoauto-muted" style="margin-top:4px;"><?php echo esc_html((string) $event['note']); ?></div>
                                             <?php endif; ?>
                                         </div>
@@ -1289,6 +1301,29 @@ final class MenuRegistrar
             esc_attr($normalized),
             esc_html($label)
         );
+    }
+
+    private function shouldRenderTimelineNote(string $eventType, string $note): bool
+    {
+        $normalizedEvent = strtolower(trim($eventType));
+        $normalizedNote = strtolower(trim($note));
+
+        if ($normalizedNote === '') {
+            return false;
+        }
+
+        $systemNotes = [
+            'action received from laravel.',
+            'action queued for execution.',
+            'action execution started.',
+            'action awaiting manual review.',
+        ];
+
+        if (in_array($normalizedNote, $systemNotes, true) && in_array($normalizedEvent, ['received', 'queued', 'running'], true)) {
+            return false;
+        }
+
+        return true;
     }
 
     /**

@@ -121,7 +121,7 @@ final class ActionRepository
                 $laravelActionId
             )
         );
-        $this->logChange($laravelActionId, 'queued', 'running', 'Action execution started.');
+        $this->logChange($laravelActionId, 'running', 'running', 'Action execution started.');
     }
 
     /**
@@ -395,7 +395,7 @@ final class ActionRepository
         $params[] = max(1, $limit);
         $whereSql = implode(' AND ', $where);
         $query = $wpdb->prepare(
-            "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC LIMIT %d",
+            "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC, id DESC LIMIT %d",
             ...$params
         );
 
@@ -435,12 +435,48 @@ final class ActionRepository
         $params[] = max(1, $limit);
 
         $query = $wpdb->prepare(
-            "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC LIMIT %d",
+            "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC, id DESC LIMIT %d",
             ...$params
         );
         $rows = $wpdb->get_results($query, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 
         return is_array($rows) ? $rows : [];
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function listDistinctActionTypes(): array
+    {
+        global $wpdb;
+
+        $rows = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            "SELECT DISTINCT action_type FROM {$this->table} WHERE action_type <> '' ORDER BY action_type ASC"
+        );
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('strval', $rows)));
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    public function listDistinctTargetTypes(): array
+    {
+        global $wpdb;
+
+        $rows = $wpdb->get_col( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            "SELECT DISTINCT target_type FROM {$this->table} WHERE target_type <> '' ORDER BY target_type ASC"
+        );
+
+        if (!is_array($rows)) {
+            return [];
+        }
+
+        return array_values(array_filter(array_map('strval', $rows)));
     }
 
     /**
