@@ -137,27 +137,32 @@ final class ActionRepository
     ): void {
         global $wpdb;
 
+        $updateData = [
+            'status' => $status,
+            'last_error' => $error,
+            'processed_at' => current_time('mysql'),
+            'updated_at' => current_time('mysql'),
+        ];
+        $updateFormat = ['%s', '%s', '%s', '%s'];
+
+        // Preserve prior snapshots when none are passed (e.g. failed re-run or manual revert).
+        if ($before !== null) {
+            $updateData['before_snapshot'] = JsonHelper::encode($before);
+            $updateFormat[] = '%s';
+        }
+
+        if ($after !== null) {
+            $updateData['after_snapshot'] = JsonHelper::encode($after);
+            $updateFormat[] = '%s';
+        }
+
         $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $this->table,
-            [
-                'status' => $status,
-                'last_error' => $error,
-                'before_snapshot' => $before !== null ? JsonHelper::encode($before) : null,
-                'after_snapshot' => $after !== null ? JsonHelper::encode($after) : null,
-                'processed_at' => current_time('mysql'),
-                'updated_at' => current_time('mysql'),
-            ],
+            $updateData,
             [
                 'laravel_action_id' => $laravelActionId,
             ],
-            [
-                '%s',
-                '%s',
-                '%s',
-                '%s',
-                '%s',
-                '%s',
-            ],
+            $updateFormat,
             [
                 '%d',
             ]

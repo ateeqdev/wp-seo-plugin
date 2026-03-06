@@ -108,7 +108,7 @@ final class StatusReporter
             return;
         }
 
-        if (in_array($status, ['applied', 'failed', 'rejected'], true)) {
+        if (in_array($status, ['applied', 'failed', 'rejected', 'rolled_back'], true)) {
             $after = JsonHelper::decodeArray(isset($action['after_snapshot']) ? (string) $action['after_snapshot'] : '');
             $this->report($action, $status, $after, isset($action['last_error']) ? (string) $action['last_error'] : null);
         }
@@ -119,6 +119,7 @@ final class StatusReporter
         return match ($status) {
             'applied' => 'provider-applied',
             'failed' => 'provider-error',
+            'rolled_back' => 'provider-rolled-back',
             default => $status,
         };
     }

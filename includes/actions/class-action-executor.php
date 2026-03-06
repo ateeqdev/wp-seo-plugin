@@ -171,8 +171,9 @@ final class ActionExecutor
                 }
             }
 
-            $this->repository->markResult($laravelActionId, $rolledBack ? 'rolled_back' : 'failed', $exception->getMessage());
-            $this->statusReporter->report($action, 'failed', [
+            $finalStatus = $rolledBack ? 'rolled_back' : 'failed';
+            $this->repository->markResult($laravelActionId, $finalStatus, $exception->getMessage());
+            $this->statusReporter->report($action, $finalStatus, [
                 'reason' => 'execution_failed',
                 'rolled_back' => $rolledBack,
             ], $exception->getMessage());
@@ -209,6 +210,9 @@ final class ActionExecutor
 
         if ($status === 'rolled_back') {
             $this->repository->markResult($laravelActionId, 'rolled_back', null);
+            $this->statusReporter->report($action, 'rolled_back', [
+                'reason' => 'manual_revert',
+            ]);
         }
 
         return $result;

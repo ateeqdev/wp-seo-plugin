@@ -56,8 +56,8 @@ final class MetaDescriptionHandler extends AbstractActionHandler
         }
 
         $length = strlen($description);
-        if ($length < 70 || $length > 320) {
-            throw new Exception('Meta description must be between 70 and 320 characters.');
+        if ($length > 320) {
+            throw new Exception('Meta description must be 320 characters or fewer.');
         }
 
         $before = [
