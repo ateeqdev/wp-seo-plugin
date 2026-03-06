@@ -446,6 +446,51 @@ final class LaravelClient
     }
 
     /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function updateGoogleAdsSettings(int $siteId, array $payload): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {
+            return $this->apiClient->request(
+                'PATCH',
+                '/api/sites/' . $siteId . '/provider-settings/google-ads',
+                [],
+                $payload,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function getWeeklyDigest(int $siteId, bool $latest = true): array
+    {
+        $query = [
+            'latest' => $latest ? '1' : '0',
+        ];
+
+        $response = $this->retryPolicy->execute(function () use ($siteId, $query): array {
+            return $this->apiClient->request(
+                'GET',
+                '/api/sites/' . $siteId . '/weekly-digest',
+                $query,
+                null,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function dispatchAction(int $siteId, int $actionId): array

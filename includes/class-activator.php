@@ -46,6 +46,7 @@ final class Activator
                 'auto_apply_actions' => true,
                 'send_events' => true,
                 'sync_briefs' => true,
+                'sync_weekly_digest' => true,
             ],
             '',
             'no'

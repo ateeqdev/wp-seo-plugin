@@ -34,6 +34,7 @@ use SEOAutomation\Connector\Sync\BriefSyncer;
 use SEOAutomation\Connector\Sync\HealthChecker;
 use SEOAutomation\Connector\Sync\SiteRegistrar;
 use SEOAutomation\Connector\Sync\UserSyncer;
+use SEOAutomation\Connector\Sync\WeeklyDigestSyncer;
 use SEOAutomation\Connector\Utils\LockManager;
 use SEOAutomation\Connector\Utils\Logger;
 
@@ -65,6 +66,7 @@ final class Plugin
     public function onPluginsLoaded(): void
     {
         Schema::createOrUpgrade();
+        QueueManager::scheduleRecurringJobs();
         update_option('seoauto_base_url', rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/'), false);
         $this->registerServices();
         $this->registerHooks();
@@ -193,12 +195,18 @@ final class Plugin
             fn (ServiceContainer $c): BriefSyncer => new BriefSyncer($c->get('laravel_client'), $c->get('logger')),
             true
         );
+        $this->container->register(
+            'weekly_digest_syncer',
+            fn (ServiceContainer $c): WeeklyDigestSyncer => new WeeklyDigestSyncer($c->get('laravel_client'), $c->get('logger')),
+            true
+        );
         $this->container->register('seo_detector', static fn (): SeoDetector => SeoDetector::instance(), true);
         $this->container->register(
             'menu_registrar',
             fn (ServiceContainer $c): MenuRegistrar => new MenuRegistrar(
                 $c->get('laravel_client'),
                 $c->get('brief_syncer'),
+                $c->get('weekly_digest_syncer'),
                 $c->get('site_registrar'),
                 $c->get('health_checker'),
                 $c->get('oauth_handler'),
@@ -244,6 +252,7 @@ final class Plugin
                 $c->get('action_poller'),
                 $c->get('brief_syncer'),
                 $c->get('user_syncer'),
+                $c->get('weekly_digest_syncer'),
                 $c->get('action_executor'),
                 $c->get('status_reporter'),
                 $c->get('logger')

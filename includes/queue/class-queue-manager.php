@@ -10,6 +10,7 @@ use SEOAutomation\Connector\Actions\StatusReporter;
 use SEOAutomation\Connector\Events\EventDispatcher;
 use SEOAutomation\Connector\Sync\BriefSyncer;
 use SEOAutomation\Connector\Sync\UserSyncer;
+use SEOAutomation\Connector\Sync\WeeklyDigestSyncer;
 use SEOAutomation\Connector\Utils\Logger;
 
 final class QueueManager
@@ -22,6 +23,8 @@ final class QueueManager
 
     private UserSyncer $userSyncer;
 
+    private WeeklyDigestSyncer $weeklyDigestSyncer;
+
     private ActionExecutor $actionExecutor;
 
     private StatusReporter $statusReporter;
@@ -33,6 +36,7 @@ final class QueueManager
         ActionPoller $actionPoller,
         BriefSyncer $briefSyncer,
         UserSyncer $userSyncer,
+        WeeklyDigestSyncer $weeklyDigestSyncer,
         ActionExecutor $actionExecutor,
         StatusReporter $statusReporter,
         Logger $logger
@@ -41,6 +45,7 @@ final class QueueManager
         $this->actionPoller = $actionPoller;
         $this->briefSyncer = $briefSyncer;
         $this->userSyncer = $userSyncer;
+        $this->weeklyDigestSyncer = $weeklyDigestSyncer;
         $this->actionExecutor = $actionExecutor;
         $this->statusReporter = $statusReporter;
         $this->logger = $logger;
@@ -66,6 +71,11 @@ final class QueueManager
         add_action('seoauto_sync_users', function (): void {
             $this->touchHeartbeat();
             $this->userSyncer->sync();
+        });
+
+        add_action('seoauto_sync_weekly_digest', function (): void {
+            $this->touchHeartbeat();
+            $this->weeklyDigestSyncer->sync();
         });
 
         add_action('seoauto_cleanup', function (): void {
@@ -117,6 +127,7 @@ final class QueueManager
         $events = $wpdb->prefix . 'seoauto_event_outbox';
         $logs = $wpdb->prefix . 'seoauto_activity_logs';
         $locks = $wpdb->prefix . 'seoauto_locks';
+        $digests = $wpdb->prefix . 'seoauto_weekly_digests';
 
         $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $wpdb->prepare("DELETE FROM {$events} WHERE created_at < DATE_SUB(%s, INTERVAL 30 DAY)", current_time('mysql'))
@@ -132,6 +143,9 @@ final class QueueManager
         );
         $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $wpdb->prepare("DELETE FROM {$locks} WHERE expires_at < %s", current_time('mysql'))
+        );
+        $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $wpdb->prepare("DELETE FROM {$digests} WHERE synced_at < DATE_SUB(%s, INTERVAL 180 DAY)", current_time('mysql'))
         );
     }
 
@@ -187,6 +201,7 @@ final class QueueManager
             'seoauto_poll_actions',
             'seoauto_sync_briefs',
             'seoauto_sync_users',
+            'seoauto_sync_weekly_digest',
             'seoauto_cleanup',
             'seoauto_execute_action',
             'seoauto_retry_ack',
@@ -244,6 +259,7 @@ final class QueueManager
         self::maybeScheduleAsRecurring('seoauto_poll_actions', 5 * MINUTE_IN_SECONDS, 'seo-automation-actions');
         self::maybeScheduleAsRecurring('seoauto_sync_briefs', 10 * MINUTE_IN_SECONDS, 'seo-automation-sync');
         self::maybeScheduleAsRecurring('seoauto_sync_users', HOUR_IN_SECONDS, 'seo-automation-sync');
+        self::maybeScheduleAsRecurring('seoauto_sync_weekly_digest', 10 * MINUTE_IN_SECONDS, 'seo-automation-sync');
 
         if (!function_exists('as_has_scheduled_action') || !as_has_scheduled_action('seoauto_cleanup')) {
             as_schedule_recurring_action(
@@ -297,6 +313,10 @@ final class QueueManager
 
         if (!wp_next_scheduled('seoauto_sync_users')) {
             wp_schedule_event(time(), 'hourly', 'seoauto_sync_users');
+        }
+
+        if (!wp_next_scheduled('seoauto_sync_weekly_digest')) {
+            wp_schedule_event(time(), 'seoauto_ten_minutes', 'seoauto_sync_weekly_digest');
         }
 
         if (!wp_next_scheduled('seoauto_cleanup')) {
