@@ -181,8 +181,8 @@ final class ActionRepository
             eventType: $eventType,
             status: $status,
             note: $error,
-            before: $before,
-            after: $after
+            before: $before ?? [],
+            after: $after ?? []
         );
     }
 
