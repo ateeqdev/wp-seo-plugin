@@ -572,7 +572,7 @@ final class MenuRegistrar
                 </section>
 
                 <!-- Automation Preferences -->
-                <section class="seoauto-card">
+                <section class="seoauto-card seoauto-card--settings">
                     <h2>Automation Preferences</h2>
                     <form method="post" action="options.php">
                         <?php settings_fields('seoauto_settings'); ?>
@@ -1915,8 +1915,6 @@ final class MenuRegistrar
             'seoauto-logs'         => ['label'=>'Change Center',  'cap'=>'manage_options'],
             'seoauto-action-items' => ['label'=>'Action Items',   'cap'=>'manage_options'],
             'seoauto-briefs'       => ['label'=>'Content Briefs', 'cap'=>'edit_posts'],
-            'seoauto-local-errors' => ['label'=>'Debug Logs',     'cap'=>'manage_options'],
-            'seoauto-schedules'    => ['label'=>'Schedules',      'cap'=>'manage_options'],
         ];
         ?>
         <div class="seoauto-shell-header">

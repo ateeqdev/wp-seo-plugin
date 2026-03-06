@@ -282,20 +282,10 @@ final class ActionRepository
         $where = ['1=1'];
         $params = [];
 
-        if (!empty($filters['status'])) {
-            $where[] = 'status = %s';
-            $params[] = (string) $filters['status'];
-        }
-
-        if (!empty($filters['action_type'])) {
-            $where[] = 'action_type = %s';
-            $params[] = (string) $filters['action_type'];
-        }
-
-        if (!empty($filters['target_type'])) {
-            $where[] = 'target_type = %s';
-            $params[] = (string) $filters['target_type'];
-        }
+        $this->appendStringFilter($where, $params, 'status', $filters['status'] ?? null);
+        $this->appendStringFilter($where, $params, 'action_type', $filters['action_type'] ?? null);
+        $this->appendStringFilter($where, $params, 'target_type', $filters['target_type'] ?? null);
+        $this->appendIntFilter($where, $params, 'target_id', $filters['post_ids'] ?? null);
 
         if (!empty($filters['search'])) {
             $search = '%' . $wpdb->esc_like((string) $filters['search']) . '%';
@@ -330,20 +320,10 @@ final class ActionRepository
         $where = ['1=1'];
         $params = [];
 
-        if (!empty($filters['status'])) {
-            $where[] = 'status = %s';
-            $params[] = (string) $filters['status'];
-        }
-
-        if (!empty($filters['action_type'])) {
-            $where[] = 'action_type = %s';
-            $params[] = (string) $filters['action_type'];
-        }
-
-        if (!empty($filters['target_type'])) {
-            $where[] = 'target_type = %s';
-            $params[] = (string) $filters['target_type'];
-        }
+        $this->appendStringFilter($where, $params, 'status', $filters['status'] ?? null);
+        $this->appendStringFilter($where, $params, 'action_type', $filters['action_type'] ?? null);
+        $this->appendStringFilter($where, $params, 'target_type', $filters['target_type'] ?? null);
+        $this->appendIntFilter($where, $params, 'target_id', $filters['post_ids'] ?? null);
 
         if (!empty($filters['search'])) {
             $search = '%' . $wpdb->esc_like((string) $filters['search']) . '%';
@@ -365,6 +345,96 @@ final class ActionRepository
         );
 
         return (int) $wpdb->get_var($query); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+    }
+
+    /**
+     * @param array<int, string> $where
+     * @param array<int, scalar|null> $params
+     * @param mixed $rawValue
+     */
+    private function appendStringFilter(array &$where, array &$params, string $column, $rawValue): void
+    {
+        $values = $this->normalizeStringFilterValues($rawValue);
+        if (empty($values)) {
+            return;
+        }
+
+        if (count($values) === 1) {
+            $where[] = "{$column} = %s";
+            $params[] = $values[0];
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($values), '%s'));
+        $where[] = "{$column} IN ({$placeholders})";
+        array_push($params, ...$values);
+    }
+
+    /**
+     * @param array<int, string> $where
+     * @param array<int, scalar|null> $params
+     * @param mixed $rawValue
+     */
+    private function appendIntFilter(array &$where, array &$params, string $column, $rawValue): void
+    {
+        $values = $this->normalizeIntFilterValues($rawValue);
+        if (empty($values)) {
+            return;
+        }
+
+        if (count($values) === 1) {
+            $where[] = "{$column} = %d";
+            $params[] = $values[0];
+            return;
+        }
+
+        $placeholders = implode(',', array_fill(0, count($values), '%d'));
+        $where[] = "{$column} IN ({$placeholders})";
+        array_push($params, ...$values);
+    }
+
+    /**
+     * @param mixed $rawValue
+     * @return array<int, string>
+     */
+    private function normalizeStringFilterValues($rawValue): array
+    {
+        $values = is_array($rawValue) ? $rawValue : [$rawValue];
+        $clean = [];
+        foreach ($values as $value) {
+            if (!is_scalar($value)) {
+                continue;
+            }
+            $normalized = sanitize_text_field((string) $value);
+            if ($normalized === '') {
+                continue;
+            }
+            $clean[$normalized] = $normalized;
+        }
+
+        return array_values($clean);
+    }
+
+    /**
+     * @param mixed $rawValue
+     * @return array<int, int>
+     */
+    private function normalizeIntFilterValues($rawValue): array
+    {
+        $values = is_array($rawValue) ? $rawValue : [$rawValue];
+        $clean = [];
+        foreach ($values as $value) {
+            if (!is_scalar($value)) {
+                continue;
+            }
+            $normalized = (int) $value;
+            if ($normalized <= 0) {
+                continue;
+            }
+            $clean[$normalized] = $normalized;
+        }
+
+        return array_values($clean);
     }
 
     /**

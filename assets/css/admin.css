@@ -154,6 +154,9 @@
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
+.seoauto-card--settings {
+  overflow: visible;
+}
 .seoauto-card h2 {
   margin: 0 0 18px;
   font-size: 17px;
@@ -961,6 +964,7 @@
    ============================================================ */
 .seoauto-excl-tag-ui {
   position: relative;
+  z-index: 10;
 }
 .seoauto-excl-chips {
   display: flex;
@@ -1012,8 +1016,9 @@
   border: 1px solid var(--gray-200);
   border-top: none;
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
-  max-height: 220px;
+  max-height: min(320px, 42vh);
   overflow-y: auto;
+  overscroll-behavior: contain;
   box-shadow: var(--shadow-md);
 }
 .seoauto-excl-option {
