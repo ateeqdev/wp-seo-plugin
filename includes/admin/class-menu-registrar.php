@@ -17,21 +17,13 @@ use SEOAutomation\Connector\Utils\Logger;
 final class MenuRegistrar
 {
     private LaravelClient $client;
-
     private BriefSyncer $briefSyncer;
-
     private SiteRegistrar $siteRegistrar;
-
     private HealthChecker $healthChecker;
-
     private OAuthHandler $oauthHandler;
-
     private SiteTokenManager $tokenManager;
-
     private Logger $logger;
-
     private ActionRepository $actionRepository;
-
     private ActionExecutor $actionExecutor;
 
     public function __construct(
@@ -44,17 +36,16 @@ final class MenuRegistrar
         ActionRepository $actionRepository,
         ActionExecutor $actionExecutor,
         Logger $logger
-    )
-    {
-        $this->client = $client;
-        $this->briefSyncer = $briefSyncer;
-        $this->siteRegistrar = $siteRegistrar;
-        $this->healthChecker = $healthChecker;
-        $this->oauthHandler = $oauthHandler;
-        $this->tokenManager = $tokenManager;
-        $this->actionRepository = $actionRepository;
-        $this->actionExecutor = $actionExecutor;
-        $this->logger = $logger;
+    ) {
+        $this->client            = $client;
+        $this->briefSyncer       = $briefSyncer;
+        $this->siteRegistrar     = $siteRegistrar;
+        $this->healthChecker     = $healthChecker;
+        $this->oauthHandler      = $oauthHandler;
+        $this->tokenManager      = $tokenManager;
+        $this->actionRepository  = $actionRepository;
+        $this->actionExecutor    = $actionExecutor;
+        $this->logger            = $logger;
     }
 
     public function registerHooks(): void
@@ -84,500 +75,274 @@ final class MenuRegistrar
         if (strpos($hookSuffix, 'seoauto') === false) {
             return;
         }
-
-        wp_enqueue_style(
-            'seoauto-admin',
-            SEOAUTO_PLUGIN_URL . 'assets/css/admin.css',
-            [],
-            SEOAUTO_VERSION
-        );
-
-        wp_enqueue_script(
-            'seoauto-admin',
-            SEOAUTO_PLUGIN_URL . 'assets/js/admin.js',
-            [],
-            SEOAUTO_VERSION,
-            true
-        );
+        wp_enqueue_style('seoauto-admin', SEOAUTO_PLUGIN_URL . 'assets/css/admin.css', [], SEOAUTO_VERSION);
+        wp_enqueue_script('seoauto-admin', SEOAUTO_PLUGIN_URL . 'assets/js/admin.js', [], SEOAUTO_VERSION, true);
     }
+
+    // ─── Form handlers ────────────────────────────────────────────────────────
 
     public function handleRegisterSite(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_register_site');
         $baseUrl = trim((string) get_option('seoauto_base_url', ''));
         if ($baseUrl === '' || !$this->isBaseUrlSyntaxValid($baseUrl)) {
-            wp_safe_redirect(add_query_arg([
-                'page' => 'seoauto-settings',
-                'seoauto_notice' => 'register_missing_base_url',
-            ], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => 'register_missing_base_url'], admin_url('admin.php')));
             exit;
         }
-
         $result = $this->siteRegistrar->registerOrUpdate(true);
         $ok = !isset($result['error']) && (!empty($result['site_id']) || ((int) get_option('seoauto_site_id', 0) > 0));
-
-        $redirect = add_query_arg(
-            [
-                'page' => 'seoauto-settings',
-                'seoauto_notice' => $ok ? 'register_ok' : 'register_failed',
-            ],
-            admin_url('admin.php')
-        );
-        wp_safe_redirect($redirect);
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $ok ? 'register_ok' : 'register_failed'], admin_url('admin.php')));
         exit;
     }
 
     public function handleHealthCheck(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_health_check');
         $result = $this->healthChecker->check();
         $ok = !empty($result['connected']);
-
-        $redirect = add_query_arg(
-            [
-                'page' => 'seoauto-settings',
-                'seoauto_notice' => $ok ? 'health_ok' : 'health_failed',
-            ],
-            admin_url('admin.php')
-        );
-        wp_safe_redirect($redirect);
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $ok ? 'health_ok' : 'health_failed'], admin_url('admin.php')));
         exit;
     }
 
     public function handleStartOAuth(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_start_oauth');
-
         try {
             $oauthUrl = $this->oauthHandler->beginGoogleOAuth(['search_console', 'analytics']);
-
-            if ($oauthUrl === '') {
-                throw new \RuntimeException('Missing oauth_url');
-            }
-
+            if ($oauthUrl === '') throw new \RuntimeException('Missing oauth_url');
             wp_redirect($oauthUrl);
             exit;
-        } catch (\Throwable $exception) {
+        } catch (\Throwable $e) {
             update_option('seoauto_oauth_status', 'failed', false);
-            update_option('seoauto_oauth_last_error', $exception->getMessage(), false);
-
-            $redirect = add_query_arg(
-                [
-                    'page' => 'seoauto-settings',
-                    'seoauto_notice' => 'oauth_init_failed',
-                ],
-                admin_url('admin.php')
-            );
-            wp_safe_redirect($redirect);
+            update_option('seoauto_oauth_last_error', $e->getMessage(), false);
+            wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => 'oauth_init_failed'], admin_url('admin.php')));
             exit;
         }
     }
 
     public function handleRevokeOAuth(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_revoke_oauth');
-
         try {
             $reason = isset($_POST['revocation_reason']) ? sanitize_text_field((string) $_POST['revocation_reason']) : '';
             $this->client->revokeGoogleOAuth($reason !== '' ? ['revocation_reason' => $reason] : []);
-
+            $notice = 'oauth_revoke_ok';
+        } catch (\Throwable $e) {
+            $notice = (int) $e->getCode() === 404 ? 'oauth_revoke_ok' : 'oauth_revoke_failed';
+            if ($notice !== 'oauth_revoke_ok') {
+                update_option('seoauto_oauth_last_error', $e->getMessage(), false);
+            }
+        }
+        if (in_array($notice, ['oauth_revoke_ok'], true)) {
             update_option('seoauto_oauth_status', 'pending', false);
             update_option('seoauto_oauth_provider', '', false);
             update_option('seoauto_oauth_scopes', [], false);
             update_option('seoauto_oauth_connected_at', 0, false);
             update_option('seoauto_oauth_last_error', '', false);
-
-            $notice = 'oauth_revoke_ok';
-        } catch (\Throwable $exception) {
-            if ((int) $exception->getCode() === 404) {
-                update_option('seoauto_oauth_status', 'pending', false);
-                update_option('seoauto_oauth_provider', '', false);
-                update_option('seoauto_oauth_scopes', [], false);
-                update_option('seoauto_oauth_connected_at', 0, false);
-                update_option('seoauto_oauth_last_error', '', false);
-                $notice = 'oauth_revoke_ok';
-            } else {
-                update_option('seoauto_oauth_last_error', $exception->getMessage(), false);
-                $notice = 'oauth_revoke_failed';
-            }
         }
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-settings',
-            'seoauto_notice' => $notice,
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleRotateToken(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_rotate_token');
         $siteId = (int) get_option('seoauto_site_id', 0);
-
         if ($siteId <= 0) {
-            wp_safe_redirect(add_query_arg([
-                'page' => 'seoauto-settings',
-                'seoauto_notice' => 'rotate_failed',
-            ], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => 'rotate_failed'], admin_url('admin.php')));
             exit;
         }
-
         try {
             $response = $this->client->rotateSiteToken($siteId);
             $newToken = isset($response['api_key']) ? (string) $response['api_key'] : '';
-
-            if ($newToken === '') {
-                throw new \RuntimeException('Token rotation response missing api_key.');
-            }
-
+            if ($newToken === '') throw new \RuntimeException('Token rotation response missing api_key.');
             $this->tokenManager->storeToken($newToken);
             update_option('seoauto_oauth_last_error', '', false);
             $notice = 'rotate_ok';
-        } catch (\Throwable $exception) {
-            update_option('seoauto_oauth_last_error', $exception->getMessage(), false);
+        } catch (\Throwable $e) {
+            update_option('seoauto_oauth_last_error', $e->getMessage(), false);
             $notice = 'rotate_failed';
         }
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-settings',
-            'seoauto_notice' => $notice,
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleUpdateSiteProfile(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_update_site_profile');
-        $siteId = (int) get_option('seoauto_site_id', 0);
-
-        $platformUserId = isset($_POST['platform_user_id']) ? sanitize_text_field((string) $_POST['platform_user_id']) : '';
-        $description = isset($_POST['site_description']) ? sanitize_textarea_field((string) $_POST['site_description']) : '';
-        $taste = isset($_POST['site_taste']) ? sanitize_textarea_field((string) $_POST['site_taste']) : '';
-
-        update_option('seoauto_owner_platform_user_id', $platformUserId, false);
-        update_option('seoauto_site_profile_description', $description, false);
-        update_option('seoauto_site_profile_taste', $taste, false);
-
-        if ($siteId <= 0 || $platformUserId === '') {
-            wp_safe_redirect(add_query_arg([
-                'page' => 'seoauto-settings',
-                'seoauto_notice' => 'profile_failed',
-            ], admin_url('admin.php')));
-            exit;
-        }
-
-        try {
-            $this->client->updateSiteProfile($siteId, [
-                'platform_user_id' => $platformUserId,
-                'description' => $description,
-                'taste' => $taste,
-            ]);
-            $notice = 'profile_ok';
-        } catch (\Throwable $exception) {
-            update_option('seoauto_oauth_last_error', $exception->getMessage(), false);
-            $notice = 'profile_failed';
-        }
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-settings',
-            'seoauto_notice' => $notice,
-        ], admin_url('admin.php')));
+        $this->siteRegistrar->registerOrUpdate(true);
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => 'profile_ok'], admin_url('admin.php')));
         exit;
     }
 
     public function handleUpdateTask(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_update_task');
         $taskId = isset($_POST['task_id']) ? (int) $_POST['task_id'] : 0;
-
         if ($taskId <= 0) {
-            wp_safe_redirect(add_query_arg([
-                'page' => 'seoauto-schedules',
-                'seoauto_notice' => 'task_update_failed',
-            ], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoauto-schedules', 'seoauto_notice' => 'task_update_failed'], admin_url('admin.php')));
             exit;
         }
-
         try {
             $isEnabled = !empty($_POST['is_enabled']);
             $delayMinutes = isset($_POST['delay_minutes']) ? max(0, (int) $_POST['delay_minutes']) : 0;
-
-            $this->client->updateTaskConfig($taskId, [
-                'is_enabled' => $isEnabled,
-                'delay_minutes' => $delayMinutes,
-            ]);
+            $this->client->updateTaskConfig($taskId, ['is_enabled' => $isEnabled, 'delay_minutes' => $delayMinutes]);
             $notice = 'task_update_ok';
-        } catch (\Throwable $exception) {
-            $this->logger->warning('admin_task_update_failed', ['error' => $exception->getMessage()], 'admin');
+        } catch (\Throwable $e) {
+            $this->logger->warning('admin_task_update_failed', ['error' => $e->getMessage()], 'admin');
             $notice = 'task_update_failed';
         }
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-schedules',
-            'seoauto_notice' => $notice,
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-schedules', 'seoauto_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleScheduleTask(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_schedule_task');
         $taskId = isset($_POST['task_id']) ? (int) $_POST['task_id'] : 0;
-
         if ($taskId <= 0) {
-            wp_safe_redirect(add_query_arg([
-                'page' => 'seoauto-schedules',
-                'seoauto_notice' => 'task_schedule_failed',
-            ], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoauto-schedules', 'seoauto_notice' => 'task_schedule_failed'], admin_url('admin.php')));
             exit;
         }
-
         $payload = [];
         $scheduledFor = isset($_POST['scheduled_for']) ? sanitize_text_field((string) $_POST['scheduled_for']) : '';
         if ($scheduledFor !== '') {
-            $timestamp = strtotime($scheduledFor);
-            if ($timestamp !== false) {
-                $payload['scheduled_for'] = gmdate('c', $timestamp);
-            }
+            $ts = strtotime($scheduledFor);
+            if ($ts !== false) $payload['scheduled_for'] = gmdate('c', $ts);
         }
-
         $inputJson = isset($_POST['input_params_json']) ? trim((string) $_POST['input_params_json']) : '';
         if ($inputJson !== '') {
             $decoded = json_decode($inputJson, true);
-            if (is_array($decoded)) {
-                $payload['input_params'] = $decoded;
-            }
+            if (is_array($decoded)) $payload['input_params'] = $decoded;
         }
-
         try {
             $this->client->scheduleTask($taskId, $payload);
             $notice = 'task_schedule_ok';
-        } catch (\Throwable $exception) {
-            $this->logger->warning('admin_task_schedule_failed', ['error' => $exception->getMessage()], 'admin');
+        } catch (\Throwable $e) {
+            $this->logger->warning('admin_task_schedule_failed', ['error' => $e->getMessage()], 'admin');
             $notice = 'task_schedule_failed';
         }
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-schedules',
-            'seoauto_notice' => $notice,
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-schedules', 'seoauto_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleLinkBrief(): void
     {
-        if (!current_user_can('edit_posts')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('edit_posts')) wp_die('Unauthorized');
         check_admin_referer('seoauto_link_brief');
-
         $briefId = isset($_POST['brief_id']) ? (int) $_POST['brief_id'] : 0;
-        $postId = isset($_POST['wp_post_id']) ? (int) $_POST['wp_post_id'] : 0;
+        $postId  = isset($_POST['wp_post_id']) ? (int) $_POST['wp_post_id'] : 0;
         $articleStatus = isset($_POST['article_status']) ? sanitize_text_field((string) $_POST['article_status']) : 'drafted';
-        if (!in_array($articleStatus, ['drafted', 'published'], true)) {
-            $articleStatus = 'drafted';
-        }
+        if (!in_array($articleStatus, ['drafted', 'published'], true)) $articleStatus = 'drafted';
         $siteId = (int) get_option('seoauto_site_id', 0);
-
         if ($briefId <= 0 || $postId <= 0 || $siteId <= 0) {
-            wp_safe_redirect(add_query_arg([
-                'page' => 'seoauto-briefs',
-                'seoauto_notice' => 'brief_link_failed',
-            ], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoauto-briefs', 'seoauto_notice' => 'brief_link_failed'], admin_url('admin.php')));
             exit;
         }
-
         $post = get_post($postId);
         if (!$post instanceof \WP_Post) {
-            wp_safe_redirect(add_query_arg([
-                'page' => 'seoauto-briefs',
-                'seoauto_notice' => 'brief_link_failed',
-            ], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoauto-briefs', 'seoauto_notice' => 'brief_link_failed'], admin_url('admin.php')));
             exit;
         }
-
         try {
             $payload = [
-                'wp_post_id' => $postId,
-                'wp_post_url' => get_permalink($postId),
+                'wp_post_id'    => $postId,
+                'wp_post_url'   => get_permalink($postId),
                 'wp_post_title' => get_the_title($postId),
                 'article_status' => $articleStatus,
-                'published_at' => get_post_status($postId) === 'publish' ? gmdate('c', (int) get_post_time('U', true, $postId)) : null,
+                'published_at'  => get_post_status($postId) === 'publish' ? gmdate('c', (int) get_post_time('U', true, $postId)) : null,
             ];
-
             $this->client->linkArticleToBrief($siteId, $briefId, $payload);
             $this->updateLocalBriefLinkState($briefId, $postId, (string) get_permalink($postId), $articleStatus);
             $notice = 'brief_link_ok';
-        } catch (\Throwable $exception) {
-            $this->logger->warning('admin_brief_link_failed', ['error' => $exception->getMessage()], 'admin');
+        } catch (\Throwable $e) {
+            $this->logger->warning('admin_brief_link_failed', ['error' => $e->getMessage()], 'admin');
             $notice = 'brief_link_failed';
         }
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-briefs',
-            'seoauto_notice' => $notice,
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-briefs', 'seoauto_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleDeleteLogs(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_delete_logs');
-
         global $wpdb;
         $table = $wpdb->prefix . 'seoauto_change_logs';
-        $deleted = $wpdb->query("DELETE FROM {$table}"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-
+        $deleted = $wpdb->query("DELETE FROM {$table}"); // phpcs:ignore
         $notice = $deleted === false ? 'logs_delete_failed' : 'logs_delete_ok';
         $deletedCount = $deleted === false ? 0 : (int) $deleted;
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-logs',
-            'seoauto_notice' => $notice,
-            'deleted_count' => $deletedCount,
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-logs', 'seoauto_notice' => $notice, 'deleted_count' => $deletedCount], admin_url('admin.php')));
         exit;
     }
 
     public function handleDeleteLocalErrors(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_delete_local_errors');
-
-        $severity = isset($_POST['severity']) ? sanitize_text_field((string) $_POST['severity']) : 'all'; // phpcs:ignore WordPress.Security.NonceVerification.Missing
+        $severity = isset($_POST['severity']) ? sanitize_text_field((string) $_POST['severity']) : 'all';
         $allowed = ['all', 'error', 'warning'];
-        if (!in_array($severity, $allowed, true)) {
-            $severity = 'all';
-        }
-
+        if (!in_array($severity, $allowed, true)) $severity = 'all';
         global $wpdb;
         $table = $wpdb->prefix . 'seoauto_activity_logs';
-
         if ($severity === 'error') {
-            $deleted = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-                $wpdb->prepare("DELETE FROM {$table} WHERE severity = %s", 'error')
-            );
+            $deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE severity = %s", 'error')); // phpcs:ignore
         } elseif ($severity === 'warning') {
-            $deleted = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-                $wpdb->prepare("DELETE FROM {$table} WHERE severity = %s", 'warning')
-            );
+            $deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE severity = %s", 'warning')); // phpcs:ignore
         } else {
-            $deleted = $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-                "DELETE FROM {$table} WHERE severity IN ('warning','error')"
-            );
+            $deleted = $wpdb->query("DELETE FROM {$table} WHERE severity IN ('warning','error')"); // phpcs:ignore
         }
-
         $notice = $deleted === false ? 'local_errors_delete_failed' : 'local_errors_delete_ok';
         $deletedCount = $deleted === false ? 0 : (int) $deleted;
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-local-errors',
-            'seoauto_notice' => $notice,
-            'deleted_count' => $deletedCount,
-            'severity' => $severity,
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-local-errors', 'seoauto_notice' => $notice, 'deleted_count' => $deletedCount, 'severity' => $severity], admin_url('admin.php')));
         exit;
     }
 
     public function handleApplyAction(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_apply_action');
         $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
-
         if ($actionId > 0) {
             \SEOAutomation\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 50);
             $this->actionRepository->markQueued($actionId);
         }
-
         $returnPage = $this->resolveActionRedirectPage();
-        wp_safe_redirect(add_query_arg([
-            'page' => $returnPage,
-            'seoauto_notice' => 'action_apply_requested',
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => $returnPage, 'seoauto_notice' => 'action_apply_requested'], admin_url('admin.php')));
         exit;
     }
 
     public function handleRevertAction(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_revert_action');
         $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
-
         $notice = 'action_revert_failed';
         if ($actionId > 0) {
             $result = $this->actionExecutor->revertByLaravelId($actionId);
-            if (($result['status'] ?? '') === 'rolled_back') {
-                $notice = 'action_revert_ok';
-            }
+            if (($result['status'] ?? '') === 'rolled_back') $notice = 'action_revert_ok';
         }
-
         $returnPage = $this->resolveActionRedirectPage();
-        wp_safe_redirect(add_query_arg([
-            'page' => $returnPage,
-            'seoauto_notice' => $notice,
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => $returnPage, 'seoauto_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleEditActionPayload(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_edit_action_payload');
-        $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
-        $payloadJson = isset($_POST['payload_json']) ? (string) wp_unslash($_POST['payload_json']) : '';
+        $actionId     = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
+        $payloadJson  = isset($_POST['payload_json']) ? (string) wp_unslash($_POST['payload_json']) : '';
         $payloadFields = isset($_POST['payload_fields']) && is_array($_POST['payload_fields']) ? wp_unslash($_POST['payload_fields']) : [];
         $payload = json_decode($payloadJson, true);
-
         $notice = 'action_edit_failed';
         if ($actionId > 0) {
             $action = $this->actionRepository->findByLaravelId($actionId);
@@ -586,16 +351,13 @@ final class MenuRegistrar
                 $decoded = json_decode((string) ($action['action_payload'] ?? '{}'), true);
                 $basePayload = is_array($decoded) ? $decoded : [];
             }
-
             if (is_array($payloadFields) && !empty($payloadFields)) {
                 $payload = $this->applyPayloadFieldEdits($basePayload, $payloadFields);
             }
-
             if (is_array($payload)) {
                 $updated = $this->actionRepository->updatePayload($actionId, $payload, get_current_user_id());
                 if ($updated) {
                     $notice = 'action_edit_ok';
-
                     if (is_array($action) && ($action['status'] ?? '') === 'applied') {
                         \SEOAutomation\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 10);
                         $this->actionRepository->markQueued($actionId);
@@ -604,1936 +366,192 @@ final class MenuRegistrar
                 }
             }
         }
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-logs',
-            'seoauto_notice' => $notice,
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-logs', 'seoauto_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
-    /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $fields
-     * @return array<string, mixed>
-     */
+    /** @param array<string,mixed> $payload @param array<string,mixed> $fields @return array<string,mixed> */
     private function applyPayloadFieldEdits(array $payload, array $fields): array
     {
         foreach ($fields as $key => $value) {
             $k = sanitize_text_field((string) $key);
             $v = is_scalar($value) ? sanitize_textarea_field((string) $value) : '';
-
-            if ($k === 'meta_description') {
-                $payload['meta_description'] = $v;
-                $payload['recommended_meta_description'] = $v;
-                continue;
-            }
-
-            if ($k === 'alt_text') {
-                $payload['alt_text'] = $v;
-                $payload['suggested_alt'] = $v;
-                continue;
-            }
-
-            if ($k === 'seo_title') {
-                $payload['seo_title'] = $v;
-                $payload['title'] = $v;
-                continue;
-            }
-
-            if ($k === 'social_tags_og_title') {
-                $payload['social_tags']['og']['title'] = $v;
-                continue;
-            }
-
-            if ($k === 'social_tags_og_description') {
-                $payload['social_tags']['og']['description'] = $v;
-                continue;
-            }
-
-            if ($k === 'social_tags_twitter_site') {
-                $payload['social_tags']['twitter']['site'] = $v;
-                continue;
-            }
-
+            if ($k === 'meta_description') { $payload['meta_description'] = $v; $payload['recommended_meta_description'] = $v; continue; }
+            if ($k === 'alt_text') { $payload['alt_text'] = $v; $payload['suggested_alt'] = $v; continue; }
+            if ($k === 'seo_title') { $payload['seo_title'] = $v; $payload['title'] = $v; continue; }
+            if ($k === 'social_tags_og_title') { $payload['social_tags']['og']['title'] = $v; continue; }
+            if ($k === 'social_tags_og_description') { $payload['social_tags']['og']['description'] = $v; continue; }
+            if ($k === 'social_tags_twitter_site') { $payload['social_tags']['twitter']['site'] = $v; continue; }
             $payload[$k] = $v;
         }
-
         return $payload;
     }
 
     public function handleUpdateActionItem(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_update_action_item');
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_admin_action_items';
+        $table  = $wpdb->prefix . 'seoauto_admin_action_items';
         $itemId = isset($_POST['item_id']) ? (int) $_POST['item_id'] : 0;
         $status = isset($_POST['status']) ? sanitize_text_field((string) $_POST['status']) : 'open';
-        $valid = ['open', 'in_progress', 'resolved'];
-
+        $valid  = ['open', 'in_progress', 'resolved'];
         if ($itemId > 0 && in_array($status, $valid, true)) {
-            $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            $wpdb->update( // phpcs:ignore
                 $table,
-                [
-                    'status' => $status,
-                    'resolved_at' => $status === 'resolved' ? current_time('mysql') : null,
-                    'updated_at' => current_time('mysql'),
-                ],
+                ['status' => $status, 'resolved_at' => $status === 'resolved' ? current_time('mysql') : null, 'updated_at' => current_time('mysql')],
                 ['id' => $itemId],
                 ['%s', '%s', '%s'],
                 ['%d']
             );
         }
-
-        wp_safe_redirect(add_query_arg([
-            'page' => 'seoauto-action-items',
-            'seoauto_notice' => 'action_item_updated',
-        ], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-action-items', 'seoauto_notice' => 'action_item_updated'], admin_url('admin.php')));
         exit;
     }
 
+    // ─── Menu Registration ────────────────────────────────────────────────────
+
     public function registerMenu(): void
     {
-        add_menu_page(
-            'SEO Automation',
-            'SEO Automation',
-            'manage_options',
-            'seoauto',
-            [$this, 'renderSettingsPage'],
-            'dashicons-performance',
-            80
-        );
-
+        add_menu_page('SEO Automation', 'SEO Automation', 'manage_options', 'seoauto', [$this, 'renderSettingsPage'], 'dashicons-performance', 80);
         add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto', [$this, 'renderSettingsPage']);
         add_submenu_page('seoauto', 'Change Center', 'Change Center', 'manage_options', 'seoauto-logs', [$this, 'renderLogsPage']);
         add_submenu_page('seoauto', 'Action Items', 'Action Items', 'manage_options', 'seoauto-action-items', [$this, 'renderActionItemsPage']);
         add_submenu_page('seoauto', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
-        add_submenu_page('seoauto', 'Debug Logs', 'Debug Logs', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
-        add_submenu_page(null, 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
+        
+        // Hidden pages - accessible via URL but not in menu (null parent)
+        add_submenu_page(null, 'Debug Logs', 'Debug Logs', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
         add_submenu_page(null, 'Schedules', 'Schedules', 'manage_options', 'seoauto-schedules', [$this, 'renderSchedulesPage']);
+        add_submenu_page(null, 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
         add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seoauto-oauth-callback', [$this, 'renderOauthCallbackPage']);
-        // Backward-compatible callback slug kept accessible but hidden from sidebar menu.
         add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seo-platform-oauth-complete', [$this, 'renderOauthCallbackPage']);
     }
 
     public function registerSettings(): void
     {
-        register_setting('seoauto_settings', 'seoauto_base_url', [
-            'type' => 'string',
-            'sanitize_callback' => [$this, 'sanitizeBaseUrl'],
-            'default' => '',
-        ]);
-
-        register_setting('seoauto_settings', 'seoauto_primary_seo_adapter', [
-            'type' => 'string',
-            'sanitize_callback' => 'sanitize_text_field',
-            'default' => 'auto',
-        ]);
-
-        register_setting('seoauto_settings', 'seoauto_change_application_mode', [
-            'type' => 'string',
-            'sanitize_callback' => [$this, 'sanitizeChangeApplicationMode'],
-            'default' => 'dangerous_auto_apply',
-        ]);
-
-        register_setting('seoauto_settings', 'seoauto_debug_enabled', [
-            'type' => 'boolean',
-            'sanitize_callback' => 'rest_sanitize_boolean',
-            'default' => false,
-        ]);
-
-        register_setting('seoauto_settings', 'seoauto_allow_insecure_ssl', [
-            'type' => 'boolean',
-            'sanitize_callback' => 'rest_sanitize_boolean',
-            'default' => false,
-        ]);
-
-        register_setting('seoauto_settings', 'seoauto_owner_platform_user_id', [
-            'type' => 'string',
-            'sanitize_callback' => 'sanitize_text_field',
-            'default' => '1',
-        ]);
-
-        register_setting('seoauto_settings', 'seoauto_site_profile_description', [
-            'type' => 'string',
-            'sanitize_callback' => 'sanitize_textarea_field',
-            'default' => '',
-        ]);
-
-        register_setting('seoauto_settings', 'seoauto_site_profile_taste', [
-            'type' => 'string',
-            'sanitize_callback' => 'sanitize_textarea_field',
-            'default' => '',
-        ]);
-
-        register_setting('seoauto_settings', 'seoauto_excluded_change_audit_pages', [
-            'type' => 'string',
-            'sanitize_callback' => [$this, 'sanitizeExcludedChangeAuditPages'],
-            'default' => '',
-        ]);
+        register_setting('seoauto_settings', 'seoauto_primary_seo_adapter', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field', 'default' => 'auto']);
+        register_setting('seoauto_settings', 'seoauto_change_application_mode', ['type' => 'string', 'sanitize_callback' => [$this, 'sanitizeChangeApplicationMode'], 'default' => 'dangerous_auto_apply']);
+        register_setting('seoauto_settings', 'seoauto_debug_enabled', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
+        register_setting('seoauto_settings', 'seoauto_allow_insecure_ssl', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
+        register_setting('seoauto_settings', 'seoauto_excluded_change_audit_pages', ['type' => 'string', 'sanitize_callback' => [$this, 'sanitizeExcludedChangeAuditPages'], 'default' => '']);
     }
 
-    public function renderDashboardPage(): void
-    {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
-        $siteId = (int) get_option('seoauto_site_id', 0);
-        $baseUrl = (string) get_option('seoauto_base_url', '');
-        $lastUserSync = (int) get_option('seoauto_last_user_sync', 0);
-        $lastBriefSync = (int) get_option('seoauto_last_brief_sync', 0);
-        $lastCron = (int) get_option('seoauto_last_cron_run', 0);
-
-        ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('SEO Automation Dashboard', 'seoauto', 'High-level status snapshot for this site.'); ?>
-            <div class="seoauto-card" style="max-width:900px;">
-            <table class="widefat striped">
-                <tbody>
-                    <tr><th scope="row">Laravel Base URL</th><td><?php echo esc_html($baseUrl !== '' ? $baseUrl : 'Not configured'); ?></td></tr>
-                    <tr><th scope="row">Site ID</th><td><?php echo esc_html($siteId > 0 ? (string) $siteId : 'Not registered'); ?></td></tr>
-                    <tr><th scope="row">Last User Sync</th><td><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i:s', $lastUserSync) : 'Never'); ?></td></tr>
-                    <tr><th scope="row">Last Brief Sync</th><td><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i:s', $lastBriefSync) : 'Never'); ?></td></tr>
-                    <tr><th scope="row">Last Queue Heartbeat</th><td><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i:s', $lastCron) : 'Never'); ?></td></tr>
-                </tbody>
-            </table>
-            </div>
-            <p style="margin-top:16px;">
-                <a class="button button-primary" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-settings')); ?>">Open Settings</a>
-            </p>
-        </div>
-        <?php
-    }
-
-    public function renderLogsPage(): void
-    {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
-        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
-        $status = isset($_GET['status']) ? sanitize_text_field((string) $_GET['status']) : '';
-        $actionType = isset($_GET['action_type']) ? sanitize_text_field((string) $_GET['action_type']) : '';
-        $targetType = isset($_GET['target_type']) ? sanitize_text_field((string) $_GET['target_type']) : '';
-        $search = isset($_GET['q']) ? sanitize_text_field((string) $_GET['q']) : '';
-        $page = max(1, (int) ($_GET['paged'] ?? 1));
-        $perPage = min(100, max(10, (int) ($_GET['per_page'] ?? 25)));
-        $offset = ($page - 1) * $perPage;
-
-        $filters = [];
-        if ($status !== '') {
-            $filters['status'] = $status;
-        }
-        if ($actionType !== '') {
-            $filters['action_type'] = $actionType;
-        }
-        if ($targetType !== '') {
-            $filters['target_type'] = $targetType;
-        }
-        if ($search !== '') {
-            $filters['search'] = $search;
-        }
-
-        $totalActions = $this->actionRepository->countActions($filters);
-        $totalPages = max(1, (int) ceil($totalActions / $perPage));
-        if ($page > $totalPages) {
-            $page = $totalPages;
-            $offset = ($page - 1) * $perPage;
-        }
-
-        $actions = $this->actionRepository->listActions($filters, $perPage, $offset);
-        $actionTypeOptions = $this->actionRepository->listDistinctActionTypes();
-        $targetTypeOptions = $this->actionRepository->listDistinctTargetTypes();
-
-        global $wpdb;
-        $siteId = (int) get_option('seoauto_site_id', 0);
-        $itemsTable = $wpdb->prefix . 'seoauto_admin_action_items';
-        $itemQuery = $siteId > 0
-            ? $wpdb->prepare(
-                "SELECT * FROM {$itemsTable} WHERE site_id = %d ORDER BY updated_at DESC LIMIT 200",
-                $siteId
-            )
-            : "SELECT * FROM {$itemsTable} WHERE 1=0";
-        $humanItems = $wpdb->get_results($itemQuery, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-        if (!is_array($humanItems)) {
-            $humanItems = [];
-        }
-
-        $humanItemsByLaravelId = [];
-        foreach ($humanItems as $item) {
-            $itemLaravelId = (int) ($item['laravel_action_id'] ?? 0);
-            if ($itemLaravelId <= 0) {
-                continue;
-            }
-
-            if (!isset($humanItemsByLaravelId[$itemLaravelId])) {
-                $humanItemsByLaravelId[$itemLaravelId] = [];
-            }
-
-            $humanItemsByLaravelId[$itemLaravelId][] = $item;
-        }
-
-        $actionTitlesByLaravelId = [];
-        foreach ($actions as $actionRow) {
-            $laravelId = (int) ($actionRow['laravel_action_id'] ?? 0);
-            if ($laravelId <= 0) {
-                continue;
-            }
-
-            $payload = json_decode((string) ($actionRow['action_payload'] ?? '{}'), true);
-            if (!is_array($payload)) {
-                $payload = [];
-            }
-
-            $title = $this->buildActionDisplayTitle($actionRow, $payload);
-
-            $actionTitlesByLaravelId[$laravelId] = $title;
-        }
-
-        foreach ($humanItemsByLaravelId as $laravelId => $items) {
-            if (!isset($actionTitlesByLaravelId[$laravelId]) && !empty($items[0]['title'])) {
-                $actionTitlesByLaravelId[$laravelId] = (string) $items[0]['title'];
-            }
-        }
-
-        $actionIdsOnPage = array_values(array_filter(array_map(
-            static fn (array $row): int => (int) ($row['laravel_action_id'] ?? 0),
-            $actions
-        ), static fn (int $id): bool => $id > 0));
-        $changeLogs = $this->actionRepository->listChangeLogsForLaravelIds($actionIdsOnPage, 500, [
-            'exclude_event_type' => 'human_action_created',
-        ]);
-
-        $groupedChangeLogs = [];
-        foreach ($changeLogs as $log) {
-            $laravelId = (int) ($log['laravel_action_id'] ?? 0);
-            if ($laravelId <= 0) {
-                continue;
-            }
-
-            if (!isset($groupedChangeLogs[$laravelId])) {
-                $groupedChangeLogs[$laravelId] = [
-                    'laravel_action_id' => $laravelId,
-                    'title' => $actionTitlesByLaravelId[$laravelId] ?? 'Action',
-                    'last_status' => (string) ($log['status'] ?? ''),
-                    'last_at' => (string) ($log['created_at'] ?? ''),
-                    'events' => [],
-                ];
-            }
-
-            $groupedChangeLogs[$laravelId]['events'][] = $log;
-        }
-
-        $openHumanItems = 0;
-        foreach ($humanItems as $item) {
-            if (($item['status'] ?? '') !== 'resolved') {
-                $openHumanItems++;
-            }
-        }
-        ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Change Center', 'seoauto-logs', 'Review automated SEO updates and their progression timeline.'); ?>
-            <?php if ($notice === 'action_apply_requested') : ?>
-                <div class="notice notice-success"><p>Action queued for execution.</p></div>
-            <?php elseif ($notice === 'action_revert_ok') : ?>
-                <div class="notice notice-success"><p>Action reverted.</p></div>
-            <?php elseif ($notice === 'action_revert_failed') : ?>
-                <div class="notice notice-error"><p>Failed to revert action.</p></div>
-            <?php elseif ($notice === 'action_edit_ok') : ?>
-                <div class="notice notice-success"><p>Action payload updated.</p></div>
-            <?php elseif ($notice === 'action_edit_ok_reapply') : ?>
-                <div class="notice notice-success"><p>Action payload updated and re-queued for re-application.</p></div>
-            <?php elseif ($notice === 'action_edit_failed') : ?>
-                <div class="notice notice-error"><p>Failed to update action payload.</p></div>
-            <?php endif; ?>
-            <div class="seoauto-kpi-grid">
-                <div class="seoauto-kpi-card">
-                    <span class="seoauto-kpi-label">Automated Actions</span>
-                    <span class="seoauto-kpi-value"><?php echo esc_html((string) count($actions)); ?></span>
-                </div>
-                <div class="seoauto-kpi-card">
-                    <span class="seoauto-kpi-label">Execution Events</span>
-                    <span class="seoauto-kpi-value"><?php echo esc_html((string) count($changeLogs)); ?></span>
-                </div>
-                <div class="seoauto-kpi-card">
-                    <span class="seoauto-kpi-label">Human Action Items</span>
-                    <span class="seoauto-kpi-value"><?php echo esc_html((string) count($humanItems)); ?></span>
-                </div>
-                <div class="seoauto-kpi-card">
-                    <span class="seoauto-kpi-label">Open Human Items</span>
-                    <span class="seoauto-kpi-value"><?php echo esc_html((string) $openHumanItems); ?></span>
-                </div>
-            </div>
-
-            <p style="margin-bottom:12px;">
-                Change Center shows machine-applied changes and their execution timeline. Human-only tasks are listed separately below.
-                <a href="<?php echo esc_url(admin_url('admin.php?page=seoauto-action-items')); ?>">Open Admin Action Items</a>
-            </p>
-            <form method="get" class="seoauto-filter-grid">
-                <input type="hidden" name="page" value="seoauto-logs">
-                <label>
-                    <span class="seoauto-muted">Status</span>
-                    <select name="status" style="width:100%;">
-                        <option value="">All statuses</option>
-                    <option value="received" <?php selected($status, 'received'); ?>>Received</option>
-                    <option value="queued" <?php selected($status, 'queued'); ?>>Queued</option>
-                    <option value="running" <?php selected($status, 'running'); ?>>Running</option>
-                    <option value="applied" <?php selected($status, 'applied'); ?>>Applied</option>
-                    <option value="failed" <?php selected($status, 'failed'); ?>>Failed</option>
-                    <option value="rolled_back" <?php selected($status, 'rolled_back'); ?>>Rolled Back</option>
-                    </select>
-                </label>
-                <label>
-                    <span class="seoauto-muted">Action Type</span>
-                    <select name="action_type" style="width:100%;">
-                        <option value="">All action types</option>
-                        <?php foreach ($actionTypeOptions as $option) : ?>
-                            <option value="<?php echo esc_attr($option); ?>" <?php selected($actionType, $option); ?>><?php echo esc_html($option); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-                <label>
-                    <span class="seoauto-muted">Target Type</span>
-                    <select name="target_type" style="width:100%;">
-                        <option value="">All target types</option>
-                        <?php foreach ($targetTypeOptions as $option) : ?>
-                            <option value="<?php echo esc_attr($option); ?>" <?php selected($targetType, $option); ?>><?php echo esc_html($option); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-                <label>
-                    <span class="seoauto-muted">Search</span>
-                    <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="URL, ID, payload" style="width:100%;">
-                </label>
-                <div>
-                    <input type="hidden" name="per_page" value="<?php echo esc_attr((string) $perPage); ?>">
-                    <button class="button button-primary" type="submit">Apply</button>
-                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-logs')); ?>">Reset</a>
-                </div>
-            </form>
-
-            <div class="seoauto-card">
-            <table class="wp-list-table widefat striped seoauto-actions-table">
-                <thead>
-                    <tr><th>Title</th><th>Type</th><th>Status</th><th>Auto</th><th>Received</th><th>Details</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                <?php if (!empty($actions)) : ?>
-                    <?php foreach ($actions as $row) : ?>
-                        <?php
-                        $laravelId = (int) ($row['laravel_action_id'] ?? 0);
-                        $actionPayload = json_decode((string) ($row['action_payload'] ?? '{}'), true);
-                        $beforeSnapshot = json_decode((string) ($row['before_snapshot'] ?? '{}'), true);
-                        $afterSnapshot = json_decode((string) ($row['after_snapshot'] ?? '{}'), true);
-                        if (!is_array($actionPayload)) {
-                            $actionPayload = [];
-                        }
-                        if (!is_array($beforeSnapshot)) {
-                            $beforeSnapshot = [];
-                        }
-                        if (!is_array($afterSnapshot)) {
-                            $afterSnapshot = [];
-                        }
-                        $actionTitle = $this->buildActionDisplayTitle($row, $actionPayload);
-                        $editableFields = $this->buildEditableFields((string) ($row['action_type'] ?? ''), $actionPayload);
-                        $readOnlyFields = $this->buildReadOnlyFields((string) ($row['action_type'] ?? ''), $actionPayload, $beforeSnapshot, $afterSnapshot);
-                        ?>
-                        <tr>
-                            <td><?php echo esc_html($actionTitle); ?></td>
-                            <td><code><?php echo esc_html((string) ($row['action_type'] ?? '')); ?></code></td>
-                            <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($row['status'] ?? 'received'))); ?></td>
-                            <td><?php echo !empty($row['auto_apply']) ? 'Yes' : 'No'; ?></td>
-                            <td><?php echo esc_html((string) ($row['received_at'] ?? '')); ?></td>
-                            <td>
-                                <div class="seoauto-action-details">
-                                    <?php if (!empty($readOnlyFields)) : ?>
-                                        <?php foreach ($readOnlyFields as $field) : ?>
-                                            <div>
-                                                <strong><?php echo esc_html((string) ($field['label'] ?? '')); ?>:</strong>
-                                                <div><?php echo esc_html((string) ($field['value'] ?? '')); ?></div>
-                                            </div>
-                                        <?php endforeach; ?>
-                                    <?php else : ?>
-                                        <span class="description">No formatted details available.</span>
-                                    <?php endif; ?>
-                                </div>
-                            </td>
-                            <td class="seoauto-action-actions">
-                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:6px;">
-                                    <?php wp_nonce_field('seoauto_apply_action'); ?>
-                                    <input type="hidden" name="action" value="seoauto_apply_action">
-                                    <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
-                                    <button class="button button-small" type="submit">Apply</button>
-                                </form>
-                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:6px;">
-                                    <?php wp_nonce_field('seoauto_revert_action'); ?>
-                                    <input type="hidden" name="action" value="seoauto_revert_action">
-                                    <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
-                                    <button class="button button-small" type="submit">Revert</button>
-                                </form>
-                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-edit-form" data-action-id="<?php echo esc_attr((string) $laravelId); ?>">
-                                    <?php wp_nonce_field('seoauto_edit_action_payload'); ?>
-                                    <input type="hidden" name="action" value="seoauto_edit_action_payload">
-                                    <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
-                                    <?php if (!empty($editableFields)) : ?>
-                                        <div style="margin-bottom:6px;">
-                                            <?php foreach ($editableFields as $field) : ?>
-                                                <?php
-                                                $fieldKey = (string) ($field['key'] ?? '');
-                                                $fieldLabel = (string) ($field['label'] ?? $fieldKey);
-                                                $fieldType = (string) ($field['type'] ?? 'text');
-                                                $fieldValue = (string) ($field['value'] ?? '');
-                                                ?>
-                                                <div style="margin-bottom:8px;">
-                                                    <label style="display:block;margin-bottom:4px;"><?php echo esc_html($fieldLabel); ?></label>
-                                                    <?php if ($fieldType === 'textarea') : ?>
-                                                        <textarea name="payload_fields[<?php echo esc_attr($fieldKey); ?>]" rows="2" style="width:100%;" data-seoauto-editable="1" disabled><?php echo esc_textarea($fieldValue); ?></textarea>
-                                                    <?php else : ?>
-                                                        <input type="text" name="payload_fields[<?php echo esc_attr($fieldKey); ?>]" value="<?php echo esc_attr($fieldValue); ?>" style="width:100%;" data-seoauto-editable="1" disabled>
-                                                    <?php endif; ?>
-                                                </div>
-                                            <?php endforeach; ?>
-                                        </div>
-                                        <button type="button" class="button button-small" data-seoauto-edit-toggle="1">Edit</button>
-                                        <button class="button button-small button-primary" type="submit" data-seoauto-save-button="1" style="display:none;">Save</button>
-                                        <button type="button" class="button button-small" data-seoauto-cancel-button="1" style="display:none;">Cancel</button>
-                                    <?php else : ?>
-                                        <span class="description">No editable values.</span>
-                                    <?php endif; ?>
-                                </form>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else : ?>
-                    <tr><td colspan="7">No automated actions found.</td></tr>
-                <?php endif; ?>
-                </tbody>
-            </table>
-            </div>
-            <?php
-            $baseArgs = [
-                'page' => 'seoauto-logs',
-                'status' => $status,
-                'action_type' => $actionType,
-                'target_type' => $targetType,
-                'q' => $search,
-                'per_page' => $perPage,
-            ];
-            $prevPage = max(1, $page - 1);
-            $nextPage = min($totalPages, $page + 1);
-            ?>
-            <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 18px;">
-                <div class="seoauto-muted">
-                    Showing <?php echo esc_html((string) count($actions)); ?> of <?php echo esc_html((string) $totalActions); ?> records
-                    (page <?php echo esc_html((string) $page); ?> of <?php echo esc_html((string) $totalPages); ?>)
-                </div>
-                <div>
-                    <a class="button <?php echo $page <= 1 ? 'disabled' : ''; ?>" href="<?php echo esc_url(add_query_arg(array_merge($baseArgs, ['paged' => $prevPage]), admin_url('admin.php'))); ?>">Previous</a>
-                    <a class="button <?php echo $page >= $totalPages ? 'disabled' : ''; ?>" href="<?php echo esc_url(add_query_arg(array_merge($baseArgs, ['paged' => $nextPage]), admin_url('admin.php'))); ?>">Next</a>
-                </div>
-            </div>
-
-            <h2 style="margin-top:20px;">Execution Timeline</h2>
-            <div class="seoauto-card">
-            <?php if (!empty($groupedChangeLogs)) : ?>
-                <?php foreach ($groupedChangeLogs as $group) : ?>
-                    <?php $events = array_reverse($group['events']); ?>
-                    <div style="border:1px solid #dcdcde;border-radius:8px;background:#fff;padding:10px;margin-bottom:12px;">
-                        <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;">
-                            <strong><?php echo esc_html((string) ($group['title'] ?? 'Action')); ?></strong>
-                            <span><?php echo wp_kses_post($this->renderStatusBadge((string) ($group['last_status'] ?? 'received'))); ?></span>
-                        </div>
-                        <div class="seoauto-muted" style="margin-top:4px;">
-                            Last event: <?php echo esc_html((string) ($group['last_at'] ?? '')); ?> • <?php echo esc_html((string) count($events)); ?> timeline events
-                        </div>
-                        <details style="margin-top:8px;">
-                            <summary>Show progression</summary>
-                            <div class="seoauto-timeline-list">
-                                <?php foreach ($events as $event) : ?>
-                                    <?php
-                                    $eventType = (string) ($event['event_type'] ?? '');
-                                    $eventStatus = (string) ($event['status'] ?? 'received');
-                                    $eventLabel = $this->resolveTimelineEventLabel($eventType, $eventStatus);
-                                    ?>
-                                    <div class="seoauto-timeline-event">
-                                        <div class="seoauto-mono"><?php echo esc_html((string) ($event['created_at'] ?? '')); ?></div>
-                                        <div><code><?php echo esc_html($eventLabel); ?></code></div>
-                                        <div>
-                                            <?php echo wp_kses_post($this->renderStatusBadge($eventStatus)); ?>
-                                            <?php if ($eventLabel !== $eventStatus && $eventType !== '') : ?>
-                                                <div class="seoauto-muted" style="margin-top:4px;">Raw event: <code><?php echo esc_html($eventType); ?></code></div>
-                                            <?php endif; ?>
-                                            <?php if ($this->shouldRenderTimelineNote($eventType, (string) ($event['note'] ?? ''))) : ?>
-                                                <div class="seoauto-muted" style="margin-top:4px;"><?php echo esc_html((string) $event['note']); ?></div>
-                                            <?php endif; ?>
-                                        </div>
-                                    </div>
-                                <?php endforeach; ?>
-                            </div>
-                        </details>
-                    </div>
-                <?php endforeach; ?>
-            <?php else : ?>
-                <p class="seoauto-muted">No execution timeline entries for the current filtered page.</p>
-            <?php endif; ?>
-            </div>
-        </div>
-        <script>
-            function seoautoSetEditMode(form, editing) {
-                var fields = form.querySelectorAll('[data-seoauto-editable="1"]');
-                var editButton = form.querySelector('[data-seoauto-edit-toggle="1"]');
-                var saveButton = form.querySelector('[data-seoauto-save-button="1"]');
-                var cancelButton = form.querySelector('[data-seoauto-cancel-button="1"]');
-
-                fields.forEach(function (field) {
-                    field.disabled = !editing;
-
-                    if (editing && typeof field.dataset.originalValue === 'undefined') {
-                        field.dataset.originalValue = field.value;
-                    }
-
-                    if (!editing && typeof field.dataset.originalValue !== 'undefined') {
-                        field.value = field.dataset.originalValue;
-                    }
-                });
-
-                if (editButton) {
-                    editButton.style.display = editing ? 'none' : 'inline-block';
-                }
-                if (saveButton) {
-                    saveButton.style.display = editing ? 'inline-block' : 'none';
-                }
-                if (cancelButton) {
-                    cancelButton.style.display = editing ? 'inline-block' : 'none';
-                }
-            }
-
-            document.addEventListener('click', function (event) {
-                var trigger = event.target;
-                if (!trigger) {
-                    return;
-                }
-
-                var isEdit = trigger.getAttribute('data-seoauto-edit-toggle') === '1';
-                var isCancel = trigger.getAttribute('data-seoauto-cancel-button') === '1';
-                if (!isEdit && !isCancel) {
-                    return;
-                }
-
-                var form = trigger.closest('.seoauto-edit-form');
-                if (!form) {
-                    return;
-                }
-
-                if (isEdit) {
-                    seoautoSetEditMode(form, true);
-                    return;
-                }
-
-                if (isCancel) {
-                    seoautoSetEditMode(form, false);
-                }
-            });
-        </script>
-        <?php
-    }
-
-    private function renderStatusBadge(string $status): string
-    {
-        $normalized = sanitize_html_class(str_replace('_', '-', strtolower(trim($status))));
-        $label = ucwords(str_replace(['-', '_'], ' ', $status));
-
-        return sprintf(
-            '<span class="seoauto-badge seoauto-status-%s">%s</span>',
-            esc_attr($normalized),
-            esc_html($label)
-        );
-    }
-
-    private function shouldRenderTimelineNote(string $eventType, string $note): bool
-    {
-        $normalizedEvent = strtolower(trim($eventType));
-        $normalizedNote = strtolower(trim($note));
-
-        if ($normalizedNote === '') {
-            return false;
-        }
-
-        $systemNotes = [
-            'action received from laravel.',
-            'action queued for execution.',
-            'action execution started.',
-            'action awaiting manual review.',
-        ];
-
-        if (in_array($normalizedNote, $systemNotes, true) && in_array($normalizedEvent, ['received', 'queued', 'running'], true)) {
-            return false;
-        }
-
-        return true;
-    }
-
-    private function resolveTimelineEventLabel(string $eventType, string $status): string
-    {
-        $event = strtolower(trim($eventType));
-        $normalizedStatus = strtolower(trim($status));
-
-        if ($event === 'queued' && $normalizedStatus === 'running') {
-            return 'running';
-        }
-
-        if ($event !== '') {
-            return $event;
-        }
-
-        return $normalizedStatus !== '' ? $normalizedStatus : 'received';
-    }
-
-    /**
-     * @param array<string, mixed> $row
-     * @param array<string, mixed> $payload
-     */
-    private function buildActionDisplayTitle(array $row, array $payload): string
-    {
-        $title = trim((string) ($payload['title'] ?? ''));
-        if ($title !== '') {
-            return $title;
-        }
-
-        $targetType = (string) ($row['target_type'] ?? '');
-        $targetId = (string) ($row['target_id'] ?? '');
-        $targetUrl = (string) ($row['target_url'] ?? '');
-
-        $targetLabel = '';
-        if ($targetType === 'post' && ctype_digit($targetId)) {
-            $postTitle = get_the_title((int) $targetId);
-            if (is_string($postTitle) && trim($postTitle) !== '') {
-                $targetLabel = trim($postTitle);
-            }
-        }
-
-        if ($targetLabel === '' && $targetUrl !== '') {
-            $targetLabel = $targetUrl;
-        }
-
-        if ($targetLabel === '' && $targetType !== '' && $targetId !== '') {
-            $targetLabel = "{$targetType}:{$targetId}";
-        }
-
-        $actionType = (string) ($row['action_type'] ?? 'action');
-        $actionLabel = ucwords(str_replace(['-', '_'], ' ', $actionType));
-
-        if ($targetLabel === '') {
-            return $actionLabel;
-        }
-
-        return "{$targetLabel} - {$actionLabel}";
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     * @return array<int, array{key:string,label:string,type:string,value:string}>
-     */
-    private function buildEditableFields(string $actionType, array $payload): array
-    {
-        return match ($actionType) {
-            'add-meta-description', 'update-meta-description' => [[
-                'key' => 'meta_description',
-                'label' => 'Meta Description',
-                'type' => 'textarea',
-                'value' => (string) ($payload['meta_description'] ?? $payload['recommended_meta_description'] ?? ''),
-            ]],
-            'add-alt-text' => [[
-                'key' => 'alt_text',
-                'label' => 'Image Alt Text',
-                'type' => 'text',
-                'value' => (string) ($payload['alt_text'] ?? $payload['suggested_alt'] ?? ''),
-            ]],
-            'update-title' => [[
-                'key' => 'seo_title',
-                'label' => 'SEO Title',
-                'type' => 'text',
-                'value' => (string) ($payload['seo_title'] ?? $payload['title'] ?? ''),
-            ]],
-            'set-social-tags' => [
-                [
-                    'key' => 'social_tags_og_title',
-                    'label' => 'OG Title',
-                    'type' => 'text',
-                    'value' => (string) ($payload['social_tags']['og']['title'] ?? ''),
-                ],
-                [
-                    'key' => 'social_tags_og_description',
-                    'label' => 'OG Description',
-                    'type' => 'textarea',
-                    'value' => (string) ($payload['social_tags']['og']['description'] ?? ''),
-                ],
-                [
-                    'key' => 'social_tags_twitter_site',
-                    'label' => 'Twitter Site',
-                    'type' => 'text',
-                    'value' => (string) ($payload['social_tags']['twitter']['site'] ?? ''),
-                ],
-            ],
-            default => [],
-        };
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     * @param array<string, mixed> $before
-     * @param array<string, mixed> $after
-     * @return array<int, array{label:string,value:string}>
-     */
-    private function buildReadOnlyFields(string $actionType, array $payload, array $before, array $after): array
-    {
-        if (in_array($actionType, ['add-meta-description', 'update-meta-description'], true)) {
-            return [[
-                'label' => 'Meta Description',
-                'value' => (string) ($payload['meta_description'] ?? $payload['recommended_meta_description'] ?? ''),
-            ]];
-        }
-
-        if ($actionType === 'add-alt-text') {
-            return [[
-                'label' => 'Image Alt Text',
-                'value' => (string) ($payload['alt_text'] ?? $payload['suggested_alt'] ?? ''),
-            ]];
-        }
-
-        if (in_array($actionType, ['add-schema', 'add-schema-markup'], true)) {
-            return [[
-                'label' => 'Schema Type',
-                'value' => (string) ($payload['schema_type'] ?? 'Article'),
-            ]];
-        }
-
-        if ($actionType === 'set-social-tags') {
-            return [
-                [
-                    'label' => 'OG Title',
-                    'value' => (string) ($payload['social_tags']['og']['title'] ?? ''),
-                ],
-                [
-                    'label' => 'Twitter Site',
-                    'value' => (string) ($payload['social_tags']['twitter']['site'] ?? ''),
-                ],
-            ];
-        }
-
-        if ($actionType === 'set-post-dates') {
-            return [
-                [
-                    'label' => 'Published At',
-                    'value' => (string) ($payload['published_at'] ?? ''),
-                ],
-                [
-                    'label' => 'Modified At',
-                    'value' => (string) ($payload['modified_at'] ?? ''),
-                ],
-            ];
-        }
-
-        if ($after !== []) {
-            $first = array_key_first($after);
-            if (is_string($first)) {
-                $value = $after[$first] ?? '';
-                return [[
-                    'label' => ucwords(str_replace(['_', '-'], ' ', $first)),
-                    'value' => is_scalar($value) ? (string) $value : 'Updated',
-                ]];
-            }
-        }
-
-        if ($before !== []) {
-            $first = array_key_first($before);
-            if (is_string($first)) {
-                $value = $before[$first] ?? '';
-                return [[
-                    'label' => ucwords(str_replace(['_', '-'], ' ', $first)),
-                    'value' => is_scalar($value) ? (string) $value : 'Available',
-                ]];
-            }
-        }
-
-        return [];
-    }
-
-    private function renderLocalLogsFallback(string $remoteError = '', string $notice = '', int $deletedCount = 0): void
-    {
-        global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_activity_logs';
-
-        $severity = isset($_GET['severity']) ? sanitize_text_field((string) $_GET['severity']) : '';
-        $dateFrom = isset($_GET['date_from']) ? sanitize_text_field((string) $_GET['date_from']) : '';
-        $dateTo = isset($_GET['date_to']) ? sanitize_text_field((string) $_GET['date_to']) : '';
-        $page = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
-        $perPage = 50;
-        $offset = ($page - 1) * $perPage;
-
-        $where = ['1=1'];
-        $params = [];
-
-        if ($severity !== '' && in_array($severity, ['debug', 'info', 'warning', 'error'], true)) {
-            $where[] = 'severity = %s';
-            $params[] = $severity;
-        }
-        if ($dateFrom !== '') {
-            $where[] = 'created_at >= %s';
-            $params[] = $dateFrom . ' 00:00:00';
-        }
-        if ($dateTo !== '') {
-            $where[] = 'created_at <= %s';
-            $params[] = $dateTo . ' 23:59:59';
-        }
-
-        $whereSql = implode(' AND ', $where);
-        $paramsForList = array_merge($params, [$perPage, $offset]);
-        $listQuery = $wpdb->prepare(
-            "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC LIMIT %d OFFSET %d",
-            ...$paramsForList
-        );
-        $rows = $wpdb->get_results($listQuery); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-        $countQuery = empty($params)
-            ? "SELECT COUNT(*) FROM {$table} WHERE {$whereSql}"
-            : $wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE {$whereSql}", ...$params);
-        $total = (int) $wpdb->get_var($countQuery); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-        $totalPages = max(1, (int) ceil($total / $perPage));
-
-        ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Activity Logs', 'seoauto-logs', 'Fallback local activity stream when remote logs are unavailable.'); ?>
-            <?php $this->renderLogsToolbar($notice, $deletedCount); ?>
-            <?php if ($remoteError !== '') : ?>
-                <div class="notice notice-warning"><p>Remote execution logs unavailable. Showing local logs. <?php echo esc_html($remoteError); ?></p></div>
-            <?php endif; ?>
-            <form method="get" class="seoauto-filter-grid seoauto-filter-grid-compact">
-                <input type="hidden" name="page" value="seoauto-logs">
-                <select name="severity">
-                    <option value="">All Severities</option>
-                    <option value="debug" <?php selected($severity, 'debug'); ?>>Debug</option>
-                    <option value="info" <?php selected($severity, 'info'); ?>>Info</option>
-                    <option value="warning" <?php selected($severity, 'warning'); ?>>Warning</option>
-                    <option value="error" <?php selected($severity, 'error'); ?>>Error</option>
-                </select>
-                <input type="date" name="date_from" value="<?php echo esc_attr($dateFrom); ?>">
-                <input type="date" name="date_to" value="<?php echo esc_attr($dateTo); ?>">
-                <button class="button" type="submit">Filter</button>
-            </form>
-
-            <div class="seoauto-card">
-            <table class="wp-list-table widefat striped" style="margin-top:12px;">
-                <thead>
-                    <tr><th>Time</th><th>Correlation</th><th>Event</th><th>Severity</th><th>Entity</th><th>Error</th></tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($rows)) : ?>
-                        <?php foreach ($rows as $row) : ?>
-                            <tr>
-                                <td><?php echo esc_html(wp_date('Y-m-d H:i:s', strtotime((string) $row->created_at))); ?></td>
-                                <td><code><?php echo esc_html(substr((string) $row->correlation_id, 0, 8)); ?></code></td>
-                                <td><?php echo esc_html((string) $row->event_name); ?></td>
-                                <td><?php echo esc_html((string) $row->severity); ?></td>
-                                <td><?php echo esc_html((string) $row->entity_type . ':' . (string) $row->entity_id); ?></td>
-                                <td><?php echo esc_html((string) $row->error_message); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else : ?>
-                        <tr><td colspan="6">No logs found.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-            </div>
-
-            <div class="tablenav bottom">
-                <div class="tablenav-pages">
-                    <?php
-                    echo wp_kses_post(
-                        paginate_links([
-                            'base' => add_query_arg('paged', '%#%'),
-                            'format' => '',
-                            'current' => $page,
-                            'total' => $totalPages,
-                        ])
-                    );
-                    ?>
-                </div>
-            </div>
-        </div>
-        <?php
-    }
-
-    private function renderLogsToolbar(string $notice, int $deletedCount): void
-    {
-        if ($notice === 'logs_delete_ok') {
-            ?>
-            <div class="notice notice-success"><p><?php echo esc_html(sprintf('Deleted %d local execution log entries.', $deletedCount)); ?></p></div>
-            <?php
-        } elseif ($notice === 'logs_delete_failed') {
-            ?>
-            <div class="notice notice-error"><p>Failed to delete local execution logs.</p></div>
-            <?php
-        }
-        ?>
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-button-row" style="margin-bottom:12px;">
-            <?php wp_nonce_field('seoauto_delete_logs'); ?>
-            <input type="hidden" name="action" value="seoauto_delete_logs">
-            <button type="submit" class="button" onclick="return confirm('Delete all local execution logs?');">Delete Local Logs</button>
-            <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-local-errors')); ?>">Open Local Errors</a>
-        </form>
-        <?php
-    }
-
-    public function renderLocalErrorsPage(): void
-    {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
-        global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_activity_logs';
-
-        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
-        $deletedCount = isset($_GET['deleted_count']) ? max(0, (int) $_GET['deleted_count']) : 0;
-        $severity = isset($_GET['severity']) ? sanitize_text_field((string) $_GET['severity']) : 'error';
-        $source = isset($_GET['source']) ? sanitize_text_field((string) $_GET['source']) : '';
-        $dateFrom = isset($_GET['date_from']) ? sanitize_text_field((string) $_GET['date_from']) : '';
-        $dateTo = isset($_GET['date_to']) ? sanitize_text_field((string) $_GET['date_to']) : '';
-        $page = isset($_GET['paged']) ? max(1, (int) $_GET['paged']) : 1;
-        $perPage = 50;
-        $offset = ($page - 1) * $perPage;
-
-        if (!in_array($severity, ['all', 'error', 'warning'], true)) {
-            $severity = 'error';
-        }
-
-        $where = ['1=1'];
-        $params = [];
-
-        if ($severity === 'error') {
-            $where[] = 'severity = %s';
-            $params[] = 'error';
-        } elseif ($severity === 'warning') {
-            $where[] = 'severity = %s';
-            $params[] = 'warning';
-        } else {
-            $where[] = "severity IN ('warning','error')";
-        }
-
-        $validSources = ['inbound', 'outbound', 'executor', 'admin'];
-        if ($source !== '' && in_array($source, $validSources, true)) {
-            $where[] = 'source = %s';
-            $params[] = $source;
-        }
-
-        if ($dateFrom !== '') {
-            $where[] = 'created_at >= %s';
-            $params[] = $dateFrom . ' 00:00:00';
-        }
-
-        if ($dateTo !== '') {
-            $where[] = 'created_at <= %s';
-            $params[] = $dateTo . ' 23:59:59';
-        }
-
-        $whereSql = implode(' AND ', $where);
-        $paramsForList = array_merge($params, [$perPage, $offset]);
-        $listQuery = $wpdb->prepare(
-            "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC LIMIT %d OFFSET %d",
-            ...$paramsForList
-        );
-
-        $rows = $wpdb->get_results($listQuery); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-        $countQuery = empty($params)
-            ? "SELECT COUNT(*) FROM {$table} WHERE {$whereSql}"
-            : $wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE {$whereSql}", ...$params);
-        $total = (int) $wpdb->get_var($countQuery); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-        $totalPages = max(1, (int) ceil($total / $perPage));
-
-        ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Debug Logs', 'seoauto-local-errors', 'Inspect local warnings and errors emitted by plugin workflows.'); ?>
-            <?php $this->renderLocalErrorsToolbar($notice, $deletedCount, $severity); ?>
-
-            <form method="get" class="seoauto-filter-grid seoauto-filter-grid-compact">
-                <input type="hidden" name="page" value="seoauto-local-errors">
-                <select name="severity">
-                    <option value="all" <?php selected($severity, 'all'); ?>>Warning + Error</option>
-                    <option value="error" <?php selected($severity, 'error'); ?>>Error</option>
-                    <option value="warning" <?php selected($severity, 'warning'); ?>>Warning</option>
-                </select>
-                <select name="source">
-                    <option value="">All Sources</option>
-                    <option value="inbound" <?php selected($source, 'inbound'); ?>>Inbound</option>
-                    <option value="outbound" <?php selected($source, 'outbound'); ?>>Outbound</option>
-                    <option value="executor" <?php selected($source, 'executor'); ?>>Executor</option>
-                    <option value="admin" <?php selected($source, 'admin'); ?>>Admin</option>
-                </select>
-                <input type="date" name="date_from" value="<?php echo esc_attr($dateFrom); ?>">
-                <input type="date" name="date_to" value="<?php echo esc_attr($dateTo); ?>">
-                <button class="button" type="submit">Filter</button>
-                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-local-errors')); ?>">Reset</a>
-            </form>
-
-            <div class="seoauto-card">
-            <table class="wp-list-table widefat striped" style="margin-top:12px;">
-                <thead>
-                    <tr><th>Time</th><th>Severity</th><th>Source</th><th>Correlation</th><th>Event</th><th>Entity</th><th>Error</th></tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($rows)) : ?>
-                        <?php foreach ($rows as $row) : ?>
-                            <tr>
-                                <td><?php echo esc_html(wp_date('Y-m-d H:i:s', strtotime((string) $row->created_at))); ?></td>
-                                <td><?php echo esc_html((string) $row->severity); ?></td>
-                                <td><?php echo esc_html((string) $row->source); ?></td>
-                                <td><code><?php echo esc_html(substr((string) $row->correlation_id, 0, 8)); ?></code></td>
-                                <td><?php echo esc_html((string) $row->event_name); ?></td>
-                                <td><?php echo esc_html((string) $row->entity_type . ':' . (string) $row->entity_id); ?></td>
-                                <td><?php echo esc_html((string) $row->error_message); ?></td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else : ?>
-                        <tr><td colspan="7">No local errors found.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-            </div>
-
-            <div class="tablenav bottom">
-                <div class="tablenav-pages">
-                    <?php
-                    echo wp_kses_post(
-                        paginate_links([
-                            'base' => add_query_arg('paged', '%#%'),
-                            'format' => '',
-                            'current' => $page,
-                            'total' => $totalPages,
-                        ])
-                    );
-                    ?>
-                </div>
-            </div>
-        </div>
-        <?php
-    }
-
-    public function renderActionItemsPage(): void
-    {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
-        global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_admin_action_items';
-        $actionsTable = $wpdb->prefix . 'seoauto_actions';
-        $siteId = (int) get_option('seoauto_site_id', 0);
-        $statusFilter = isset($_GET['status']) ? sanitize_text_field((string) $_GET['status']) : '';
-        $categoryFilter = isset($_GET['category']) ? sanitize_text_field((string) $_GET['category']) : '';
-        $targetTypeFilter = isset($_GET['target_type']) ? sanitize_text_field((string) $_GET['target_type']) : '';
-        $search = isset($_GET['q']) ? sanitize_text_field((string) $_GET['q']) : '';
-        $page = max(1, (int) ($_GET['paged'] ?? 1));
-        $perPage = min(100, max(10, (int) ($_GET['per_page'] ?? 25)));
-        $offset = ($page - 1) * $perPage;
-        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
-
-        $where = ['1=1'];
-        $params = [];
-        if ($siteId > 0) {
-            $where[] = 'i.site_id = %d';
-            $params[] = $siteId;
-        } else {
-            $where[] = '1=0';
-        }
-
-        if ($statusFilter !== '') {
-            $where[] = 'i.status = %s';
-            $params[] = $statusFilter;
-        }
-        if ($categoryFilter !== '') {
-            $where[] = 'i.category = %s';
-            $params[] = $categoryFilter;
-        }
-        if ($targetTypeFilter !== '') {
-            $where[] = 'a.target_type = %s';
-            $params[] = $targetTypeFilter;
-        }
-        if ($search !== '') {
-            $like = '%' . $wpdb->esc_like($search) . '%';
-            $where[] = '(i.title LIKE %s OR i.details LIKE %s OR i.recommended_value LIKE %s)';
-            $params[] = $like;
-            $params[] = $like;
-            $params[] = $like;
-        }
-
-        $whereSql = implode(' AND ', $where);
-        $itemsQuery = $wpdb->prepare(
-            "SELECT i.*, a.target_type, a.target_id, a.target_url, a.action_type AS linked_action_type, a.status AS linked_action_status
-             FROM {$table} i
-             LEFT JOIN {$actionsTable} a ON a.laravel_action_id = i.laravel_action_id
-             WHERE {$whereSql}
-             ORDER BY i.updated_at DESC
-             LIMIT %d OFFSET %d",
-            ...array_merge($params, [$perPage, $offset])
-        );
-
-        $countQuery = $wpdb->prepare(
-            "SELECT COUNT(*)
-             FROM {$table} i
-             LEFT JOIN {$actionsTable} a ON a.laravel_action_id = i.laravel_action_id
-             WHERE {$whereSql}",
-            ...$params
-        );
-
-        $items = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-            $itemsQuery
-        );
-        if (!is_array($items)) {
-            $items = [];
-        }
-        $total = (int) $wpdb->get_var($countQuery); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-        $totalPages = max(1, (int) ceil($total / $perPage));
-
-        $categoryOptions = $siteId > 0
-            ? $wpdb->get_col($wpdb->prepare("SELECT DISTINCT category FROM {$table} WHERE site_id = %d ORDER BY category ASC", $siteId))
-            : [];
-        $targetTypeOptions = $siteId > 0
-            ? $wpdb->get_col($wpdb->prepare("SELECT DISTINCT a.target_type FROM {$table} i INNER JOIN {$actionsTable} a ON a.laravel_action_id = i.laravel_action_id WHERE i.site_id = %d AND a.target_type <> '' ORDER BY a.target_type ASC", $siteId))
-            : [];
-        if (!is_array($categoryOptions)) {
-            $categoryOptions = [];
-        }
-        if (!is_array($targetTypeOptions)) {
-            $targetTypeOptions = [];
-        }
-        ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Action Items', 'seoauto-action-items', 'Track tasks requiring manual admin input and resolve them quickly.'); ?>
-            <?php if ($notice === 'action_item_updated') : ?>
-                <div class="notice notice-success"><p>Action item updated.</p></div>
-            <?php endif; ?>
-            <?php if ($siteId <= 0) : ?>
-                <div class="notice notice-warning"><p>Site is not registered yet. Action items are hidden until a site ID is available.</p></div>
-            <?php endif; ?>
-            <form method="get" class="seoauto-filter-grid">
-                <input type="hidden" name="page" value="seoauto-action-items">
-                <label>
-                    <span>Status</span>
-                    <select name="status" style="width:100%;">
-                        <option value="">All statuses</option>
-                        <option value="open" <?php selected($statusFilter, 'open'); ?>>Open</option>
-                        <option value="in_progress" <?php selected($statusFilter, 'in_progress'); ?>>In Progress</option>
-                        <option value="resolved" <?php selected($statusFilter, 'resolved'); ?>>Resolved</option>
-                    </select>
-                </label>
-                <label>
-                    <span>Category</span>
-                    <select name="category" style="width:100%;">
-                        <option value="">All categories</option>
-                        <?php foreach ($categoryOptions as $option) : ?>
-                            <option value="<?php echo esc_attr((string) $option); ?>" <?php selected($categoryFilter, (string) $option); ?>><?php echo esc_html((string) $option); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-                <label>
-                    <span>Target Type</span>
-                    <select name="target_type" style="width:100%;">
-                        <option value="">All target types</option>
-                        <?php foreach ($targetTypeOptions as $option) : ?>
-                            <option value="<?php echo esc_attr((string) $option); ?>" <?php selected($targetTypeFilter, (string) $option); ?>><?php echo esc_html((string) $option); ?></option>
-                        <?php endforeach; ?>
-                    </select>
-                </label>
-                <label>
-                    <span>Search</span>
-                    <input type="text" name="q" value="<?php echo esc_attr($search); ?>" style="width:100%;" placeholder="title/details">
-                </label>
-                <div>
-                    <input type="hidden" name="per_page" value="<?php echo esc_attr((string) $perPage); ?>">
-                    <button class="button button-primary" type="submit">Apply</button>
-                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-action-items')); ?>">Reset</a>
-                </div>
-            </form>
-            <div class="seoauto-card">
-            <table class="wp-list-table widefat striped">
-                <thead>
-                    <tr><th>ID</th><th>Title</th><th>Category</th><th>Status</th><th>Target</th><th>Details</th><th>Update</th><th>Actions</th></tr>
-                </thead>
-                <tbody>
-                    <?php if (!empty($items)) : ?>
-                        <?php foreach ($items as $item) : ?>
-                            <?php
-                            $laravelId = isset($item->laravel_action_id) ? (int) $item->laravel_action_id : 0;
-                            $targetLabel = '';
-                            $targetType = (string) ($item->target_type ?? '');
-                            $targetId = (string) ($item->target_id ?? '');
-                            $targetUrl = (string) ($item->target_url ?? '');
-                            $linkedActionType = (string) ($item->linked_action_type ?? '');
-                            $linkedActionStatus = (string) ($item->linked_action_status ?? '');
-
-                            if ($targetType === 'post' && ctype_digit($targetId)) {
-                                $postTitle = get_the_title((int) $targetId);
-                                if (is_string($postTitle) && trim($postTitle) !== '') {
-                                    $targetLabel = trim($postTitle);
-                                }
-                            }
-
-                            if ($targetLabel === '' && $targetUrl !== '') {
-                                $targetLabel = $targetUrl;
-                            }
-
-                            if ($targetLabel === '' && $targetId !== '') {
-                                $targetLabel = "{$targetType}:{$targetId}";
-                            }
-
-                            $displayTitle = (string) $item->title;
-                            if ($targetLabel !== '' && stripos($displayTitle, $targetLabel) === false) {
-                                $displayTitle = "{$targetLabel} - {$displayTitle}";
-                            }
-                            ?>
-                            <tr>
-                                <td><?php echo esc_html((string) $item->id); ?></td>
-                                <td><?php echo esc_html($displayTitle); ?></td>
-                                <td><?php echo esc_html((string) $item->category); ?></td>
-                                <td><?php echo esc_html((string) $item->status); ?></td>
-                                <td><?php echo esc_html($targetLabel !== '' ? $targetLabel : 'N/A'); ?></td>
-                                <td><?php echo esc_html((string) $item->details); ?></td>
-                                <td>
-                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                                        <?php wp_nonce_field('seoauto_update_action_item'); ?>
-                                        <input type="hidden" name="action" value="seoauto_update_action_item">
-                                        <input type="hidden" name="item_id" value="<?php echo esc_attr((string) $item->id); ?>">
-                                        <select name="status">
-                                            <option value="open" <?php selected((string) $item->status, 'open'); ?>>Open</option>
-                                            <option value="in_progress" <?php selected((string) $item->status, 'in_progress'); ?>>In Progress</option>
-                                            <option value="resolved" <?php selected((string) $item->status, 'resolved'); ?>>Resolved</option>
-                                        </select>
-                                        <button class="button button-small" type="submit">Save</button>
-                                    </form>
-                                </td>
-                                <td>
-                                    <?php if ($targetUrl !== '') : ?>
-                                        <a class="button button-small" href="<?php echo esc_url($targetUrl); ?>" target="_blank" rel="noopener noreferrer">Open</a>
-                                    <?php endif; ?>
-                                    <?php if ($targetType === 'post' && ctype_digit($targetId)) : ?>
-                                        <a class="button button-small" href="<?php echo esc_url(admin_url('post.php?post=' . (int) $targetId . '&action=edit')); ?>">Edit</a>
-                                    <?php endif; ?>
-                                    <?php if ($laravelId > 0 && $linkedActionType !== '' && $linkedActionType !== 'human-action-required') : ?>
-                                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
-                                            <?php wp_nonce_field('seoauto_apply_action'); ?>
-                                            <input type="hidden" name="action" value="seoauto_apply_action">
-                                            <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
-                                            <input type="hidden" name="return_page" value="seoauto-action-items">
-                                            <button class="button button-small" type="submit">Apply</button>
-                                        </form>
-                                        <?php if ($linkedActionStatus === 'applied') : ?>
-                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:inline-block;">
-                                                <?php wp_nonce_field('seoauto_revert_action'); ?>
-                                                <input type="hidden" name="action" value="seoauto_revert_action">
-                                                <input type="hidden" name="action_id" value="<?php echo esc_attr((string) $laravelId); ?>">
-                                                <input type="hidden" name="return_page" value="seoauto-action-items">
-                                                <button class="button button-small" type="submit">Revert</button>
-                                            </form>
-                                        <?php endif; ?>
-                                    <?php endif; ?>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else : ?>
-                        <tr><td colspan="8">No human action items found.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-            </div>
-            <div class="tablenav bottom">
-                <div class="tablenav-pages">
-                    <?php
-                    echo wp_kses_post(
-                        paginate_links([
-                            'base' => add_query_arg('paged', '%#%'),
-                            'format' => '',
-                            'current' => $page,
-                            'total' => $totalPages,
-                        ])
-                    );
-                    ?>
-                </div>
-            </div>
-        </div>
-        <?php
-    }
-
-    private function resolveActionRedirectPage(): string
-    {
-        $returnPage = isset($_POST['return_page']) ? sanitize_text_field((string) $_POST['return_page']) : ''; // phpcs:ignore WordPress.Security.NonceVerification.Missing
-        $allowed = ['seoauto-logs', 'seoauto-action-items'];
-
-        if (in_array($returnPage, $allowed, true)) {
-            return $returnPage;
-        }
-
-        return 'seoauto-logs';
-    }
-
-    private function renderLocalErrorsToolbar(string $notice, int $deletedCount, string $severity): void
-    {
-        if ($notice === 'local_errors_delete_ok') {
-            ?>
-            <div class="notice notice-success"><p><?php echo esc_html(sprintf('Deleted %d local error entries.', $deletedCount)); ?></p></div>
-            <?php
-        } elseif ($notice === 'local_errors_delete_failed') {
-            ?>
-            <div class="notice notice-error"><p>Failed to delete local error entries.</p></div>
-            <?php
-        }
-        ?>
-        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-button-row" style="margin-bottom:12px;">
-            <?php wp_nonce_field('seoauto_delete_local_errors'); ?>
-            <input type="hidden" name="action" value="seoauto_delete_local_errors">
-            <input type="hidden" name="severity" value="<?php echo esc_attr($severity); ?>">
-            <button type="submit" class="button" onclick="return confirm('Delete filtered local errors?');">Delete Local Errors</button>
-            <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-logs')); ?>">Open Execution Logs</a>
-        </form>
-        <?php
-    }
-
-    public function renderSchedulesPage(): void
-    {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
-        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
-        $tasks = [];
-        $scheduled = [];
-        $remoteErrors = [];
-
-        try {
-            $tasksRes = $this->client->listTasksFast();
-            $tasks = isset($tasksRes['tasks']) && is_array($tasksRes['tasks']) ? $tasksRes['tasks'] : [];
-        } catch (\Throwable $exception) {
-            $remoteErrors[] = 'Tasks: ' . $exception->getMessage();
-            $this->logger->warning('admin_tasks_fetch_failed', ['error' => $exception->getMessage()], 'admin');
-        }
-
-        try {
-            $scheduledRes = $this->client->listScheduledTasksFast(['limit' => 50]);
-            $scheduled = isset($scheduledRes['scheduled_tasks']) && is_array($scheduledRes['scheduled_tasks']) ? $scheduledRes['scheduled_tasks'] : [];
-        } catch (\Throwable $exception) {
-            $remoteErrors[] = 'Scheduled runs: ' . $exception->getMessage();
-            $this->logger->warning('admin_scheduled_runs_fetch_failed', ['error' => $exception->getMessage()], 'admin');
-        }
-
-        ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Schedules', 'seoauto-schedules', 'Manage background task configuration and scheduled executions.'); ?>
-            <?php if ($notice === 'task_update_ok') : ?>
-                <div class="notice notice-success"><p>Task configuration updated.</p></div>
-            <?php elseif ($notice === 'task_update_failed') : ?>
-                <div class="notice notice-error"><p>Task configuration update failed.</p></div>
-            <?php elseif ($notice === 'task_schedule_ok') : ?>
-                <div class="notice notice-success"><p>Task scheduled successfully.</p></div>
-            <?php elseif ($notice === 'task_schedule_failed') : ?>
-                <div class="notice notice-error"><p>Task scheduling failed.</p></div>
-            <?php endif; ?>
-            <?php if (!empty($remoteErrors)) : ?>
-                <div class="notice notice-warning">
-                    <p>Some schedule data could not be loaded from Laravel. <?php echo esc_html(implode(' | ', $remoteErrors)); ?></p>
-                </div>
-            <?php endif; ?>
-
-            <h2>Configured Tasks</h2>
-            <div class="seoauto-card">
-            <table class="wp-list-table widefat striped">
-                <thead><tr><th>Task ID</th><th>Name</th><th>Category</th><th>Frequency</th><th>Enabled</th><th>Timezone</th><th>Actions</th></tr></thead>
-                <tbody>
-                <?php if (!empty($tasks)) : ?>
-                    <?php foreach ($tasks as $task) : ?>
-                        <?php
-                        $taskId = isset($task['seo_execution_task_id']) ? (int) $task['seo_execution_task_id'] : 0;
-                        $isEnabled = !empty($task['is_enabled']);
-                        $delay = isset($task['delay_minutes']) ? (int) $task['delay_minutes'] : 0;
-                        ?>
-                        <tr>
-                            <td><?php echo esc_html((string) $taskId); ?></td>
-                            <td><?php echo esc_html((string) ($task['name'] ?? '')); ?></td>
-                            <td><?php echo esc_html((string) ($task['category'] ?? '')); ?></td>
-                            <td><?php echo esc_html((string) ($task['frequency'] ?? '')); ?></td>
-                            <td><?php echo $isEnabled ? 'Yes' : 'No'; ?></td>
-                            <td><?php echo esc_html((string) ($task['run_timezone'] ?? 'UTC')); ?></td>
-                            <td>
-                                <?php if ($taskId > 0) : ?>
-                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:8px;">
-                                        <?php wp_nonce_field('seoauto_update_task'); ?>
-                                        <input type="hidden" name="action" value="seoauto_update_task">
-                                        <input type="hidden" name="task_id" value="<?php echo esc_attr((string) $taskId); ?>">
-                                        <label style="display:inline-block;margin-right:6px;">
-                                            <input type="checkbox" name="is_enabled" value="1" <?php checked($isEnabled); ?>> Enabled
-                                        </label>
-                                        <label style="display:inline-block;margin-right:6px;">
-                                            Delay
-                                            <input type="number" min="0" name="delay_minutes" value="<?php echo esc_attr((string) $delay); ?>" style="width:70px;">
-                                        </label>
-                                        <button type="submit" class="button button-small">Save</button>
-                                    </form>
-
-                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                                        <?php wp_nonce_field('seoauto_schedule_task'); ?>
-                                        <input type="hidden" name="action" value="seoauto_schedule_task">
-                                        <input type="hidden" name="task_id" value="<?php echo esc_attr((string) $taskId); ?>">
-                                        <input type="datetime-local" name="scheduled_for" style="margin-right:6px;">
-                                        <input type="text" name="input_params_json" placeholder='{\"origin\":\"wp-admin\"}' style="width:180px;margin-right:6px;">
-                                        <button type="submit" class="button button-small">Schedule</button>
-                                    </form>
-                                <?php else : ?>
-                                    —
-                                <?php endif; ?>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else : ?>
-                    <tr><td colspan="7">No tasks found or API unavailable.</td></tr>
-                <?php endif; ?>
-                </tbody>
-            </table>
-            </div>
-
-            <h2 style="margin-top:24px;">Scheduled Runs</h2>
-            <div class="seoauto-card">
-            <table class="wp-list-table widefat striped">
-                <thead><tr><th>ID</th><th>Task</th><th>Status</th><th>Trigger</th><th>Scheduled For</th></tr></thead>
-                <tbody>
-                <?php if (!empty($scheduled)) : ?>
-                    <?php foreach ($scheduled as $item) : ?>
-                        <tr>
-                            <td><?php echo esc_html((string) ($item['id'] ?? '')); ?></td>
-                            <td><?php echo esc_html((string) ($item['task_name'] ?? '')); ?></td>
-                            <td><?php echo esc_html((string) ($item['status'] ?? '')); ?></td>
-                            <td><?php echo esc_html((string) ($item['trigger_source'] ?? '')); ?></td>
-                            <td><?php echo esc_html((string) ($item['scheduled_for'] ?? '')); ?></td>
-                        </tr>
-                    <?php endforeach; ?>
-                <?php else : ?>
-                    <tr><td colspan="5">No scheduled tasks found.</td></tr>
-                <?php endif; ?>
-                </tbody>
-            </table>
-            </div>
-        </div>
-        <?php
-    }
-
-    public function renderBriefsPage(): void
-    {
-        if (!current_user_can('edit_posts')) {
-            wp_die('Unauthorized');
-        }
-
-        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
-        $this->briefSyncer->sync();
-
-        global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_content_briefs';
-
-        $rows = $wpdb->get_results( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-            "SELECT * FROM {$table} ORDER BY synced_at DESC LIMIT 100"
-        );
-
-        ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Content Briefs', 'seoauto-briefs', 'Review synced briefs and link them to WordPress posts.'); ?>
-            <?php if ($notice === 'brief_link_ok') : ?>
-                <div class="notice notice-success"><p>Content brief linked to article.</p></div>
-            <?php elseif ($notice === 'brief_link_failed') : ?>
-                <div class="notice notice-error"><p>Failed to link content brief.</p></div>
-            <?php endif; ?>
-            <div class="seoauto-card">
-            <table class="wp-list-table widefat striped">
-                <thead><tr><th>ID</th><th>Title</th><th>Focus Keyword</th><th>Brief Details</th><th>Article Status</th><th>Assignment</th><th>Linked Post</th><th>Link Article</th></tr></thead>
-                <tbody>
-                    <?php if (!empty($rows)) : ?>
-                        <?php foreach ($rows as $row) : ?>
-                            <?php $payload = json_decode((string) $row->payload, true); ?>
-                            <tr>
-                                <td><?php echo esc_html((string) $row->laravel_content_brief_id); ?></td>
-                                <td><?php echo esc_html((string) ($payload['brief_title'] ?? 'Untitled')); ?></td>
-                                <td><?php echo esc_html((string) ($payload['focus_keyword'] ?? '')); ?></td>
-                                <td><?php echo wp_kses_post($this->buildBriefDetailsHtml(is_array($payload) ? $payload : [])); ?></td>
-                                <td><?php echo esc_html((string) $row->article_status); ?></td>
-                                <td><?php echo esc_html((string) $row->assignment_status); ?></td>
-                                <td>
-                                    <?php if (!empty($row->linked_wp_post_id)) : ?>
-                                        <a href="<?php echo esc_url(get_edit_post_link((int) $row->linked_wp_post_id)); ?>">#<?php echo esc_html((string) $row->linked_wp_post_id); ?></a>
-                                    <?php else : ?>
-                                        —
-                                    <?php endif; ?>
-                                </td>
-                                <td>
-                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                                        <?php wp_nonce_field('seoauto_link_brief'); ?>
-                                        <input type="hidden" name="action" value="seoauto_link_brief">
-                                        <input type="hidden" name="brief_id" value="<?php echo esc_attr((string) $row->laravel_content_brief_id); ?>">
-                                        <input type="number" min="1" name="wp_post_id" placeholder="WP Post ID" style="width:110px;margin-right:6px;">
-                                        <select name="article_status" style="margin-right:6px;">
-                                            <option value="drafted">drafted</option>
-                                            <option value="published">published</option>
-                                        </select>
-                                        <button class="button button-small" type="submit">Link</button>
-                                    </form>
-                                </td>
-                            </tr>
-                        <?php endforeach; ?>
-                    <?php else : ?>
-                        <tr><td colspan="8">No briefs synced yet.</td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
-            </div>
-        </div>
-        <?php
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     */
-    private function buildBriefDetailsHtml(array $payload): string
-    {
-        $search_intent = trim((string) ($payload['search_intent'] ?? ''));
-        $brief_summary = trim((string) ($payload['brief_summary'] ?? ''));
-        $writer_notes = trim((string) ($payload['writer_notes'] ?? ''));
-        $outline_items = $this->collectInsightItemsByType($payload, 'outline-item', 10);
-        $pain_points = $this->collectInsightItemsByType($payload, 'pain-point', 6);
-        $content_ideas = $this->collectInsightItemsByType($payload, 'content-idea', 6);
-
-        $threads = [];
-        foreach ((array) ($payload['threads'] ?? []) as $thread_row) {
-            if (!is_array($thread_row)) {
-                continue;
-            }
-
-            $title = trim((string) ($thread_row['thread_title'] ?? ''));
-            $subreddit = trim((string) ($thread_row['subreddit'] ?? ''));
-            if ($title === '') {
-                continue;
-            }
-
-            $threads[] = $subreddit !== '' ? "{$title} ({$subreddit})" : $title;
-            if (count($threads) >= 5) {
-                break;
-            }
-        }
-
-        $html = '<strong>Search Intent:</strong> ' . esc_html($search_intent !== '' ? $search_intent : '—');
-        $html .= '<br><strong>Brief Summary:</strong> ' . esc_html($brief_summary !== '' ? $brief_summary : '—');
-        $html .= '<br><strong>Writer Notes:</strong> ' . esc_html($writer_notes !== '' ? $writer_notes : '—');
-        $html .= '<br><strong>Recommended Outline</strong>' . $this->renderBulletList($outline_items);
-        $html .= '<strong>Reader Pain Points</strong>' . $this->renderBulletList($pain_points);
-        $html .= '<strong>Content Angles</strong>' . $this->renderBulletList($content_ideas);
-        $html .= '<strong>Source Threads</strong>' . $this->renderBulletList($threads);
-
-        return $html;
-    }
-
-    /**
-     * @param array<string, mixed> $payload
-     * @return list<string>
-     */
-    private function collectInsightItemsByType(array $payload, string $type, int $limit): array
-    {
-        $items = [];
-
-        foreach ((array) ($payload['insights'] ?? []) as $insight_row) {
-            if (!is_array($insight_row)) {
-                continue;
-            }
-
-            if ((string) ($insight_row['insight_type'] ?? '') !== $type) {
-                continue;
-            }
-
-            $value = trim((string) ($insight_row['details'] ?? $insight_row['headline'] ?? ''));
-            if ($value === '') {
-                continue;
-            }
-
-            $items[] = $value;
-            if (count($items) >= $limit) {
-                break;
-            }
-        }
-
-        return $items;
-    }
-
-    /**
-     * @param list<string> $items
-     */
-    private function renderBulletList(array $items): string
-    {
-        $clean = array_values(
-            array_filter(
-                array_map(static fn ($item): string => trim((string) $item), $items),
-                static fn (string $item): bool => $item !== ''
-            )
-        );
-
-        if ($clean === []) {
-            return '<br>—';
-        }
-
-        $html = '<ul style="margin:4px 0 10px 18px;list-style:disc;">';
-        foreach ($clean as $item) {
-            $html .= '<li>' . esc_html($item) . '</li>';
-        }
-        $html .= '</ul>';
-
-        return $html;
-    }
-
-    public function renderOauthCallbackPage(): void
-    {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
-
-        $hasCallbackState = isset($_GET['status']); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-
-        if ($hasCallbackState) {
-            $result = $this->oauthHandler->handleCallback($_GET); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
-            $status = sanitize_text_field((string) ($result['status'] ?? 'failed'));
-            $provider = sanitize_text_field((string) ($result['provider'] ?? 'google'));
-            $scopes = isset($result['scopes']) && is_array($result['scopes']) ? $result['scopes'] : [];
-            $error = sanitize_text_field((string) ($result['error'] ?? ''));
-            $health = isset($result['health']) && is_array($result['health']) ? $result['health'] : [];
-        } else {
-            $status = (string) get_option('seoauto_oauth_status', 'pending');
-            $provider = (string) get_option('seoauto_oauth_provider', '');
-            $scopes = get_option('seoauto_oauth_scopes', []);
-            if (!is_array($scopes)) {
-                $scopes = [];
-            }
-            $error = (string) get_option('seoauto_oauth_last_error', '');
-            $health = [];
-        }
-
-        ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('OAuth Connection', 'seoauto', 'Authentication status for provider integrations.'); ?>
-            <?php if ($status === 'active') : ?>
-                <div class="notice notice-success"><p>OAuth connected successfully.</p></div>
-            <?php elseif ($status === 'error') : ?>
-                <div class="notice notice-warning"><p>OAuth succeeded but health check failed.</p></div>
-            <?php elseif ($status === 'pending' || $status === 'in_progress') : ?>
-                <div class="notice notice-info"><p>OAuth not connected yet.</p></div>
-            <?php else : ?>
-                <div class="notice notice-error"><p>OAuth callback failed.</p></div>
-            <?php endif; ?>
-
-            <div class="seoauto-card" style="max-width:900px;">
-            <table class="widefat striped">
-                <tbody>
-                    <tr><th scope="row">Status</th><td><?php echo esc_html($status); ?></td></tr>
-                    <tr><th scope="row">Provider</th><td><?php echo esc_html($provider); ?></td></tr>
-                    <tr><th scope="row">Scopes</th><td><?php echo esc_html(!empty($scopes) ? implode(', ', array_map('strval', $scopes)) : 'None'); ?></td></tr>
-                    <tr><th scope="row">Error</th><td><?php echo esc_html($error !== '' ? $error : 'None'); ?></td></tr>
-                    <tr><th scope="row">Health Connected</th><td><?php echo !empty($health['connected']) ? 'Yes' : 'No'; ?></td></tr>
-                </tbody>
-            </table>
-            </div>
-
-            <p style="margin-top:16px;">
-                <a class="button button-primary" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-settings')); ?>">Back to Settings</a>
-            </p>
-        </div>
-        <?php
-    }
+    // ─── Render: Settings ─────────────────────────────────────────────────────
 
     public function renderSettingsPage(): void
     {
-        if (!current_user_can('manage_options')) {
-            wp_die('Unauthorized');
-        }
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
 
-        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
+        $notice         = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
+        $oauthStatus    = (string) get_option('seoauto_oauth_status', 'pending');
+        $oauthProvider  = (string) get_option('seoauto_oauth_provider', '');
+        $oauthScopes    = get_option('seoauto_oauth_scopes', []);
+        if (!is_array($oauthScopes)) $oauthScopes = [];
+        $oauthConnectedAt = (int) get_option('seoauto_oauth_connected_at', 0);
+        $oauthError     = (string) get_option('seoauto_oauth_last_error', '');
+        $adapter        = (string) get_option('seoauto_primary_seo_adapter', 'auto');
+        $mode           = (string) get_option('seoauto_change_application_mode', 'dangerous_auto_apply');
+        $siteId         = (int) get_option('seoauto_site_id', 0);
+        $lastCron       = (int) get_option('seoauto_last_cron_run', 0);
+        $lastUserSync   = (int) get_option('seoauto_last_user_sync', 0);
+        $lastBriefSync  = (int) get_option('seoauto_last_brief_sync', 0);
+
+        $excludedRaw    = (string) get_option('seoauto_excluded_change_audit_pages', '');
+        $excludedItems  = array_values(array_filter(array_map('trim', explode("\n", $excludedRaw))));
+
+        $isConnected    = $oauthStatus === 'active';
+
         $providerAlerts = get_option('seoauto_provider_connection_alerts', []);
-        if (!is_array($providerAlerts)) {
-            $providerAlerts = [];
-        }
+        if (!is_array($providerAlerts)) $providerAlerts = [];
 
+        // Fetch all published posts + pages for the exclusion tag UI
+        $allPosts = get_posts([
+            'post_type'      => ['post', 'page'],
+            'post_status'    => 'publish',
+            'posts_per_page' => 500,
+            'orderby'        => 'title',
+            'order'          => 'ASC',
+            'fields'         => 'ids',
+        ]);
+        $excludedIds = [];
+        foreach ($excludedItems as $item) {
+            if (ctype_digit(trim($item))) {
+                $excludedIds[] = (int) trim($item);
+            }
+        }
         ?>
         <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('SEO Automation Settings', 'seoauto', 'Core plugin preferences, connection state, and profile sync.'); ?>
-            <?php settings_errors('seoauto_base_url'); ?>
-            <?php if ($notice === 'register_ok') : ?>
-                <div class="notice notice-success"><p>Site registration updated successfully.</p></div>
-            <?php elseif ($notice === 'register_missing_base_url') : ?>
-                <div class="notice notice-warning"><p>Laravel endpoint configuration is missing.</p></div>
-            <?php elseif ($notice === 'register_failed') : ?>
-                <div class="notice notice-error"><p>Site registration failed. Check logs for details.</p></div>
-            <?php elseif ($notice === 'health_ok') : ?>
-                <div class="notice notice-success"><p>Health check passed.</p></div>
-            <?php elseif ($notice === 'health_failed') : ?>
-                <div class="notice notice-warning"><p>Health check failed.</p></div>
-            <?php elseif ($notice === 'oauth_init_failed') : ?>
-                <div class="notice notice-error"><p>Failed to initialize OAuth. Check API settings and registration.</p></div>
-            <?php elseif ($notice === 'oauth_revoke_ok') : ?>
-                <div class="notice notice-success"><p>OAuth token revoked successfully.</p></div>
-            <?php elseif ($notice === 'oauth_revoke_failed') : ?>
-                <div class="notice notice-error"><p>OAuth revoke failed.</p></div>
-            <?php elseif ($notice === 'rotate_ok') : ?>
-                <div class="notice notice-success"><p>Site token rotated and stored.</p></div>
-            <?php elseif ($notice === 'rotate_failed') : ?>
-                <div class="notice notice-error"><p>Site token rotation failed.</p></div>
-            <?php elseif ($notice === 'profile_ok') : ?>
-                <div class="notice notice-success"><p>Site profile updated.</p></div>
-            <?php elseif ($notice === 'profile_failed') : ?>
-                <div class="notice notice-error"><p>Site profile update failed.</p></div>
-            <?php endif; ?>
-            <?php foreach ($providerAlerts as $key => $alert) : ?>
-                <?php if (!is_array($alert)) {
-                    continue;
-                } ?>
-                <?php
-                $providerName = sanitize_text_field((string) ($alert['provider_name'] ?? $key));
-                $taskName = sanitize_text_field((string) ($alert['task_name'] ?? 'unknown'));
-                $message = sanitize_text_field((string) ($alert['message'] ?? 'Provider access issue detected.'));
-                $resolutionHint = sanitize_text_field((string) ($alert['resolution_hint'] ?? 'Reconnect credentials and verify account permissions.'));
-                $statusCode = isset($alert['status_code']) ? (int) $alert['status_code'] : 0;
-                $occurrences = max((int) ($alert['occurrences'] ?? 1), 1);
-                $lastDetectedAt = sanitize_text_field((string) ($alert['last_detected_at'] ?? 'unknown'));
-                ?>
+            <?php $this->renderAdminShellHeader('SEO Automation', 'seoauto', 'Manage your site\'s SEO automation preferences and integrations.'); ?>
+
+            <?php $this->renderNotice($notice); ?>
+
+            <?php if (!empty($providerAlerts)) : foreach ($providerAlerts as $key => $alert) : if (!is_array($alert)) continue; ?>
                 <div class="notice notice-warning">
-                    <p>
-                        <strong><?php echo esc_html($providerName); ?> provider issue</strong>
-                        <?php echo esc_html($message); ?>
-                        <?php if ($statusCode > 0) : ?>
-                            <?php echo esc_html(' (HTTP ' . $statusCode . ')'); ?>
-                        <?php endif; ?>
-                    </p>
-                    <p>
-                        <?php echo esc_html('Task: ' . $taskName . ' | Occurrences: ' . $occurrences . ' | Last detected: ' . $lastDetectedAt); ?>
-                    </p>
-                    <p><?php echo esc_html($resolutionHint); ?></p>
+                    <p><strong><?php echo esc_html((string)($alert['provider_name'] ?? $key)); ?> issue:</strong> <?php echo esc_html((string)($alert['message'] ?? '')); ?></p>
+                    <p><?php echo esc_html((string)($alert['resolution_hint'] ?? '')); ?></p>
                 </div>
-            <?php endforeach; ?>
-            <?php if ((bool) get_option('seoauto_allow_insecure_ssl', false)) : ?>
-                <div class="notice notice-warning"><p>Insecure SSL mode is enabled for Laravel API calls. Use for local development only.</p></div>
-            <?php endif; ?>
+            <?php endforeach; endif; ?>
+
             <?php if ((bool) get_option('seoauto_api_blocked', false)) : ?>
-                <?php
-                $apiError = (string) get_option('seoauto_api_last_error', '');
-                $apiErrorAt = (int) get_option('seoauto_api_last_error_at', 0);
-                $apiErrorLower = strtolower($apiError);
-                $isOwnershipProofError = strpos($apiErrorLower, 'ownership proof verification failed') !== false;
-                $isValidationError = strpos($apiErrorLower, 'http 422') !== false;
-                $isAuthError = strpos($apiErrorLower, 'http 401') !== false || strpos($apiErrorLower, 'http 403') !== false;
-                ?>
                 <div class="notice notice-error">
-                    <p><strong>Laravel API request failed.</strong> WordPress could reach Laravel, but the API call was rejected or failed.</p>
-                    <p><?php echo esc_html($apiError !== '' ? $apiError : 'Unknown transport error'); ?></p>
-                    <p><?php echo esc_html($apiErrorAt > 0 ? 'Last failure: ' . wp_date('Y-m-d H:i:s', $apiErrorAt) : ''); ?></p>
-                    <?php if ($isOwnershipProofError) : ?>
-                        <p>Ownership proof could not be verified from Laravel. Ensure this site domain is publicly reachable by Laravel (not localhost/private-only mapping).</p>
-                    <?php elseif ($isValidationError) : ?>
-                        <p>This is a validation error (422). Inspect payload fields and endpoint requirements rather than firewall/TLS.</p>
-                    <?php elseif ($isAuthError) : ?>
-                        <p>This is an authorization error. Verify site token, ownership challenge flow, and plugin registration state.</p>
-                    <?php else : ?>
-                        <p>Recommended: verify firewall/WAF rules, DNS, TLS certs, and outbound HTTP availability from this host. No automatic firewall exception is applied.</p>
-                    <?php endif; ?>
+                    <p><strong>Connection error:</strong> <?php echo esc_html((string)get_option('seoauto_api_last_error', 'Unknown error')); ?></p>
                 </div>
             <?php endif; ?>
-            <?php
-            $siteId = (int) get_option('seoauto_site_id', 0);
-            $baseUrl = (string) get_option('seoauto_base_url', '');
-            $lastUserSync = (int) get_option('seoauto_last_user_sync', 0);
-            $lastBriefSync = (int) get_option('seoauto_last_brief_sync', 0);
-            $lastCron = (int) get_option('seoauto_last_cron_run', 0);
-            ?>
-            <?php
-            $adapter = (string) get_option('seoauto_primary_seo_adapter', 'auto');
-            $mode = (string) get_option('seoauto_change_application_mode', 'dangerous_auto_apply');
-            $oauthStatus = (string) get_option('seoauto_oauth_status', 'pending');
-            $oauthProvider = (string) get_option('seoauto_oauth_provider', '');
-            $oauthScopes = get_option('seoauto_oauth_scopes', []);
-            if (!is_array($oauthScopes)) {
-                $oauthScopes = [];
-            }
-            $oauthConnectedAt = (int) get_option('seoauto_oauth_connected_at', 0);
-            $oauthError = (string) get_option('seoauto_oauth_last_error', '');
-            $ownerPlatformUserId = (string) get_option('seoauto_owner_platform_user_id', (string) get_current_user_id());
-            $siteDescription = (string) get_option('seoauto_site_profile_description', '');
-            $siteTaste = (string) get_option('seoauto_site_profile_taste', '');
-            ?>
+
+            <!-- Site Status Banner -->
+            <div class="seoauto-card seoauto-card-wide" style="margin-bottom:16px;">
+                <div class="seoauto-card-head">
+                    <h2>Site Status</h2>
+                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-briefs')); ?>">View Content Briefs</a>
+                </div>
+                <div class="seoauto-stat-grid">
+                    <div class="seoauto-stat"><span>Registration</span><strong><?php echo esc_html($siteId > 0 ? 'Active' : 'Not registered'); ?></strong></div>
+                    <div class="seoauto-stat"><span>Queue Heartbeat</span><strong><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i', $lastCron) : 'Never'); ?></strong></div>
+                    <div class="seoauto-stat"><span>User Sync</span><strong><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i', $lastUserSync) : 'Never'); ?></strong></div>
+                    <div class="seoauto-stat"><span>Brief Sync</span><strong><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i', $lastBriefSync) : 'Never'); ?></strong></div>
+                    <div class="seoauto-stat"><span>Google Connection</span><strong><?php echo esc_html($isConnected ? 'Connected' . ($oauthProvider !== '' ? ' (' . $oauthProvider . ')' : '') : 'Not connected'); ?></strong></div>
+                </div>
+            </div>
 
             <div class="seoauto-settings-grid">
-                <section class="seoauto-card seoauto-card-wide">
-                    <div class="seoauto-card-head">
-                        <h2>Site Status</h2>
-                        <a class="button button-secondary" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-briefs')); ?>">Open Content Briefs</a>
-                    </div>
-                    <div class="seoauto-stat-grid">
-                        <div class="seoauto-stat"><span>Laravel URL</span><strong><?php echo esc_html($baseUrl !== '' ? $baseUrl : 'Not configured'); ?></strong></div>
-                        <div class="seoauto-stat"><span>Site Registration</span><strong><?php echo esc_html($siteId > 0 ? 'Registered #' . $siteId : 'Not registered'); ?></strong></div>
-                        <div class="seoauto-stat"><span>Queue Heartbeat</span><strong><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i:s', $lastCron) : 'Never'); ?></strong></div>
-                        <div class="seoauto-stat"><span>User Sync</span><strong><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i:s', $lastUserSync) : 'Never'); ?></strong></div>
-                        <div class="seoauto-stat"><span>Brief Sync</span><strong><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i:s', $lastBriefSync) : 'Never'); ?></strong></div>
-                    </div>
-                </section>
 
+                <!-- Google Connection -->
                 <section class="seoauto-card">
-                    <h2>Automation Preferences</h2>
-                    <form method="post" action="options.php">
-                        <?php settings_fields('seoauto_settings'); ?>
-                        <div class="seoauto-form-field">
-                            <label for="seoauto_primary_seo_adapter">Primary SEO Adapter</label>
-                            <select name="seoauto_primary_seo_adapter" id="seoauto_primary_seo_adapter">
-                                <option value="auto" <?php selected($adapter, 'auto'); ?>>Auto Detect</option>
-                                <option value="yoast" <?php selected($adapter, 'yoast'); ?>>Yoast</option>
-                                <option value="rankmath" <?php selected($adapter, 'rankmath'); ?>>Rank Math</option>
-                                <option value="aioseo" <?php selected($adapter, 'aioseo'); ?>>AIOSEO</option>
-                                <option value="core" <?php selected($adapter, 'core'); ?>>Core Fallback</option>
-                            </select>
-                        </div>
-                        <div class="seoauto-form-field">
-                            <label>Change Application Mode</label>
-                            <label><input type="radio" name="seoauto_change_application_mode" value="dangerous_auto_apply" <?php checked($mode, 'dangerous_auto_apply'); ?>> Dangerously apply all suggestions</label>
-                            <label><input type="radio" name="seoauto_change_application_mode" value="review_before_apply" <?php checked($mode, 'review_before_apply'); ?>> Review every change before application</label>
-                        </div>
-                        <div class="seoauto-form-field">
-                            <label><input type="checkbox" name="seoauto_debug_enabled" value="1" <?php checked((bool) get_option('seoauto_debug_enabled', false)); ?>> Debug logging enabled</label>
-                        </div>
-                        <div class="seoauto-form-field">
-                            <label><input type="checkbox" name="seoauto_allow_insecure_ssl" value="1" <?php checked((bool) get_option('seoauto_allow_insecure_ssl', false)); ?>> Allow insecure SSL for Laravel API calls (dev only)</label>
-                        </div>
-                        <div class="seoauto-form-field">
-                            <label for="seoauto_excluded_change_audit_pages">Excluded Pages From Change-Triggered Audits</label>
-                            <textarea
-                                id="seoauto_excluded_change_audit_pages"
-                                name="seoauto_excluded_change_audit_pages"
-                                rows="6"
-                                class="large-text"
-                                placeholder="123&#10;about-us&#10;https://example.com/privacy-policy/"><?php echo esc_textarea((string) get_option('seoauto_excluded_change_audit_pages', '')); ?></textarea>
-                            <p class="description">One value per line (or comma-separated): post ID, slug, or full URL. Matching pages will not trigger Laravel audits on create/update/publish events.</p>
-                        </div>
-                        <?php submit_button('Save Settings', 'primary', 'submit', false); ?>
-                    </form>
-                </section>
+                    <h2>Google Integration</h2>
 
-                <section class="seoauto-card">
-                    <h2>Connection</h2>
-                    <div class="seoauto-kv-list">
-                        <div><span>OAuth Status</span><strong><?php echo esc_html($oauthStatus); ?></strong></div>
-                        <div><span>Connected Provider</span><strong><?php echo esc_html($oauthProvider !== '' ? $oauthProvider : 'Not connected'); ?></strong></div>
-                        <div><span>Connected Scopes</span><strong><?php echo esc_html(!empty($oauthScopes) ? implode(', ', array_map('strval', $oauthScopes)) : 'None'); ?></strong></div>
-                        <div><span>Connected At</span><strong><?php echo esc_html($oauthConnectedAt > 0 ? wp_date('Y-m-d H:i:s', $oauthConnectedAt) : 'Never'); ?></strong></div>
-                        <div><span>Last OAuth Error</span><strong><?php echo esc_html($oauthError !== '' ? $oauthError : 'None'); ?></strong></div>
-                    </div>
+                    <?php if (!$isConnected) : ?>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:16px;">
+                            <?php wp_nonce_field('seoauto_start_oauth'); ?>
+                            <input type="hidden" name="action" value="seoauto_start_oauth">
+                            <button type="submit" class="seoauto-google-cta">
+                                <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
+                                Connect with Google
+                            </button>
+                        </form>
+                        <p class="seoauto-muted" style="margin:0 0 12px;">Connect Google Search Console &amp; Analytics to enable automated SEO insights.</p>
+                    <?php else : ?>
+                        <div class="seoauto-kv-list" style="margin-bottom:14px;">
+                            <div><span>Status</span><strong><?php echo wp_kses_post($this->renderStatusBadge('active')); ?></strong></div>
+                            <div><span>Scopes</span><strong><?php echo esc_html(!empty($oauthScopes) ? implode(', ', array_map('strval', $oauthScopes)) : 'None'); ?></strong></div>
+                            <div><span>Connected</span><strong><?php echo esc_html($oauthConnectedAt > 0 ? wp_date('Y-m-d H:i', $oauthConnectedAt) : '—'); ?></strong></div>
+                            <?php if ($oauthError !== '') : ?><div><span>Last Error</span><strong style="color:var(--red);"><?php echo esc_html($oauthError); ?></strong></div><?php endif; ?>
+                        </div>
+                        <div class="seoauto-button-row">
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                <?php wp_nonce_field('seoauto_start_oauth'); ?>
+                                <input type="hidden" name="action" value="seoauto_start_oauth">
+                                <button type="submit" class="button button-secondary">Reconnect Google</button>
+                            </form>
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-inline-input-form">
+                                <?php wp_nonce_field('seoauto_revoke_oauth'); ?>
+                                <input type="hidden" name="action" value="seoauto_revoke_oauth">
+                                <input type="text" name="revocation_reason" placeholder="Reason (optional)" style="height:32px;padding:0 8px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;">
+                                <button type="submit" class="button seoauto-btn-danger">Disconnect</button>
+                            </form>
+                        </div>
+                    <?php endif; ?>
+
+                    <hr style="border:none;border-top:1px solid var(--gray-200);margin:16px 0;">
                     <div class="seoauto-button-row">
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                             <?php wp_nonce_field('seoauto_health_check'); ?>
@@ -2541,42 +559,97 @@ final class MenuRegistrar
                             <button type="submit" class="button">Run Health Check</button>
                         </form>
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                            <?php wp_nonce_field('seoauto_start_oauth'); ?>
-                            <input type="hidden" name="action" value="seoauto_start_oauth">
-                            <button type="submit" class="button button-secondary">Connect Google</button>
-                        </form>
-                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                             <?php wp_nonce_field('seoauto_rotate_token'); ?>
                             <input type="hidden" name="action" value="seoauto_rotate_token">
-                            <button type="submit" class="button">Rotate Site Token</button>
+                            <button type="submit" class="button">Rotate API Token</button>
                         </form>
-                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-inline-input-form">
-                            <?php wp_nonce_field('seoauto_revoke_oauth'); ?>
-                            <input type="hidden" name="action" value="seoauto_revoke_oauth">
-                            <input type="text" name="revocation_reason" placeholder="Revocation reason">
-                            <button type="submit" class="button">Revoke Google OAuth</button>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                            <?php wp_nonce_field('seoauto_register_site'); ?>
+                            <input type="hidden" name="action" value="seoauto_register_site">
+                            <button type="submit" class="button">Sync Registration</button>
                         </form>
                     </div>
                 </section>
 
-                <section class="seoauto-card seoauto-card-wide">
-                    <h2>Site Profile (Laravel)</h2>
-                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                        <?php wp_nonce_field('seoauto_update_site_profile'); ?>
-                        <input type="hidden" name="action" value="seoauto_update_site_profile">
+                <!-- Automation Preferences -->
+                <section class="seoauto-card">
+                    <h2>Automation Preferences</h2>
+                    <form method="post" action="options.php">
+                        <?php settings_fields('seoauto_settings'); ?>
                         <div class="seoauto-form-field">
-                            <label for="platform_user_id">Owner Platform User ID</label>
-                            <input id="platform_user_id" name="platform_user_id" type="text" class="regular-text" value="<?php echo esc_attr($ownerPlatformUserId); ?>">
+                            <label for="seoauto_primary_seo_adapter">Primary SEO Plugin</label>
+                            <select name="seoauto_primary_seo_adapter" id="seoauto_primary_seo_adapter">
+                                <option value="auto" <?php selected($adapter, 'auto'); ?>>Auto Detect</option>
+                                <option value="yoast" <?php selected($adapter, 'yoast'); ?>>Yoast SEO</option>
+                                <option value="rankmath" <?php selected($adapter, 'rankmath'); ?>>Rank Math</option>
+                                <option value="aioseo" <?php selected($adapter, 'aioseo'); ?>>AIOSEO</option>
+                                <option value="core" <?php selected($adapter, 'core'); ?>>WordPress Core</option>
+                            </select>
                         </div>
                         <div class="seoauto-form-field">
-                            <label for="site_description">Description</label>
-                            <textarea id="site_description" name="site_description" rows="3" class="large-text"><?php echo esc_textarea($siteDescription); ?></textarea>
+                            <div class="seoauto-label">Change Application Mode</div>
+                            <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
+                                <input type="radio" name="seoauto_change_application_mode" value="dangerous_auto_apply" <?php checked($mode, 'dangerous_auto_apply'); ?>>
+                                <span>Apply changes automatically</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="radio" name="seoauto_change_application_mode" value="review_before_apply" <?php checked($mode, 'review_before_apply'); ?>>
+                                <span>Review every change before applying</span>
+                            </label>
                         </div>
                         <div class="seoauto-form-field">
-                            <label for="site_taste">Taste</label>
-                            <textarea id="site_taste" name="site_taste" rows="3" class="large-text"><?php echo esc_textarea($siteTaste); ?></textarea>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" name="seoauto_debug_enabled" value="1" <?php checked((bool)get_option('seoauto_debug_enabled', false)); ?>>
+                                <span>Enable debug logging</span>
+                            </label>
                         </div>
-                        <button type="submit" class="button button-secondary">Update Profile</button>
+                        <div class="seoauto-form-field">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" name="seoauto_allow_insecure_ssl" value="1" <?php checked((bool)get_option('seoauto_allow_insecure_ssl', false)); ?>>
+                                <span>Allow insecure SSL <em>(dev only)</em></span>
+                            </label>
+                        </div>
+
+                        <!-- FIX 4: Excluded pages — tag-chip UI -->
+                        <div class="seoauto-form-field">
+                            <label>Exclude Pages from Audits</label>
+                            <div id="seoauto-exclusion-tag-ui" class="seoauto-excl-tag-ui">
+                                <!-- Selected chips rendered by JS -->
+                                <div class="seoauto-excl-chips"></div>
+                                <!-- Search input -->
+                                <div class="seoauto-excl-search-wrap">
+                                    <input
+                                        type="text"
+                                        class="seoauto-excl-search"
+                                        placeholder="Search and add pages…"
+                                        autocomplete="off"
+                                    >
+                                </div>
+                                <!-- Dropdown options -->
+                                <div class="seoauto-excl-dropdown">
+                                    <?php foreach ($allPosts as $postId) :
+                                        $postTitle = get_the_title($postId);
+                                        $postType  = get_post_type($postId);
+                                        $typeLabel = $postType === 'page' ? 'Page' : 'Post';
+                                        $isSelected = in_array($postId, $excludedIds, true);
+                                    ?>
+                                        <div
+                                            class="seoauto-excl-option<?php echo $isSelected ? ' is-selected' : ''; ?>"
+                                            data-id="<?php echo esc_attr((string)$postId); ?>"
+                                            data-label="<?php echo esc_attr(strtolower($postTitle)); ?>"
+                                        >
+                                            <span class="seoauto-excl-checkmark"><?php echo $isSelected ? '✓' : ''; ?></span>
+                                            <span class="seoauto-excl-type-tag"><?php echo esc_html($typeLabel); ?></span>
+                                            <?php echo esc_html($postTitle); ?>
+                                        </div>
+                                    <?php endforeach; ?>
+                                </div>
+                            </div>
+                            <input type="hidden" name="seoauto_excluded_change_audit_pages" id="seoauto-exclusion-hidden" value="<?php echo esc_attr($excludedRaw); ?>">
+                            <div class="description" style="margin-top:6px;">Click pages to add/remove. Selected pages will not trigger audits on save or publish.</div>
+                        </div>
+
+                        <?php submit_button('Save Preferences', 'primary', 'submit', false); ?>
                     </form>
                 </section>
             </div>
@@ -2584,111 +657,1318 @@ final class MenuRegistrar
         <?php
     }
 
+    // ─── Render: Change Center ─────────────────────────────────────────────────
+
+    public function renderLogsPage(): void
+    {
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
+
+        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string)$_GET['seoauto_notice']) : '';
+
+        $statusArr     = isset($_GET['status'])      ? array_filter(array_map('sanitize_text_field', (array)$_GET['status']))      : [];
+        $actionTypeArr = isset($_GET['action_type']) ? array_filter(array_map('sanitize_text_field', (array)$_GET['action_type'])) : [];
+        $targetTypeArr = isset($_GET['target_type']) ? array_filter(array_map('sanitize_text_field', (array)$_GET['target_type'])) : [];
+        $postIdArr     = isset($_GET['post_id'])     ? array_filter(array_map('intval',              (array)$_GET['post_id']))      : [];
+        $search        = isset($_GET['q'])           ? sanitize_text_field((string)$_GET['q'])  : '';
+        $page          = max(1, (int)($_GET['paged'] ?? 1));
+        $perPage       = min(100, max(10, (int)($_GET['per_page'] ?? 10)));
+        $offset        = ($page - 1) * $perPage;
+
+        // FIX 1: OR logic — each filter group is OR within itself, AND between groups
+        $filters = [];
+        if (!empty($statusArr))     $filters['status']      = $statusArr;
+        if (!empty($actionTypeArr)) $filters['action_type'] = $actionTypeArr;
+        if (!empty($targetTypeArr)) $filters['target_type'] = $targetTypeArr;
+        if (!empty($postIdArr))     $filters['post_ids']    = $postIdArr;
+        if ($search !== '')         $filters['search']      = $search;
+
+        $totalActions = $this->actionRepository->countActions($filters);
+        $totalPages   = max(1, (int) ceil($totalActions / $perPage));
+        if ($page > $totalPages) { $page = $totalPages; $offset = ($page - 1) * $perPage; }
+
+        $actions           = $this->actionRepository->listActions($filters, $perPage, $offset);
+        $actionTypeOptions = $this->actionRepository->listDistinctActionTypes();
+        $targetTypeOptions = $this->actionRepository->listDistinctTargetTypes();
+
+        $siteId = (int) get_option('seoauto_site_id', 0);
+        global $wpdb;
+        $itemsTable = $wpdb->prefix . 'seoauto_admin_action_items';
+        $humanItems = $siteId > 0
+            ? $wpdb->get_results($wpdb->prepare("SELECT * FROM {$itemsTable} WHERE site_id = %d ORDER BY updated_at DESC LIMIT 200", $siteId), ARRAY_A) // phpcs:ignore
+            : [];
+        if (!is_array($humanItems)) $humanItems = [];
+        $openHumanItems = count(array_filter($humanItems, fn($i) => ($i['status'] ?? '') !== 'resolved'));
+
+        $actionIdsOnPage = array_values(array_filter(array_map(
+            static fn (array $row): int => (int)($row['laravel_action_id'] ?? 0),
+            $actions
+        ), static fn (int $id): bool => $id > 0));
+
+        $changeLogs = $this->actionRepository->listChangeLogsForLaravelIds($actionIdsOnPage, 500, ['exclude_event_type' => 'human_action_created']);
+
+        $groupedChangeLogs = [];
+        foreach ($changeLogs as $log) {
+            $lid = (int)($log['laravel_action_id'] ?? 0);
+            if ($lid <= 0) continue;
+            if (!isset($groupedChangeLogs[$lid])) {
+                $groupedChangeLogs[$lid] = ['events' => []];
+            }
+            $groupedChangeLogs[$lid]['events'][] = $log;
+        }
+
+        $allPosts = get_posts(['post_type'=>['post','page'],'post_status'=>'publish','posts_per_page'=>500,'orderby'=>'title','order'=>'ASC','fields'=>'ids']);
+
+        // FIX 1: Build label maps for JS chip filter bar
+        $labelMapsJson = wp_json_encode([
+            'status'      => ['received'=>'Received','queued'=>'Queued','running'=>'Running','applied'=>'Applied','failed'=>'Failed','rolled_back'=>'Rolled Back'],
+            'action_type' => array_combine($actionTypeOptions, $actionTypeOptions),
+            'target_type' => array_combine($targetTypeOptions, $targetTypeOptions),
+            'post_id'     => array_combine(
+                array_map('strval', $allPosts),
+                array_map(fn($pid) => (string)get_the_title($pid), $allPosts)
+            ),
+        ]);
+        ?>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Change Center', 'seoauto-logs', 'Review automated SEO changes and their execution history.'); ?>
+            <?php $this->renderNotice($notice); ?>
+
+            <div class="seoauto-kpi-grid">
+                <div class="seoauto-kpi-card"><span class="seoauto-kpi-label">Total Actions</span><span class="seoauto-kpi-value"><?php echo esc_html((string)$totalActions); ?></span></div>
+                <div class="seoauto-kpi-card"><span class="seoauto-kpi-label">On This Page</span><span class="seoauto-kpi-value"><?php echo esc_html((string)count($actions)); ?></span></div>
+                <div class="seoauto-kpi-card"><span class="seoauto-kpi-label">Human Items</span><span class="seoauto-kpi-value"><?php echo esc_html((string)count($humanItems)); ?></span></div>
+                <div class="seoauto-kpi-card"><span class="seoauto-kpi-label">Open Items</span><span class="seoauto-kpi-value"><?php echo esc_html((string)$openHumanItems); ?></span></div>
+            </div>
+
+            <!-- FIX 1: Chip filter bar — data-label-maps added, hidden inputs removed from PHP -->
+            <div class="seoauto-chip-filter-bar" id="seoauto-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
+                <form method="get" class="seoauto-filter-form" id="seoauto-filter-form">
+                    <input type="hidden" name="page" value="seoauto-logs">
+                    <input type="hidden" name="per_page" value="<?php echo esc_attr((string)$perPage); ?>">
+
+                    <!-- Active filter chips row — populated by JS -->
+                    <div class="seoauto-active-chips" id="seoauto-active-chips"></div>
+
+                    <!-- Filter dropdowns row -->
+                    <div class="seoauto-filter-dropdowns">
+                        <?php
+                        $filterDefs = [
+                            ['key'=>'status',      'label'=>'Status',      'options'=> array_combine(
+                                ['received','queued','running','applied','failed','rolled_back'],
+                                ['Received','Queued','Running','Applied','Failed','Rolled Back']
+                            )],
+                            ['key'=>'action_type', 'label'=>'Action Type', 'options'=> array_combine($actionTypeOptions, $actionTypeOptions)],
+                            ['key'=>'target_type', 'label'=>'Target Type', 'options'=> array_combine($targetTypeOptions, $targetTypeOptions)],
+                        ];
+                        foreach ($filterDefs as $fd) :
+                            $activeVals = match($fd['key']) {
+                                'status'      => $statusArr,
+                                'action_type' => $actionTypeArr,
+                                'target_type' => $targetTypeArr,
+                                default       => [],
+                            };
+                        ?>
+                        <div class="seoauto-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
+                            <button type="button" class="seoauto-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
+                                <?php echo esc_html($fd['label']); ?>
+                                <?php if (!empty($activeVals)) echo '<span class="seoauto-filter-count">' . count($activeVals) . '</span>'; ?>
+                                <span class="seoauto-filter-chevron">▾</span>
+                            </button>
+                            <div class="seoauto-filter-panel" style="display:none;">
+                                <div class="seoauto-filter-panel-inner">
+                                    <?php foreach ($fd['options'] as $val => $label) : ?>
+                                        <label class="seoauto-filter-option">
+                                            <input type="checkbox"
+                                                name="<?php echo esc_attr($fd['key']); ?>[]"
+                                                value="<?php echo esc_attr((string)$val); ?>"
+                                                <?php checked(in_array((string)$val, $activeVals, true)); ?>>
+                                            <?php echo esc_html((string)$label); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="seoauto-filter-panel-footer">
+                                    <button type="button" class="seoauto-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
+                                    <button type="button" class="button button-small button-primary seoauto-filter-apply">Apply</button>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+
+                        <!-- Page / Post filter -->
+                        <div class="seoauto-filter-dropdown" data-filter-key="post_id">
+                            <button type="button" class="seoauto-filter-btn <?php echo !empty($postIdArr) ? 'has-active' : ''; ?>">
+                                Page
+                                <?php if (!empty($postIdArr)) echo '<span class="seoauto-filter-count">' . count($postIdArr) . '</span>'; ?>
+                                <span class="seoauto-filter-chevron">▾</span>
+                            </button>
+                            <div class="seoauto-filter-panel seoauto-filter-panel--wide" style="display:none;">
+                                <div class="seoauto-filter-panel-search">
+                                    <input type="text" placeholder="Search pages…" class="seoauto-filter-post-search" autocomplete="off">
+                                </div>
+                                <div class="seoauto-filter-panel-inner" style="max-height:200px;overflow-y:auto;">
+                                    <?php foreach ($allPosts as $pid) :
+                                        $pt = get_post_type($pid) === 'page' ? 'Page' : 'Post';
+                                        $ptitle = get_the_title($pid);
+                                    ?>
+                                        <label class="seoauto-filter-option" data-label="<?php echo esc_attr(strtolower($ptitle)); ?>">
+                                            <input type="checkbox"
+                                                name="post_id[]"
+                                                value="<?php echo esc_attr((string)$pid); ?>"
+                                                <?php checked(in_array($pid, $postIdArr, true)); ?>>
+                                            <span class="seoauto-filter-type-tag"><?php echo esc_html($pt); ?></span>
+                                            <?php echo esc_html($ptitle); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="seoauto-filter-panel-footer">
+                                    <button type="button" class="seoauto-filter-clear-one button-link" data-filter-key="post_id">Clear</button>
+                                    <button type="button" class="button button-small button-primary seoauto-filter-apply">Apply</button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Keyword search -->
+                        <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+                            <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="Search keyword…" style="height:32px;padding:0 10px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;width:180px;">
+                            <button class="button button-primary" type="submit">Search</button>
+                            <?php if (!empty($statusArr) || !empty($actionTypeArr) || !empty($targetTypeArr) || !empty($postIdArr) || $search !== '') : ?>
+                                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-logs')); ?>">Reset</a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- FIX 1: Hidden inputs managed entirely by JS — empty on page load -->
+                    <div id="seoauto-filter-hidden-inputs" class="seoauto-filter-hidden-inputs"></div>
+                </form>
+            </div>
+
+            <!-- Actions Table -->
+            <div class="seoauto-card" style="padding:0;overflow:hidden;">
+                <div class="seoauto-table-wrap">
+                <table class="wp-list-table widefat seoauto-changes-table">
+                    <thead>
+                        <tr>
+                            <th style="min-width:200px;">Title / Target</th>
+                            <th style="min-width:110px;">Action Type</th>
+                            <th style="min-width:90px;">Status</th>
+                            <th style="min-width:220px;">Proposed Change</th>
+                            <th style="min-width:120px;">Received</th>
+                            <th style="min-width:100px;">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (!empty($actions)) : ?>
+                        <?php foreach ($actions as $row) : ?>
+                            <?php
+                            $laravelId      = (int)($row['laravel_action_id'] ?? 0);
+                            $rowStatus      = (string)($row['status'] ?? 'received');
+                            $isApplied      = $rowStatus === 'applied';
+                            $actionPayload  = json_decode((string)($row['action_payload'] ?? '{}'), true);
+                            $beforeSnapshot = json_decode((string)($row['before_snapshot'] ?? '{}'), true);
+                            if (!is_array($actionPayload))  $actionPayload  = [];
+                            if (!is_array($beforeSnapshot)) $beforeSnapshot = [];
+                            $actionTitle    = $this->buildActionDisplayTitle($row, $actionPayload);
+                            $editableFields = $this->buildEditableFields((string)($row['action_type'] ?? ''), $actionPayload);
+                            $proposedFields = $this->buildReadOnlyFields((string)($row['action_type'] ?? ''), $actionPayload, [], []);
+                            $currentFields  = $this->buildReadOnlyFields((string)($row['action_type'] ?? ''), $beforeSnapshot, [], []);
+                            $hasLogs        = isset($groupedChangeLogs[$laravelId]) && !empty($groupedChangeLogs[$laravelId]['events']);
+                            ?>
+                            <tr>
+                                <td>
+                                    <strong><?php echo esc_html($actionTitle); ?></strong>
+                                    <?php if (!empty($row['target_url'])) : ?>
+                                        <div class="seoauto-muted seoauto-truncate" style="max-width:200px;" title="<?php echo esc_attr((string)$row['target_url']); ?>">
+                                            <a href="<?php echo esc_url((string)$row['target_url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html((string)$row['target_url']); ?></a>
+                                        </div>
+                                    <?php endif; ?>
+                                    <?php if ($hasLogs) : ?>
+                                        <!-- FIX 2: progression toggle now uses document-level JS listener -->
+                                        <button type="button"
+                                            class="seoauto-progression-toggle"
+                                            data-target="progression-<?php echo esc_attr((string)$laravelId); ?>"
+                                            title="Show execution steps">
+                                            <span class="seoauto-prog-arrow">▸</span> progression
+                                        </button>
+                                    <?php endif; ?>
+                                </td>
+                                <td><code style="font-size:11px;"><?php echo esc_html((string)($row['action_type'] ?? '')); ?></code></td>
+                                <td><?php echo wp_kses_post($this->renderStatusBadge($rowStatus)); ?></td>
+
+                                <!-- FIX 5: Edit form lives here, in the Proposed Change column -->
+                                <td>
+                                    <div class="seoauto-inline-edit-container">
+                                        <div class="seoauto-inline-display">
+                                            <?php if (!empty($proposedFields)) : ?>
+                                                <?php foreach ($proposedFields as $field) : ?>
+                                                    <div style="margin-bottom:4px;">
+                                                        <div class="seoauto-field-label"><?php echo esc_html((string)($field['label'] ?? '')); ?></div>
+                                                        <div class="seoauto-field-value"><?php echo esc_html((string)($field['value'] ?? '')); ?></div>
+                                                    </div>
+                                                <?php endforeach; ?>
+                                                <?php if (!empty($currentFields) && $currentFields !== $proposedFields) : ?>
+                                                    <button type="button" class="seoauto-toggle-current">▸ Currently applied</button>
+                                                    <div class="seoauto-current-value" style="display:none;">
+                                                        <div class="seoauto-field-label">Currently applied</div>
+                                                        <?php foreach ($currentFields as $cf) : ?>
+                                                            <div class="seoauto-field-value" style="color:var(--gray-500);"><?php echo esc_html((string)($cf['value'] ?? '')); ?></div>
+                                                        <?php endforeach; ?>
+                                                    </div>
+                                                <?php endif; ?>
+                                            <?php else : ?>
+                                                <span class="seoauto-muted">—</span>
+                                            <?php endif; ?>
+                                        </div>
+
+                                        <?php if (!empty($editableFields)) : ?>
+                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                                <?php wp_nonce_field('seoauto_edit_action_payload'); ?>
+                                                <input type="hidden" name="action" value="seoauto_edit_action_payload">
+                                                <input type="hidden" name="action_id" value="<?php echo esc_attr((string)$laravelId); ?>">
+                                                <div class="seoauto-inline-edit-actions">
+                                                    <button type="button" class="button button-small" data-seoauto-edit-toggle="1">Edit</button>
+                                                    <button type="submit" class="button button-small button-primary" data-seoauto-save-button="1" style="display:none;">Save</button>
+                                                    <button type="button" class="button button-small" data-seoauto-cancel-button="1" style="display:none;">Cancel</button>
+                                                </div>
+                                                <div class="seoauto-inline-edit-fields">
+                                                    <?php foreach ($editableFields as $field) : ?>
+                                                        <?php
+                                                        $fk = (string)($field['key']   ?? '');
+                                                        $fl = (string)($field['label'] ?? $fk);
+                                                        $ft = (string)($field['type']  ?? 'text');
+                                                        $fv = (string)($field['value'] ?? '');
+                                                        ?>
+                                                        <label><?php echo esc_html($fl); ?>
+                                                            <?php if ($ft === 'textarea') : ?>
+                                                                <textarea name="payload_fields[<?php echo esc_attr($fk); ?>]" rows="3"><?php echo esc_textarea($fv); ?></textarea>
+                                                            <?php else : ?>
+                                                                <input type="text" name="payload_fields[<?php echo esc_attr($fk); ?>]" value="<?php echo esc_attr($fv); ?>">
+                                                            <?php endif; ?>
+                                                        </label>
+                                                    <?php endforeach; ?>
+                                                </div>
+                                            </form>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+
+                                <td class="seoauto-nowrap seoauto-muted" style="font-size:12px;"><?php echo esc_html((string)($row['received_at'] ?? '')); ?></td>
+
+                                <!-- Actions column: only Apply/Revert, no Edit button -->
+                                <td>
+                                    <div class="seoauto-action-btns">
+                                        <?php if (!$isApplied) : ?>
+                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                                <?php wp_nonce_field('seoauto_apply_action'); ?>
+                                                <input type="hidden" name="action" value="seoauto_apply_action">
+                                                <input type="hidden" name="action_id" value="<?php echo esc_attr((string)$laravelId); ?>">
+                                                <button class="button button-small button-primary" type="submit">Apply</button>
+                                            </form>
+                                        <?php endif; ?>
+                                        <?php if ($isApplied) : ?>
+                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                                <?php wp_nonce_field('seoauto_revert_action'); ?>
+                                                <input type="hidden" name="action" value="seoauto_revert_action">
+                                                <input type="hidden" name="action_id" value="<?php echo esc_attr((string)$laravelId); ?>">
+                                                <button class="button button-small seoauto-btn-danger" type="submit">Revert</button>
+                                            </form>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                            <?php if ($hasLogs) : ?>
+                                <tr id="progression-<?php echo esc_attr((string)$laravelId); ?>" class="seoauto-progression-row" style="display:none;">
+                                    <td colspan="6" style="padding:0 0 0 32px;background:var(--gray-50);border-top:none;">
+                                        <div class="seoauto-prog-timeline">
+                                            <?php
+                                            $events = array_reverse($groupedChangeLogs[$laravelId]['events']);
+                                            foreach ($events as $event) :
+                                                $evStatus = strtolower(trim((string)($event['status'] ?? '')));
+                                                $evNote   = (string)($event['note'] ?? '');
+                                                $evAt     = (string)($event['created_at'] ?? '');
+                                                $showNote = $this->shouldRenderTimelineNote((string)($event['event_type']??''), $evNote);
+                                            ?>
+                                                <div class="seoauto-prog-step">
+                                                    <div class="seoauto-prog-dot seoauto-prog-dot--<?php echo esc_attr($evStatus); ?>"></div>
+                                                    <div class="seoauto-prog-info">
+                                                        <?php echo wp_kses_post($this->renderStatusBadge($evStatus)); ?>
+                                                        <span class="seoauto-prog-ts"><?php echo esc_html($evAt); ?></span>
+                                                        <?php if ($showNote) : ?><div class="seoauto-prog-note"><?php echo esc_html($evNote); ?></div><?php endif; ?>
+                                                    </div>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </td>
+                                </tr>
+                            <?php endif; ?>
+                        <?php endforeach; ?>
+                    <?php else : ?>
+                        <tr><td colspan="6" style="padding:32px;text-align:center;color:var(--gray-400);">No actions found. Adjust filters or wait for changes to be received.</td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+
+            <!-- Pagination -->
+            <?php
+            $baseArgs = ['page'=>'seoauto-logs','per_page'=>$perPage,'q'=>$search];
+            foreach ($statusArr as $v)     $baseArgs['status'][]      = $v;
+            foreach ($actionTypeArr as $v) $baseArgs['action_type'][] = $v;
+            foreach ($targetTypeArr as $v) $baseArgs['target_type'][] = $v;
+            foreach ($postIdArr as $v)     $baseArgs['post_id'][]     = $v;
+            ?>
+            <div class="seoauto-pagination">
+                <div>Showing <?php echo esc_html((string)count($actions)); ?> of <?php echo esc_html((string)$totalActions); ?> (page <?php echo esc_html((string)$page); ?> / <?php echo esc_html((string)$totalPages); ?>)</div>
+                <div class="seoauto-button-row">
+                    <a class="button <?php echo $page <= 1 ? 'disabled' : ''; ?>" href="<?php echo esc_url(add_query_arg(array_merge($baseArgs, ['paged'=>max(1,$page-1)]), admin_url('admin.php'))); ?>">← Previous</a>
+                    <a class="button <?php echo $page >= $totalPages ? 'disabled' : ''; ?>" href="<?php echo esc_url(add_query_arg(array_merge($baseArgs, ['paged'=>min($totalPages,$page+1)]), admin_url('admin.php'))); ?>">Next →</a>
+                </div>
+            </div>
+
+            <!-- Delete logs -->
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:24px;">
+                <?php wp_nonce_field('seoauto_delete_logs'); ?>
+                <input type="hidden" name="action" value="seoauto_delete_logs">
+                <button type="submit" class="button seoauto-btn-danger" onclick="return confirm('Delete all execution logs? This cannot be undone.');">Delete All Logs</button>
+            </form>
+        </div>
+        <?php
+        // NOTE: All JS for this page (chip filters, progression toggle, inline edit) is in admin.js
+    }
+
+    // ─── Render: Action Items ──────────────────────────────────────────────────
+
+    public function renderActionItemsPage(): void
+    {
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
+
+        global $wpdb;
+        $table        = $wpdb->prefix . 'seoauto_admin_action_items';
+        $actionsTable = $wpdb->prefix . 'seoauto_actions';
+        $siteId       = (int) get_option('seoauto_site_id', 0);
+        
+        $statusArr      = isset($_GET['status'])      ? array_filter(array_map('sanitize_text_field', (array)$_GET['status']))      : [];
+        $categoryArr    = isset($_GET['category'])    ? array_filter(array_map('sanitize_text_field', (array)$_GET['category']))    : [];
+        $targetTypeArr  = isset($_GET['target_type']) ? array_filter(array_map('sanitize_text_field', (array)$_GET['target_type'])) : [];
+        $search         = isset($_GET['q'])           ? sanitize_text_field((string)$_GET['q'])           : '';
+        
+        $page    = max(1, (int)($_GET['paged'] ?? 1));
+        $perPage = min(100, max(10, (int)($_GET['per_page'] ?? 10)));
+        $offset  = ($page - 1) * $perPage;
+        $notice  = isset($_GET['seoauto_notice']) ? sanitize_text_field((string)$_GET['seoauto_notice']) : '';
+
+        $where  = ['1=1'];
+        $params = [];
+        if ($siteId > 0) { $where[] = 'i.site_id = %d'; $params[] = $siteId; } else { $where[] = '1=0'; }
+        
+        if (!empty($statusArr)) {
+            $placeholders = implode(',', array_fill(0, count($statusArr), '%s'));
+            $where[] = "i.status IN ($placeholders)";
+            $params = array_merge($params, $statusArr);
+        }
+        
+        if (!empty($categoryArr)) {
+            $placeholders = implode(',', array_fill(0, count($categoryArr), '%s'));
+            $where[] = "i.category IN ($placeholders)";
+            $params = array_merge($params, $categoryArr);
+        }
+        
+        if (!empty($targetTypeArr)) {
+            $placeholders = implode(',', array_fill(0, count($targetTypeArr), '%s'));
+            $where[] = "a.target_type IN ($placeholders)";
+            $params = array_merge($params, $targetTypeArr);
+        }
+        
+        if ($search !== '') {
+            $like = '%' . $wpdb->esc_like($search) . '%';
+            $where[] = '(i.title LIKE %s OR i.details LIKE %s OR i.recommended_value LIKE %s)';
+            $params[] = $like; $params[] = $like; $params[] = $like;
+        }
+        
+        $whereSql = implode(' AND ', $where);
+
+        $items = $wpdb->get_results( // phpcs:ignore
+            $wpdb->prepare("SELECT i.*, a.target_type, a.target_id, a.target_url, a.action_type AS linked_action_type, a.status AS linked_action_status FROM {$table} i LEFT JOIN {$actionsTable} a ON a.laravel_action_id = i.laravel_action_id WHERE {$whereSql} ORDER BY i.updated_at DESC LIMIT %d OFFSET %d",
+                ...array_merge($params, [$perPage, $offset]))
+        );
+        if (!is_array($items)) $items = [];
+
+        $total      = (int)$wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$table} i LEFT JOIN {$actionsTable} a ON a.laravel_action_id = i.laravel_action_id WHERE {$whereSql}", ...$params)); // phpcs:ignore
+        $totalPages = max(1, (int)ceil($total / $perPage));
+
+        $categoryOptions   = $siteId > 0 ? (array)$wpdb->get_col($wpdb->prepare("SELECT DISTINCT category FROM {$table} WHERE site_id = %d ORDER BY category ASC", $siteId)) : []; // phpcs:ignore
+        $targetTypeOptions = $siteId > 0 ? (array)$wpdb->get_col($wpdb->prepare("SELECT DISTINCT a.target_type FROM {$table} i INNER JOIN {$actionsTable} a ON a.laravel_action_id = i.laravel_action_id WHERE i.site_id = %d AND a.target_type <> '' ORDER BY a.target_type ASC", $siteId)) : []; // phpcs:ignore
+        
+        $labelMapsJson = wp_json_encode([
+            'status'      => ['open'=>'Open','in_progress'=>'In Progress','resolved'=>'Resolved'],
+            'category'    => array_combine($categoryOptions, $categoryOptions),
+            'target_type' => array_combine($targetTypeOptions, $targetTypeOptions),
+        ]);
+        ?>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Action Items', 'seoauto-action-items', 'Track tasks that need your manual attention.'); ?>
+            <?php $this->renderNotice($notice); ?>
+            <?php if ($siteId <= 0) : ?>
+                <div class="notice notice-warning"><p>Site not yet registered. Action items will appear here once registration is complete.</p></div>
+            <?php endif; ?>
+
+            <!-- Chip Filter Bar -->
+            <div class="seoauto-chip-filter-bar" id="seoauto-items-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
+                <form method="get" class="seoauto-filter-form" id="seoauto-items-filter-form">
+                    <input type="hidden" name="page" value="seoauto-action-items">
+                    <input type="hidden" name="per_page" value="<?php echo esc_attr((string)$perPage); ?>">
+
+                    <!-- Active filter chips row -->
+                    <div class="seoauto-active-chips" id="seoauto-items-active-chips"></div>
+
+                    <!-- Filter dropdowns row -->
+                    <div class="seoauto-filter-dropdowns">
+                        <?php
+                        $filterDefs = [
+                            ['key'=>'status',      'label'=>'Status',      'options'=> ['open'=>'Open','in_progress'=>'In Progress','resolved'=>'Resolved']],
+                            ['key'=>'category',    'label'=>'Category',    'options'=> array_combine($categoryOptions, $categoryOptions)],
+                            ['key'=>'target_type', 'label'=>'Target Type', 'options'=> array_combine($targetTypeOptions, $targetTypeOptions)],
+                        ];
+                        foreach ($filterDefs as $fd) :
+                            $activeVals = match($fd['key']) {
+                                'status'      => $statusArr,
+                                'category'    => $categoryArr,
+                                'target_type' => $targetTypeArr,
+                                default       => [],
+                            };
+                        ?>
+                        <div class="seoauto-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
+                            <button type="button" class="seoauto-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
+                                <?php echo esc_html($fd['label']); ?>
+                                <?php if (!empty($activeVals)) echo '<span class="seoauto-filter-count">' . count($activeVals) . '</span>'; ?>
+                                <span class="seoauto-filter-chevron">▾</span>
+                            </button>
+                            <div class="seoauto-filter-panel" style="display:none;">
+                                <div class="seoauto-filter-panel-inner">
+                                    <?php foreach ($fd['options'] as $val => $label) : ?>
+                                        <label class="seoauto-filter-option">
+                                            <input type="checkbox"
+                                                name="<?php echo esc_attr($fd['key']); ?>[]"
+                                                value="<?php echo esc_attr((string)$val); ?>"
+                                                <?php checked(in_array((string)$val, $activeVals, true)); ?>>
+                                            <?php echo esc_html((string)$label); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="seoauto-filter-panel-footer">
+                                    <button type="button" class="seoauto-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
+                                    <button type="button" class="button button-small button-primary seoauto-filter-apply">Apply</button>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+
+                        <!-- Keyword search -->
+                        <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+                            <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="Search keyword…" style="height:32px;padding:0 10px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;width:180px;">
+                            <button class="button button-primary" type="submit">Search</button>
+                            <?php if (!empty($statusArr) || !empty($categoryArr) || !empty($targetTypeArr) || $search !== '') : ?>
+                                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-action-items')); ?>">Reset</a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- Hidden inputs managed by JS -->
+                    <div id="seoauto-items-filter-hidden-inputs" class="seoauto-filter-hidden-inputs"></div>
+                </form>
+            </div>
+
+            <div class="seoauto-card" style="padding:0;overflow:hidden;">
+                <div class="seoauto-table-wrap">
+                <table class="wp-list-table widefat seoauto-items-table">
+                    <thead>
+                        <tr><th>Title</th><th>Category</th><th>Status</th><th>Target</th><th>Details</th><th>Update</th><th>Actions</th></tr>
+                    </thead>
+                    <tbody>
+                    <?php if (!empty($items)) : ?>
+                        <?php foreach ($items as $item) : ?>
+                            <?php
+                            $laravelId         = (int)($item->laravel_action_id ?? 0);
+                            $targetType        = (string)($item->target_type ?? '');
+                            $targetId          = (string)($item->target_id ?? '');
+                            $targetUrl         = (string)($item->target_url ?? '');
+                            $linkedActionType  = (string)($item->linked_action_type ?? '');
+                            $linkedActionStatus= (string)($item->linked_action_status ?? '');
+                            $targetLabel = '';
+                            if ($targetType === 'post' && ctype_digit($targetId)) {
+                                $pt = get_the_title((int)$targetId);
+                                if (is_string($pt) && trim($pt) !== '') $targetLabel = trim($pt);
+                            }
+                            if ($targetLabel === '' && $targetUrl !== '') $targetLabel = $targetUrl;
+                            if ($targetLabel === '' && $targetId !== '') $targetLabel = "{$targetType}:{$targetId}";
+                            ?>
+                            <tr>
+                                <td><strong><?php echo esc_html((string)$item->title); ?></strong></td>
+                                <td><?php echo esc_html((string)$item->category); ?></td>
+                                <td><?php echo wp_kses_post($this->renderStatusBadge((string)$item->status)); ?></td>
+                                <td>
+                                    <?php if ($targetLabel !== '') : ?><div><?php echo esc_html($targetLabel); ?></div><?php endif; ?>
+                                    <?php if ($targetUrl !== '') : ?><a href="<?php echo esc_url($targetUrl); ?>" target="_blank" rel="noopener noreferrer" class="seoauto-muted" style="font-size:12px;">↗ View</a><?php endif; ?>
+                                </td>
+                                <td class="seoauto-muted"><?php echo esc_html((string)$item->details); ?></td>
+                                <td>
+                                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:flex;gap:6px;align-items:center;">
+                                        <?php wp_nonce_field('seoauto_update_action_item'); ?>
+                                        <input type="hidden" name="action" value="seoauto_update_action_item">
+                                        <input type="hidden" name="item_id" value="<?php echo esc_attr((string)$item->id); ?>">
+                                        <select name="status" style="height:28px;font-size:12px;border:1px solid var(--gray-300);border-radius:4px;padding:0 6px;">
+                                            <option value="open" <?php selected((string)$item->status,'open'); ?>>Open</option>
+                                            <option value="in_progress" <?php selected((string)$item->status,'in_progress'); ?>>In Progress</option>
+                                            <option value="resolved" <?php selected((string)$item->status,'resolved'); ?>>Resolved</option>
+                                        </select>
+                                        <button class="button button-small" type="submit">Save</button>
+                                    </form>
+                                </td>
+                                <td>
+                                    <div class="seoauto-action-btns">
+                                        <?php if ($targetType === 'post' && ctype_digit($targetId)) : ?>
+                                            <a class="button button-small" href="<?php echo esc_url(admin_url('post.php?post='.(int)$targetId.'&action=edit')); ?>">Edit Post</a>
+                                        <?php endif; ?>
+                                        <?php if ($laravelId > 0 && $linkedActionType !== '' && $linkedActionType !== 'human-action-required') : ?>
+                                            <?php if ($linkedActionStatus !== 'applied') : ?>
+                                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                                    <?php wp_nonce_field('seoauto_apply_action'); ?>
+                                                    <input type="hidden" name="action" value="seoauto_apply_action">
+                                                    <input type="hidden" name="action_id" value="<?php echo esc_attr((string)$laravelId); ?>">
+                                                    <input type="hidden" name="return_page" value="seoauto-action-items">
+                                                    <button class="button button-small button-primary" type="submit">Apply</button>
+                                                </form>
+                                            <?php endif; ?>
+                                            <?php if ($linkedActionStatus === 'applied') : ?>
+                                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                                    <?php wp_nonce_field('seoauto_revert_action'); ?>
+                                                    <input type="hidden" name="action" value="seoauto_revert_action">
+                                                    <input type="hidden" name="action_id" value="<?php echo esc_attr((string)$laravelId); ?>">
+                                                    <input type="hidden" name="return_page" value="seoauto-action-items">
+                                                    <button class="button button-small seoauto-btn-danger" type="submit">Revert</button>
+                                                </form>
+                                            <?php endif; ?>
+                                        <?php endif; ?>
+                                    </div>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else : ?>
+                        <tr><td colspan="7">
+                            <div class="seoauto-debug-empty">
+                                <strong>No action items found</strong>
+                                <p>Action items will appear here when your site needs manual attention.</p>
+                            </div>
+                        </td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+            <div class="seoauto-pagination">
+                <div><?php echo esc_html((string)$total); ?> total items</div>
+                <div>
+                    <?php echo wp_kses_post(paginate_links(['base' => add_query_arg('paged','%#%'), 'format' => '', 'current' => $page, 'total' => $totalPages])); ?>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    // ─── Render: Content Briefs ───────────────────────────────────────────────
+
+    public function renderBriefsPage(): void
+    {
+        if (!current_user_can('edit_posts')) wp_die('Unauthorized');
+
+        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string)$_GET['seoauto_notice']) : '';
+        $this->briefSyncer->sync();
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_content_briefs';
+        $rows  = $wpdb->get_results("SELECT * FROM {$table} ORDER BY synced_at DESC LIMIT 100"); // phpcs:ignore
+        ?>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Content Briefs', 'seoauto-briefs', 'Review synced content briefs and link them to published posts.'); ?>
+            <?php $this->renderNotice($notice); ?>
+
+            <?php if (empty($rows)) : ?>
+                <div class="seoauto-card">
+                    <div class="seoauto-debug-empty">
+                        <strong>No content briefs yet</strong>
+                        <p>Briefs will appear here once your SEO platform sends them through.</p>
+                    </div>
+                </div>
+            <?php else : ?>
+                <div class="seoauto-briefs-list">
+                    <?php foreach ($rows as $row) : ?>
+                        <?php
+                        $payload = json_decode((string)$row->payload, true);
+                        if (!is_array($payload)) $payload = [];
+                        $briefTitle   = (string)($payload['brief_title'] ?? 'Untitled Brief');
+                        $focusKw      = (string)($payload['focus_keyword'] ?? '');
+                        $searchIntent = (string)($payload['search_intent'] ?? '');
+                        $briefSummary = (string)($payload['brief_summary'] ?? '');
+                        $writerNotes  = (string)($payload['writer_notes'] ?? '');
+                        $outlineItems = $this->collectInsightItemsByType($payload, 'outline-item', 10);
+                        $painPoints   = $this->collectInsightItemsByType($payload, 'pain-point', 6);
+                        $contentIdeas = $this->collectInsightItemsByType($payload, 'content-idea', 6);
+                        $threads = [];
+                        foreach ((array)($payload['threads'] ?? []) as $tr) {
+                            if (!is_array($tr)) continue;
+                            $ttl = trim((string)($tr['thread_title'] ?? ''));
+                            $sub = trim((string)($tr['subreddit'] ?? ''));
+                            if ($ttl === '') continue;
+                            $threads[] = $sub !== '' ? "{$ttl} ({$sub})" : $ttl;
+                            if (count($threads) >= 5) break;
+                        }
+                        ?>
+                        <div class="seoauto-brief-card">
+                            <div class="seoauto-brief-header">
+                                <div>
+                                    <h3 class="seoauto-brief-title"><?php echo esc_html($briefTitle); ?></h3>
+                                    <div class="seoauto-brief-meta">
+                                        <?php if ($focusKw !== '') : ?><span>🔑 <?php echo esc_html($focusKw); ?></span><?php endif; ?>
+                                        <?php if ($searchIntent !== '') : ?><span>🎯 <?php echo esc_html($searchIntent); ?></span><?php endif; ?>
+                                        <span><?php echo esc_html(ucfirst((string)$row->article_status)); ?> · <?php echo esc_html(ucfirst((string)$row->assignment_status)); ?></span>
+                                    </div>
+                                </div>
+                                <?php echo wp_kses_post($this->renderStatusBadge((string)$row->article_status)); ?>
+                            </div>
+
+                            <div class="seoauto-brief-body">
+                                <?php if ($briefSummary !== '' || $writerNotes !== '') : ?>
+                                <div class="seoauto-brief-col">
+                                    <?php if ($briefSummary !== '') : ?>
+                                        <h4>Brief Summary</h4>
+                                        <p><?php echo esc_html($briefSummary); ?></p>
+                                    <?php endif; ?>
+                                    <?php if ($writerNotes !== '') : ?>
+                                        <h4 style="margin-top:14px;">Writer Notes</h4>
+                                        <p><?php echo esc_html($writerNotes); ?></p>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($outlineItems)) : ?>
+                                <div class="seoauto-brief-col">
+                                    <h4>Recommended Outline</h4>
+                                    <ul class="seoauto-brief-ul">
+                                        <?php foreach ($outlineItems as $item) : ?><li><?php echo esc_html($item); ?></li><?php endforeach; ?>
+                                    </ul>
+                                </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($painPoints) || !empty($contentIdeas)) : ?>
+                                <div class="seoauto-brief-col">
+                                    <?php if (!empty($painPoints)) : ?>
+                                        <h4>Reader Pain Points</h4>
+                                        <ul class="seoauto-brief-ul">
+                                            <?php foreach ($painPoints as $item) : ?><li><?php echo esc_html($item); ?></li><?php endforeach; ?>
+                                        </ul>
+                                    <?php endif; ?>
+                                    <?php if (!empty($contentIdeas)) : ?>
+                                        <h4 style="margin-top:14px;">Content Angles</h4>
+                                        <ul class="seoauto-brief-ul">
+                                            <?php foreach ($contentIdeas as $item) : ?><li><?php echo esc_html($item); ?></li><?php endforeach; ?>
+                                        </ul>
+                                    <?php endif; ?>
+                                </div>
+                                <?php endif; ?>
+
+                                <?php if (!empty($threads)) : ?>
+                                <div class="seoauto-brief-col-full">
+                                    <h4>Source Threads</h4>
+                                    <ul class="seoauto-brief-ul" style="columns:2;gap:16px;">
+                                        <?php foreach ($threads as $t) : ?><li><?php echo esc_html($t); ?></li><?php endforeach; ?>
+                                    </ul>
+                                </div>
+                                <?php endif; ?>
+                            </div>
+
+                            <div class="seoauto-brief-footer">
+                                <div class="seoauto-brief-linked">
+                                    <?php if (!empty($row->linked_wp_post_id)) : ?>
+                                        Linked to: <a href="<?php echo esc_url((string)get_edit_post_link((int)$row->linked_wp_post_id)); ?>"><?php echo esc_html(get_the_title((int)$row->linked_wp_post_id)); ?></a>
+                                    <?php else : ?>
+                                        <span class="seoauto-muted">Not linked to a post yet</span>
+                                    <?php endif; ?>
+                                </div>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-brief-link-form">
+                                    <?php wp_nonce_field('seoauto_link_brief'); ?>
+                                    <input type="hidden" name="action" value="seoauto_link_brief">
+                                    <input type="hidden" name="brief_id" value="<?php echo esc_attr((string)$row->laravel_content_brief_id); ?>">
+                                    <input type="number" min="1" name="wp_post_id" placeholder="Post ID" style="width:100px;">
+                                    <select name="article_status">
+                                        <option value="drafted">Drafted</option>
+                                        <option value="published">Published</option>
+                                    </select>
+                                    <button class="button button-primary" type="submit">Link Post</button>
+                                </form>
+                            </div>
+                        </div>
+                    <?php endforeach; ?>
+                </div>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    // ─── Render: Schedules ────────────────────────────────────────────────────
+
+    public function renderSchedulesPage(): void
+    {
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
+
+        $notice  = isset($_GET['seoauto_notice']) ? sanitize_text_field((string)$_GET['seoauto_notice']) : '';
+        $tasks   = [];
+        $scheduled = [];
+        $remoteErrors = [];
+
+        try {
+            $res   = $this->client->listTasksFast();
+            $tasks = isset($res['tasks']) && is_array($res['tasks']) ? $res['tasks'] : [];
+        } catch (\Throwable $e) {
+            $remoteErrors[] = $e->getMessage();
+            $this->logger->warning('admin_tasks_fetch_failed', ['error' => $e->getMessage()], 'admin');
+        }
+
+        try {
+            $res       = $this->client->listScheduledTasksFast(['limit' => 50]);
+            $scheduled = isset($res['scheduled_tasks']) && is_array($res['scheduled_tasks']) ? $res['scheduled_tasks'] : [];
+        } catch (\Throwable $e) {
+            $remoteErrors[] = $e->getMessage();
+            $this->logger->warning('admin_scheduled_runs_fetch_failed', ['error' => $e->getMessage()], 'admin');
+        }
+        ?>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Schedules', 'seoauto-schedules', 'Manage background task configuration and timing.'); ?>
+            <?php $this->renderNotice($notice); ?>
+            <?php if (!empty($remoteErrors)) : ?>
+                <div class="notice notice-warning"><p>Could not load some schedule data: <?php echo esc_html(implode(' | ', $remoteErrors)); ?></p></div>
+            <?php endif; ?>
+
+            <?php
+            $scheduledByTask = [];
+            foreach ($scheduled as $item) {
+                $tid = (int)($item['seo_execution_task_id'] ?? 0);
+                if ($tid > 0) $scheduledByTask[$tid][] = $item;
+            }
+            ?>
+
+            <div class="seoauto-card" style="padding:0;overflow:hidden;">
+                <div class="seoauto-table-wrap">
+                <table class="wp-list-table widefat seoauto-schedules-table">
+                    <thead>
+                        <tr>
+                            <th>Task</th>
+                            <th>Category</th>
+                            <th>Frequency</th>
+                            <th>Status</th>
+                            <th>Next / Last Run</th>
+                            <th>Configure</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    <?php if (!empty($tasks)) : ?>
+                        <?php foreach ($tasks as $task) : ?>
+                            <?php
+                            $taskId    = isset($task['seo_execution_task_id']) ? (int)$task['seo_execution_task_id'] : 0;
+                            $isEnabled = !empty($task['is_enabled']);
+                            $delay     = isset($task['delay_minutes']) ? (int)$task['delay_minutes'] : 0;
+                            $taskRuns  = $scheduledByTask[$taskId] ?? [];
+                            $latestRun = !empty($taskRuns) ? $taskRuns[0] : null;
+                            ?>
+                            <tr>
+                                <td><strong><?php echo esc_html((string)($task['name'] ?? '')); ?></strong></td>
+                                <td><?php echo esc_html((string)($task['category'] ?? '')); ?></td>
+                                <td><?php echo esc_html((string)($task['frequency'] ?? '—')); ?></td>
+                                <td><?php echo $isEnabled ? '<span class="seoauto-badge seoauto-status-applied">Enabled</span>' : '<span class="seoauto-badge seoauto-status-received">Disabled</span>'; ?></td>
+                                <td class="seoauto-mono seoauto-muted" style="font-size:12px;">
+                                    <?php if ($latestRun) : ?>
+                                        <?php echo wp_kses_post($this->renderStatusBadge((string)($latestRun['status'] ?? ''))); ?>
+                                        <div style="margin-top:3px;"><?php echo esc_html((string)($latestRun['scheduled_for'] ?? '')); ?></div>
+                                    <?php else : ?>
+                                        —
+                                    <?php endif; ?>
+                                </td>
+                                <td>
+                                    <?php if ($taskId > 0) : ?>
+                                        <div class="seoauto-task-forms">
+                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-task-update-form">
+                                                <?php wp_nonce_field('seoauto_update_task'); ?>
+                                                <input type="hidden" name="action" value="seoauto_update_task">
+                                                <input type="hidden" name="task_id" value="<?php echo esc_attr((string)$taskId); ?>">
+                                                <label><input type="checkbox" name="is_enabled" value="1" <?php checked($isEnabled); ?>> Enabled</label>
+                                                <label>Delay: <input type="number" min="0" name="delay_minutes" value="<?php echo esc_attr((string)$delay); ?>" style="width:60px;"> min</label>
+                                                <button type="submit" class="button button-small">Save</button>
+                                            </form>
+                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-task-schedule-form">
+                                                <?php wp_nonce_field('seoauto_schedule_task'); ?>
+                                                <input type="hidden" name="action" value="seoauto_schedule_task">
+                                                <input type="hidden" name="task_id" value="<?php echo esc_attr((string)$taskId); ?>">
+                                                <input type="datetime-local" name="scheduled_for">
+                                                <button type="submit" class="button button-small button-primary">Schedule Run</button>
+                                            </form>
+                                        </div>
+                                    <?php else : ?>—<?php endif; ?>
+                                </td>
+                            </tr>
+                        <?php endforeach; ?>
+                    <?php else : ?>
+                        <tr><td colspan="6"><div class="seoauto-debug-empty"><strong>No tasks found</strong><p>Tasks will appear here once your site is registered and connected.</p></div></td></tr>
+                    <?php endif; ?>
+                    </tbody>
+                </table>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    // ─── Render: Debug Logs ───────────────────────────────────────────────────
+
+    public function renderLocalErrorsPage(): void
+    {
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
+
+        global $wpdb;
+        $table = $wpdb->prefix . 'seoauto_activity_logs';
+
+        $notice       = isset($_GET['seoauto_notice'])  ? sanitize_text_field((string)$_GET['seoauto_notice'])  : '';
+        $deletedCount = isset($_GET['deleted_count'])   ? max(0,(int)$_GET['deleted_count'])                    : 0;
+        
+        $severityArr  = isset($_GET['severity'])        ? array_filter(array_map('sanitize_text_field', (array)$_GET['severity'])) : [];
+        $sourceArr    = isset($_GET['source'])          ? array_filter(array_map('sanitize_text_field', (array)$_GET['source']))   : [];
+        $dateFrom     = isset($_GET['date_from'])       ? sanitize_text_field((string)$_GET['date_from'])       : '';
+        $dateTo       = isset($_GET['date_to'])         ? sanitize_text_field((string)$_GET['date_to'])         : '';
+        $search       = isset($_GET['q'])               ? sanitize_text_field((string)$_GET['q'])               : '';
+        
+        $page         = max(1, (int)($_GET['paged'] ?? 1));
+        $perPage      = 50;
+        $offset       = ($page - 1) * $perPage;
+
+        $where = ['1=1']; $params = [];
+        
+        if (!empty($severityArr)) {
+            $placeholders = implode(',', array_fill(0, count($severityArr), '%s'));
+            $where[] = "severity IN ($placeholders)";
+            $params = array_merge($params, $severityArr);
+        } else {
+            $where[] = "severity IN ('warning','error')";
+        }
+
+        $validSources = ['inbound','outbound','executor','admin'];
+        if (!empty($sourceArr)) {
+            $filtered = array_values(array_filter($sourceArr, fn($s) => in_array($s, $validSources, true)));
+            if (!empty($filtered)) {
+                $placeholders = implode(',', array_fill(0, count($filtered), '%s'));
+                $where[] = "source IN ($placeholders)";
+                $params = array_merge($params, $filtered);
+            }
+        }
+        
+        if ($dateFrom !== '') { $where[] = 'created_at >= %s'; $params[] = $dateFrom.' 00:00:00'; }
+        if ($dateTo !== '')   { $where[] = 'created_at <= %s'; $params[] = $dateTo.' 23:59:59'; }
+        if ($search !== '') {
+            $like = '%' . $wpdb->esc_like($search) . '%';
+            $where[] = '(event_name LIKE %s OR error_message LIKE %s OR entity_type LIKE %s)';
+            $params[] = $like; $params[] = $like; $params[] = $like;
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $rows  = $wpdb->get_results($wpdb->prepare("SELECT * FROM {$table} WHERE {$whereSql} ORDER BY created_at DESC LIMIT %d OFFSET %d", ...array_merge($params,[$perPage,$offset]))); // phpcs:ignore
+        $total = (int)$wpdb->get_var(empty($params) ? "SELECT COUNT(*) FROM {$table} WHERE {$whereSql}" : $wpdb->prepare("SELECT COUNT(*) FROM {$table} WHERE {$whereSql}", ...$params)); // phpcs:ignore
+        $totalPages = max(1,(int)ceil($total / $perPage));
+
+        $labelMapsJson = wp_json_encode([
+            'severity' => ['error'=>'Error','warning'=>'Warning'],
+            'source'   => ['inbound'=>'Inbound','outbound'=>'Outbound','executor'=>'Executor','admin'=>'Admin'],
+        ]);
+        ?>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Debug Logs', 'seoauto-local-errors', 'Inspect plugin warnings and errors.'); ?>
+            <?php $this->renderNotice($notice); ?>
+
+            <!-- Toolbar -->
+            <div class="seoauto-button-row" style="margin-bottom:14px;">
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                    <?php wp_nonce_field('seoauto_delete_local_errors'); ?>
+                    <input type="hidden" name="action" value="seoauto_delete_local_errors">
+                    <input type="hidden" name="severity" value="all">
+                    <button type="submit" class="button seoauto-btn-danger" onclick="return confirm('Delete matching log entries?');">Clear Logs</button>
+                </form>
+            </div>
+
+            <!-- Chip Filter Bar -->
+            <div class="seoauto-chip-filter-bar" id="seoauto-debug-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
+                <form method="get" class="seoauto-filter-form" id="seoauto-debug-filter-form">
+                    <input type="hidden" name="page" value="seoauto-local-errors">
+
+                    <!-- Active filter chips row -->
+                    <div class="seoauto-active-chips" id="seoauto-debug-active-chips"></div>
+
+                    <!-- Filter dropdowns row -->
+                    <div class="seoauto-filter-dropdowns">
+                        <?php
+                        $filterDefs = [
+                            ['key'=>'severity', 'label'=>'Severity', 'options'=> ['error'=>'Error','warning'=>'Warning']],
+                            ['key'=>'source',   'label'=>'Source',   'options'=> ['inbound'=>'Inbound','outbound'=>'Outbound','executor'=>'Executor','admin'=>'Admin']],
+                        ];
+                        foreach ($filterDefs as $fd) :
+                            $activeVals = match($fd['key']) {
+                                'severity' => $severityArr,
+                                'source'   => $sourceArr,
+                                default    => [],
+                            };
+                        ?>
+                        <div class="seoauto-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
+                            <button type="button" class="seoauto-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
+                                <?php echo esc_html($fd['label']); ?>
+                                <?php if (!empty($activeVals)) echo '<span class="seoauto-filter-count">' . count($activeVals) . '</span>'; ?>
+                                <span class="seoauto-filter-chevron">▾</span>
+                            </button>
+                            <div class="seoauto-filter-panel" style="display:none;">
+                                <div class="seoauto-filter-panel-inner">
+                                    <?php foreach ($fd['options'] as $val => $label) : ?>
+                                        <label class="seoauto-filter-option">
+                                            <input type="checkbox"
+                                                name="<?php echo esc_attr($fd['key']); ?>[]"
+                                                value="<?php echo esc_attr((string)$val); ?>"
+                                                <?php checked(in_array((string)$val, $activeVals, true)); ?>>
+                                            <?php echo esc_html((string)$label); ?>
+                                        </label>
+                                    <?php endforeach; ?>
+                                </div>
+                                <div class="seoauto-filter-panel-footer">
+                                    <button type="button" class="seoauto-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
+                                    <button type="button" class="button button-small button-primary seoauto-filter-apply">Apply</button>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endforeach; ?>
+
+                        <!-- Date filters -->
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--gray-600);">
+                            <span>From</span>
+                            <input type="date" name="date_from" value="<?php echo esc_attr($dateFrom); ?>" style="height:32px;padding:0 8px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;">
+                        </label>
+                        <label style="display:flex;flex-direction:column;gap:4px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.6px;color:var(--gray-600);">
+                            <span>To</span>
+                            <input type="date" name="date_to" value="<?php echo esc_attr($dateTo); ?>" style="height:32px;padding:0 8px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;">
+                        </label>
+
+                        <!-- Keyword search -->
+                        <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+                            <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="Search keyword…" style="height:32px;padding:0 10px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;width:180px;">
+                            <button class="button button-primary" type="submit">Search</button>
+                            <?php if (!empty($severityArr) || !empty($sourceArr) || $dateFrom !== '' || $dateTo !== '' || $search !== '') : ?>
+                                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-local-errors')); ?>">Reset</a>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+
+                    <!-- Hidden inputs managed by JS -->
+                    <div id="seoauto-debug-filter-hidden-inputs" class="seoauto-filter-hidden-inputs"></div>
+                </form>
+            </div>
+
+            <div class="seoauto-card" style="padding:0;overflow:hidden;">
+                <div class="seoauto-table-wrap">
+                <?php if (!empty($rows)) : ?>
+                <table class="wp-list-table widefat" style="min-width:900px;">
+                    <thead>
+                        <tr><th>Time</th><th>Severity</th><th>Source</th><th>Event</th><th>Entity</th><th>Error</th></tr>
+                    </thead>
+                    <tbody>
+                        <?php foreach ($rows as $row) : ?>
+                            <tr>
+                                <td class="seoauto-mono seoauto-nowrap"><?php echo esc_html(wp_date('Y-m-d H:i:s', strtotime((string)$row->created_at))); ?></td>
+                                <td><span class="seoauto-severity-<?php echo esc_attr((string)$row->severity); ?>"><?php echo esc_html(strtoupper((string)$row->severity)); ?></span></td>
+                                <td><?php echo esc_html((string)$row->source); ?></td>
+                                <td><code><?php echo esc_html((string)$row->event_name); ?></code></td>
+                                <td class="seoauto-muted"><?php echo esc_html((string)$row->entity_type.':'.(string)$row->entity_id); ?></td>
+                                <td><?php echo esc_html((string)$row->error_message); ?></td>
+                            </tr>
+                        <?php endforeach; ?>
+                    </tbody>
+                </table>
+                <?php else : ?>
+                    <div class="seoauto-debug-empty">
+                        <strong>No log entries found</strong>
+                        <p>
+                            <?php if (!empty($severityArr) || !empty($sourceArr) || $dateFrom !== '' || $dateTo !== '' || $search !== '') : ?>
+                                Try adjusting your filters — or this is great news, no issues detected!
+                            <?php else : ?>
+                                Your plugin is running clean. Errors and warnings will appear here if any occur.
+                            <?php endif; ?>
+                        </p>
+                    </div>
+                <?php endif; ?>
+                </div>
+            </div>
+
+            <div class="seoauto-pagination">
+                <div><?php echo esc_html((string)$total); ?> total entries</div>
+                <div><?php echo wp_kses_post(paginate_links(['base' => add_query_arg('paged','%#%'), 'format' => '', 'current' => $page, 'total' => $totalPages])); ?></div>
+            </div>
+        </div>
+        <?php
+    }
+
+    // ─── Render: OAuth Callback ───────────────────────────────────────────────
+
+    public function renderOauthCallbackPage(): void
+    {
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
+
+        if (isset($_GET['status'])) { // phpcs:ignore
+            $result   = $this->oauthHandler->handleCallback($_GET); // phpcs:ignore
+            $status   = sanitize_text_field((string)($result['status'] ?? 'failed'));
+            $scopes   = isset($result['scopes']) && is_array($result['scopes']) ? $result['scopes'] : [];
+            $error    = sanitize_text_field((string)($result['error'] ?? ''));
+        } else {
+            $status   = (string)get_option('seoauto_oauth_status', 'pending');
+            $scopes   = (array)get_option('seoauto_oauth_scopes', []);
+            $error    = (string)get_option('seoauto_oauth_last_error', '');
+        }
+        ?>
+        <div class="wrap seoauto-admin-page">
+            <?php $this->renderAdminShellHeader('Google Connection', 'seoauto', ''); ?>
+            <?php if ($status === 'active') : ?>
+                <div class="notice notice-success"><p>✓ Google connected successfully. You can close this page.</p></div>
+            <?php elseif ($status === 'error') : ?>
+                <div class="notice notice-warning"><p>Connected but a health check issue was detected. Check debug logs.</p></div>
+            <?php elseif (in_array($status, ['pending','in_progress'], true)) : ?>
+                <div class="notice notice-info"><p>Connection not yet completed.</p></div>
+            <?php else : ?>
+                <div class="notice notice-error"><p>Connection failed. <?php echo esc_html($error); ?></p></div>
+            <?php endif; ?>
+            <p style="margin-top:16px;">
+                <a class="button button-primary" href="<?php echo esc_url(admin_url('admin.php?page=seoauto')); ?>">← Back to Settings</a>
+            </p>
+        </div>
+        <?php
+    }
+
+    // ─── Helpers ──────────────────────────────────────────────────────────────
+
+    private function renderNotice(string $notice): void
+    {
+        $map = [
+            'register_ok'            => ['success', 'Site registration updated successfully.'],
+            'register_missing_base_url' => ['warning', 'No endpoint configured. Check plugin settings.'],
+            'register_failed'        => ['error',   'Site registration failed. Check debug logs.'],
+            'health_ok'              => ['success', 'Health check passed — connection is working.'],
+            'health_failed'          => ['warning', 'Health check failed — check your connection settings.'],
+            'oauth_init_failed'      => ['error',   'Failed to start Google authorization. Ensure site is registered.'],
+            'oauth_revoke_ok'        => ['success', 'Google account disconnected.'],
+            'oauth_revoke_failed'    => ['error',   'Disconnect failed. Check debug logs.'],
+            'rotate_ok'              => ['success', 'API token rotated successfully.'],
+            'rotate_failed'          => ['error',   'Token rotation failed. Check debug logs.'],
+            'profile_ok'             => ['success', 'Site profile synced.'],
+            'profile_failed'         => ['error',   'Profile sync failed.'],
+            'task_update_ok'         => ['success', 'Task configuration saved.'],
+            'task_update_failed'     => ['error',   'Task configuration update failed.'],
+            'task_schedule_ok'       => ['success', 'Task scheduled successfully.'],
+            'task_schedule_failed'   => ['error',   'Task scheduling failed.'],
+            'brief_link_ok'          => ['success', 'Content brief linked to post.'],
+            'brief_link_failed'      => ['error',   'Failed to link brief. Check post ID.'],
+            'logs_delete_ok'         => ['success', 'Execution logs cleared.'],
+            'logs_delete_failed'     => ['error',   'Failed to delete logs.'],
+            'local_errors_delete_ok' => ['success', 'Debug log entries cleared.'],
+            'local_errors_delete_failed' => ['error', 'Failed to clear debug logs.'],
+            'action_apply_requested' => ['success', 'Change queued for execution.'],
+            'action_revert_ok'       => ['success', 'Change reverted successfully.'],
+            'action_revert_failed'   => ['error',   'Revert failed — the change may not be reversible.'],
+            'action_edit_ok'         => ['success', 'Change updated.'],
+            'action_edit_ok_reapply' => ['success', 'Change updated and re-queued for application.'],
+            'action_edit_failed'     => ['error',   'Failed to update change.'],
+            'action_item_updated'    => ['success', 'Action item updated.'],
+        ];
+
+        if (!isset($map[$notice])) return;
+        [$type, $message] = $map[$notice];
+        echo '<div class="notice notice-' . esc_attr($type) . '"><p>' . esc_html($message) . '</p></div>';
+    }
+
+    private function renderStatusBadge(string $status): string
+    {
+        $normalized = sanitize_html_class(str_replace('_', '-', strtolower(trim($status))));
+        $label = ucwords(str_replace(['-','_'], ' ', $status));
+        return sprintf('<span class="seoauto-badge seoauto-status-%s">%s</span>', esc_attr($normalized), esc_html($label));
+    }
+
+    private function shouldRenderTimelineNote(string $eventType, string $note): bool
+    {
+        if (trim($note) === '') return false;
+        $systemNotes = ['action received from laravel.','action queued for execution.','action execution started.','action awaiting manual review.'];
+        return !in_array(strtolower(trim($note)), $systemNotes, true);
+    }
+
+    private function resolveTimelineEventLabel(string $eventType, string $status): string
+    {
+        $ev = strtolower(trim($eventType));
+        if ($ev === 'queued' && strtolower(trim($status)) === 'running') return 'running';
+        return $ev !== '' ? $ev : (trim($status) !== '' ? $status : 'received');
+    }
+
+    /** @param array<string,mixed> $row @param array<string,mixed> $payload */
+    private function buildActionDisplayTitle(array $row, array $payload): string
+    {
+        $title = trim((string)($payload['title'] ?? ''));
+        if ($title !== '') return $title;
+
+        $targetType = (string)($row['target_type'] ?? '');
+        $targetId   = (string)($row['target_id'] ?? '');
+        $targetUrl  = (string)($row['target_url'] ?? '');
+        $targetLabel = '';
+
+        if ($targetType === 'post' && ctype_digit($targetId)) {
+            $pt = get_the_title((int)$targetId);
+            if (is_string($pt) && trim($pt) !== '') $targetLabel = trim($pt);
+        }
+        if ($targetLabel === '' && $targetUrl !== '') $targetLabel = parse_url($targetUrl, PHP_URL_PATH) ?: $targetUrl;
+        if ($targetLabel === '' && $targetType !== '' && $targetId !== '') $targetLabel = "{$targetType}:{$targetId}";
+
+        $actionLabel = ucwords(str_replace(['-','_'], ' ', (string)($row['action_type'] ?? 'action')));
+        return $targetLabel !== '' ? "{$targetLabel} — {$actionLabel}" : $actionLabel;
+    }
+
+    /** @param array<string,mixed> $payload @return array<int,array{key:string,label:string,type:string,value:string}> */
+    private function buildEditableFields(string $actionType, array $payload): array
+    {
+        return match ($actionType) {
+            'add-meta-description','update-meta-description' => [['key'=>'meta_description','label'=>'Meta Description','type'=>'textarea','value'=>(string)($payload['meta_description']??$payload['recommended_meta_description']??'')]],
+            'add-alt-text' => [['key'=>'alt_text','label'=>'Image Alt Text','type'=>'text','value'=>(string)($payload['alt_text']??$payload['suggested_alt']??'')]],
+            'update-title' => [['key'=>'seo_title','label'=>'SEO Title','type'=>'text','value'=>(string)($payload['seo_title']??$payload['title']??'')]],
+            'set-social-tags' => [
+                ['key'=>'social_tags_og_title','label'=>'OG Title','type'=>'text','value'=>(string)($payload['social_tags']['og']['title']??'')],
+                ['key'=>'social_tags_og_description','label'=>'OG Description','type'=>'textarea','value'=>(string)($payload['social_tags']['og']['description']??'')],
+                ['key'=>'social_tags_twitter_site','label'=>'Twitter/X Handle','type'=>'text','value'=>(string)($payload['social_tags']['twitter']['site']??'')],
+            ],
+            default => [],
+        };
+    }
+
+    /** @param array<string,mixed> $payload @param array<string,mixed> $before @param array<string,mixed> $after @return array<int,array{label:string,value:string}> */
+    private function buildReadOnlyFields(string $actionType, array $payload, array $before, array $after): array
+    {
+        if (in_array($actionType, ['add-meta-description','update-meta-description'], true)) {
+            return [['label'=>'Meta Description','value'=>(string)($payload['meta_description']??$payload['recommended_meta_description']??'')]];
+        }
+        if ($actionType === 'add-alt-text') {
+            return [['label'=>'Alt Text','value'=>(string)($payload['alt_text']??$payload['suggested_alt']??'')]];
+        }
+        if (in_array($actionType, ['add-schema','add-schema-markup'], true)) {
+            return [['label'=>'Schema Type','value'=>(string)($payload['schema_type']??'Article')]];
+        }
+        if ($actionType === 'set-social-tags') {
+            return [
+                ['label'=>'OG Title','value'=>(string)($payload['social_tags']['og']['title']??'')],
+                ['label'=>'Twitter/X','value'=>(string)($payload['social_tags']['twitter']['site']??'')],
+            ];
+        }
+        if ($actionType === 'set-post-dates') {
+            return [['label'=>'Published At','value'=>(string)($payload['published_at']??'')],['label'=>'Modified At','value'=>(string)($payload['modified_at']??'')]];
+        }
+        if ($actionType === 'update-title') {
+            return [['label'=>'SEO Title','value'=>(string)($payload['seo_title']??$payload['title']??'')]];
+        }
+        if ($after !== []) {
+            $first = array_key_first($after);
+            if (is_string($first)) { $v = $after[$first] ?? ''; return [['label'=>ucwords(str_replace(['_','-'],' ',$first)),'value'=>is_scalar($v)?(string)$v:'Updated']]; }
+        }
+        return [];
+    }
+
     private function updateLocalBriefLinkState(int $briefId, int $postId, string $postUrl, string $articleStatus): void
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_content_briefs';
-
-        $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-            $table,
-            [
-                'linked_wp_post_id' => $postId,
-                'linked_wp_post_url' => $postUrl,
-                'article_status' => $articleStatus,
-                'assignment_status' => 'completed',
-                'updated_at' => current_time('mysql'),
-            ],
-            ['laravel_content_brief_id' => $briefId],
-            ['%d', '%s', '%s', '%s', '%s'],
+        $wpdb->update( // phpcs:ignore
+            $wpdb->prefix . 'seoauto_content_briefs',
+            ['linked_wp_post_id'=>$postId,'linked_wp_post_url'=>$postUrl,'article_status'=>$articleStatus,'assignment_status'=>'completed','updated_at'=>current_time('mysql')],
+            ['laravel_content_brief_id'=>$briefId],
+            ['%d','%s','%s','%s','%s'],
             ['%d']
         );
     }
 
-    /**
-     * Normalize/stabilize Laravel API base URL from settings input.
-     *
-     * @param mixed $value
-     */
-    public function sanitizeBaseUrl($value): string
+    /** @param array<string,mixed> $payload @return list<string> */
+    private function collectInsightItemsByType(array $payload, string $type, int $limit): array
     {
-        return rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/');
-    }
-
-    /**
-     * @param mixed $value
-     */
-    public function sanitizeChangeApplicationMode($value): string
-    {
-        $mode = trim((string) $value);
-        $allowed = ['dangerous_auto_apply', 'review_before_apply'];
-
-        return in_array($mode, $allowed, true) ? $mode : 'dangerous_auto_apply';
-    }
-
-    /**
-     * @param mixed $value
-     */
-    public function sanitizeExcludedChangeAuditPages($value): string
-    {
-        $raw = trim((string) $value);
-        if ($raw === '') {
-            return '';
+        $items = [];
+        foreach ((array)($payload['insights'] ?? []) as $insight) {
+            if (!is_array($insight) || (string)($insight['insight_type'] ?? '') !== $type) continue;
+            $v = trim((string)($insight['details'] ?? $insight['headline'] ?? ''));
+            if ($v === '') continue;
+            $items[] = $v;
+            if (count($items) >= $limit) break;
         }
-
-        $tokens = preg_split('/[\r\n,]+/', $raw) ?: [];
-        $clean = [];
-        foreach ($tokens as $token) {
-            $normalized = trim((string) $token);
-            if ($normalized === '') {
-                continue;
-            }
-            $clean[] = sanitize_text_field($normalized);
-        }
-
-        $clean = array_values(array_unique($clean));
-
-        return implode("\n", $clean);
-    }
-
-    private function isBaseUrlSyntaxValid(string $url): bool
-    {
-        $scheme = wp_parse_url($url, PHP_URL_SCHEME);
-        $host = wp_parse_url($url, PHP_URL_HOST);
-
-        if (!is_string($scheme) || !in_array(strtolower($scheme), ['http', 'https'], true)) {
-            return false;
-        }
-
-        return is_string($host) && $host !== '';
+        return $items;
     }
 
     private function renderAdminShellHeader(string $title, string $activePage, string $description = ''): void
     {
         $tabs = [
-            'seoauto' => ['label' => 'Settings', 'cap' => 'manage_options'],
-            'seoauto-logs' => ['label' => 'Change Center', 'cap' => 'manage_options'],
-            'seoauto-action-items' => ['label' => 'Action Items', 'cap' => 'manage_options'],
-            'seoauto-briefs' => ['label' => 'Content Briefs', 'cap' => 'edit_posts'],
-            'seoauto-local-errors' => ['label' => 'Debug Logs', 'cap' => 'manage_options'],
-            'seoauto-schedules' => ['label' => 'Schedules', 'cap' => 'manage_options'],
+            'seoauto'              => ['label'=>'Settings',       'cap'=>'manage_options'],
+            'seoauto-logs'         => ['label'=>'Change Center',  'cap'=>'manage_options'],
+            'seoauto-action-items' => ['label'=>'Action Items',   'cap'=>'manage_options'],
+            'seoauto-briefs'       => ['label'=>'Content Briefs', 'cap'=>'edit_posts'],
+            'seoauto-local-errors' => ['label'=>'Debug Logs',     'cap'=>'manage_options'],
+            'seoauto-schedules'    => ['label'=>'Schedules',      'cap'=>'manage_options'],
         ];
         ?>
         <div class="seoauto-shell-header">
             <h1><?php echo esc_html($title); ?></h1>
-            <?php if ($description !== '') : ?>
-                <p><?php echo esc_html($description); ?></p>
-            <?php endif; ?>
+            <?php if ($description !== '') : ?><p><?php echo esc_html($description); ?></p><?php endif; ?>
             <div class="seoauto-shell-tabs">
                 <?php foreach ($tabs as $slug => $tab) : ?>
-                    <?php if (!current_user_can((string) $tab['cap'])) {
-                        continue;
-                    } ?>
-                    <a class="seoauto-shell-tab <?php echo $slug === $activePage ? 'is-active' : ''; ?>" href="<?php echo esc_url(admin_url('admin.php?page=' . $slug)); ?>">
-                        <?php echo esc_html((string) $tab['label']); ?>
+                    <?php if (!current_user_can((string)$tab['cap'])) continue; ?>
+                    <a class="seoauto-shell-tab <?php echo $slug === $activePage ? 'is-active' : ''; ?>" href="<?php echo esc_url(admin_url('admin.php?page='.$slug)); ?>">
+                        <?php echo esc_html((string)$tab['label']); ?>
                     </a>
                 <?php endforeach; ?>
             </div>
         </div>
         <?php
+    }
+
+    private function resolveActionRedirectPage(): string
+    {
+        $returnPage = isset($_POST['return_page']) ? sanitize_text_field((string)$_POST['return_page']) : ''; // phpcs:ignore
+        return in_array($returnPage, ['seoauto-logs','seoauto-action-items'], true) ? $returnPage : 'seoauto-logs';
+    }
+
+    public function sanitizeBaseUrl($value): string
+    {
+        return rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/');
+    }
+
+    public function sanitizeChangeApplicationMode($value): string
+    {
+        $mode = trim((string)$value);
+        return in_array($mode, ['dangerous_auto_apply','review_before_apply'], true) ? $mode : 'dangerous_auto_apply';
+    }
+
+    public function sanitizeExcludedChangeAuditPages($value): string
+    {
+        $raw = trim((string)$value);
+        if ($raw === '') return '';
+        $tokens = preg_split('/[\r\n,]+/', $raw) ?: [];
+        $clean  = [];
+        foreach ($tokens as $token) {
+            $n = trim((string)$token);
+            if ($n !== '') $clean[] = sanitize_text_field($n);
+        }
+        return implode("\n", array_values(array_unique($clean)));
+    }
+
+    private function isBaseUrlSyntaxValid(string $url): bool
+    {
+        $scheme = wp_parse_url($url, PHP_URL_SCHEME);
+        $host   = wp_parse_url($url, PHP_URL_HOST);
+        if (!is_string($scheme) || !in_array(strtolower($scheme), ['http','https'], true)) return false;
+        return is_string($host) && $host !== '';
     }
 }
