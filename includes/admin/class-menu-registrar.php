@@ -12,14 +12,12 @@ use SEOAutomation\Connector\Auth\SiteTokenManager;
 use SEOAutomation\Connector\Sync\BriefSyncer;
 use SEOAutomation\Connector\Sync\HealthChecker;
 use SEOAutomation\Connector\Sync\SiteRegistrar;
-use SEOAutomation\Connector\Sync\WeeklyDigestSyncer;
 use SEOAutomation\Connector\Utils\Logger;
 
 final class MenuRegistrar
 {
     private LaravelClient $client;
     private BriefSyncer $briefSyncer;
-    private WeeklyDigestSyncer $weeklyDigestSyncer;
     private SiteRegistrar $siteRegistrar;
     private HealthChecker $healthChecker;
     private OAuthHandler $oauthHandler;
@@ -31,7 +29,6 @@ final class MenuRegistrar
     public function __construct(
         LaravelClient $client,
         BriefSyncer $briefSyncer,
-        WeeklyDigestSyncer $weeklyDigestSyncer,
         SiteRegistrar $siteRegistrar,
         HealthChecker $healthChecker,
         OAuthHandler $oauthHandler,
@@ -42,7 +39,6 @@ final class MenuRegistrar
     ) {
         $this->client            = $client;
         $this->briefSyncer       = $briefSyncer;
-        $this->weeklyDigestSyncer = $weeklyDigestSyncer;
         $this->siteRegistrar     = $siteRegistrar;
         $this->healthChecker     = $healthChecker;
         $this->oauthHandler      = $oauthHandler;
@@ -63,8 +59,6 @@ final class MenuRegistrar
         add_action('admin_post_seoauto_revoke_oauth', [$this, 'handleRevokeOAuth']);
         add_action('admin_post_seoauto_rotate_token', [$this, 'handleRotateToken']);
         add_action('admin_post_seoauto_update_site_profile', [$this, 'handleUpdateSiteProfile']);
-        add_action('admin_post_seoauto_update_google_ads_settings', [$this, 'handleUpdateGoogleAdsSettings']);
-        add_action('admin_post_seoauto_sync_weekly_digest', [$this, 'handleSyncWeeklyDigest']);
         add_action('admin_post_seoauto_update_task', [$this, 'handleUpdateTask']);
         add_action('admin_post_seoauto_schedule_task', [$this, 'handleScheduleTask']);
         add_action('admin_post_seoauto_link_brief', [$this, 'handleLinkBrief']);
@@ -117,7 +111,7 @@ final class MenuRegistrar
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_start_oauth');
         try {
-            $oauthUrl = $this->oauthHandler->beginGoogleOAuth(['search_console', 'analytics', 'ads']);
+            $oauthUrl = $this->oauthHandler->beginGoogleOAuth(['search_console', 'analytics']);
             if ($oauthUrl === '') throw new \RuntimeException('Missing oauth_url');
             wp_redirect($oauthUrl);
             exit;
@@ -184,63 +178,6 @@ final class MenuRegistrar
         check_admin_referer('seoauto_update_site_profile');
         $this->siteRegistrar->registerOrUpdate(true);
         wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => 'profile_ok'], admin_url('admin.php')));
-        exit;
-    }
-
-    public function handleUpdateGoogleAdsSettings(): void
-    {
-        if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_update_google_ads_settings');
-
-        $siteId = (int) get_option('seoauto_site_id', 0);
-        if ($siteId <= 0) {
-            wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => 'ads_settings_failed'], admin_url('admin.php')));
-            exit;
-        }
-
-        $customerId = isset($_POST['google_ads_customer_id']) ? preg_replace('/[^0-9]/', '', (string) $_POST['google_ads_customer_id']) : '';
-        $loginCustomerId = isset($_POST['google_ads_login_customer_id']) ? preg_replace('/[^0-9]/', '', (string) $_POST['google_ads_login_customer_id']) : '';
-        $adsEnabled = !empty($_POST['google_ads_enabled']);
-
-        try {
-            $this->client->updateGoogleAdsSettings($siteId, [
-                'customer_id' => $customerId,
-                'login_customer_id' => $loginCustomerId !== '' ? $loginCustomerId : null,
-                'ads_enabled' => $adsEnabled,
-            ]);
-
-            update_option('seoauto_google_ads_customer_id', $customerId, false);
-            update_option('seoauto_google_ads_login_customer_id', $loginCustomerId, false);
-            update_option('seoauto_google_ads_enabled', $adsEnabled, false);
-
-            $notice = 'ads_settings_ok';
-        } catch (\Throwable $exception) {
-            $this->logger->warning('admin_google_ads_settings_failed', [
-                'error' => $exception->getMessage(),
-            ], 'admin');
-            $notice = 'ads_settings_failed';
-        }
-
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $notice], admin_url('admin.php')));
-        exit;
-    }
-
-    public function handleSyncWeeklyDigest(): void
-    {
-        if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_sync_weekly_digest');
-
-        try {
-            $this->weeklyDigestSyncer->sync();
-            $notice = 'digest_sync_ok';
-        } catch (\Throwable $exception) {
-            $this->logger->warning('admin_weekly_digest_sync_failed', [
-                'error' => $exception->getMessage(),
-            ], 'admin');
-            $notice = 'digest_sync_failed';
-        }
-
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
@@ -616,11 +553,6 @@ final class MenuRegistrar
         $lastCron       = (int) get_option('seoauto_last_cron_run', 0);
         $lastUserSync   = (int) get_option('seoauto_last_user_sync', 0);
         $lastBriefSync  = (int) get_option('seoauto_last_brief_sync', 0);
-        $lastDigestSync = (int) get_option('seoauto_last_digest_sync', 0);
-        $googleAdsCustomerId = (string) get_option('seoauto_google_ads_customer_id', '');
-        $googleAdsLoginCustomerId = (string) get_option('seoauto_google_ads_login_customer_id', '');
-        $googleAdsEnabled = (bool) get_option('seoauto_google_ads_enabled', false);
-        $latestDigest = $this->getLatestWeeklyDigest($siteId);
 
         $excludedRaw    = (string) get_option('seoauto_excluded_change_audit_pages', '');
         $excludedItems  = array_values(array_filter(array_map('trim', explode("\n", $excludedRaw))));
@@ -675,61 +607,8 @@ final class MenuRegistrar
                     <div class="seoauto-stat"><span>Queue Heartbeat</span><strong><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i', $lastCron) : 'Never'); ?></strong></div>
                     <div class="seoauto-stat"><span>User Sync</span><strong><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i', $lastUserSync) : 'Never'); ?></strong></div>
                     <div class="seoauto-stat"><span>Brief Sync</span><strong><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i', $lastBriefSync) : 'Never'); ?></strong></div>
-                    <div class="seoauto-stat"><span>Digest Sync</span><strong><?php echo esc_html($lastDigestSync > 0 ? wp_date('Y-m-d H:i', $lastDigestSync) : 'Never'); ?></strong></div>
                     <div class="seoauto-stat"><span>Google Connection</span><strong><?php echo esc_html($isConnected ? 'Connected' . ($oauthProvider !== '' ? ' (' . $oauthProvider . ')' : '') : 'Not connected'); ?></strong></div>
                 </div>
-            </div>
-
-            <div class="seoauto-card seoauto-card-wide" style="margin-bottom:16px;">
-                <div class="seoauto-card-head">
-                    <h2>Weekly SEO Digest</h2>
-                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                        <?php wp_nonce_field('seoauto_sync_weekly_digest'); ?>
-                        <input type="hidden" name="action" value="seoauto_sync_weekly_digest">
-                        <button type="submit" class="button">Sync Digest Now</button>
-                    </form>
-                </div>
-                <?php if (!empty($latestDigest)) : ?>
-                    <?php $digestSummary = isset($latestDigest['summary']) && is_array($latestDigest['summary']) ? $latestDigest['summary'] : []; ?>
-                    <?php $digestItems = isset($latestDigest['items']) && is_array($latestDigest['items']) ? $latestDigest['items'] : []; ?>
-                    <div class="seoauto-stat-grid" style="margin-bottom:14px;">
-                        <div class="seoauto-stat"><span>Period</span><strong><?php echo esc_html(((string) ($latestDigest['period_start'] ?? '—')) . ' to ' . ((string) ($latestDigest['period_end'] ?? '—'))); ?></strong></div>
-                        <div class="seoauto-stat"><span>Generated</span><strong><?php echo esc_html((string) ($latestDigest['generated_at'] ?? '—')); ?></strong></div>
-                        <div class="seoauto-stat"><span>Total Opportunities</span><strong><?php echo esc_html((string) ($digestSummary['total_opportunities'] ?? count($digestItems))); ?></strong></div>
-                    </div>
-                    <?php if (!empty($digestItems)) : ?>
-                        <div class="seoauto-table-wrap">
-                            <table class="wp-list-table widefat">
-                                <thead>
-                                    <tr>
-                                        <th>Opportunity</th>
-                                        <th>Priority</th>
-                                        <th>Status</th>
-                                        <th>Evidence</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                <?php foreach (array_slice($digestItems, 0, 5) as $item) : ?>
-                                    <?php
-                                        $opportunity = isset($item['opportunity']) && is_array($item['opportunity']) ? $item['opportunity'] : [];
-                                        $evidence = isset($opportunity['evidence']) && is_array($opportunity['evidence']) ? $opportunity['evidence'] : [];
-                                    ?>
-                                    <tr>
-                                        <td><?php echo esc_html((string) ($opportunity['type'] ?? 'unknown')); ?></td>
-                                        <td><?php echo esc_html((string) ($item['priority'] ?? $opportunity['priority'] ?? '0')); ?></td>
-                                        <td><?php echo wp_kses_post($this->renderStatusBadge((string) ($opportunity['status'] ?? 'open'))); ?></td>
-                                        <td><code><?php echo esc_html(wp_json_encode($evidence)); ?></code></td>
-                                    </tr>
-                                <?php endforeach; ?>
-                                </tbody>
-                            </table>
-                        </div>
-                    <?php else : ?>
-                        <p class="seoauto-muted">No opportunity items were included in the latest digest.</p>
-                    <?php endif; ?>
-                <?php else : ?>
-                    <p class="seoauto-muted">No digest has been synced yet. The connector fetches the latest digest automatically.</p>
-                <?php endif; ?>
             </div>
 
             <div class="seoauto-settings-grid">
@@ -769,40 +648,6 @@ final class MenuRegistrar
                             </form>
                         </div>
                     <?php endif; ?>
-
-                    <hr style="border:none;border-top:1px solid var(--gray-200);margin:16px 0;">
-                    <h3 style="margin:0 0 10px;">Google Ads Settings</h3>
-                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:16px;">
-                        <?php wp_nonce_field('seoauto_update_google_ads_settings'); ?>
-                        <input type="hidden" name="action" value="seoauto_update_google_ads_settings">
-                        <div class="seoauto-form-field">
-                            <label for="seoauto_google_ads_customer_id">Customer ID</label>
-                            <input
-                                id="seoauto_google_ads_customer_id"
-                                type="text"
-                                name="google_ads_customer_id"
-                                placeholder="1234567890"
-                                value="<?php echo esc_attr($googleAdsCustomerId); ?>"
-                            >
-                        </div>
-                        <div class="seoauto-form-field">
-                            <label for="seoauto_google_ads_login_customer_id">Login Customer ID (optional)</label>
-                            <input
-                                id="seoauto_google_ads_login_customer_id"
-                                type="text"
-                                name="google_ads_login_customer_id"
-                                placeholder="0987654321"
-                                value="<?php echo esc_attr($googleAdsLoginCustomerId); ?>"
-                            >
-                        </div>
-                        <div class="seoauto-form-field">
-                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input type="checkbox" name="google_ads_enabled" value="1" <?php checked($googleAdsEnabled); ?>>
-                                <span>Enable Google Ads ingestion</span>
-                            </label>
-                        </div>
-                        <button type="submit" class="button button-secondary">Save Google Ads Settings</button>
-                    </form>
 
                     <hr style="border:none;border-top:1px solid var(--gray-200);margin:16px 0;">
                     <div class="seoauto-button-row">
@@ -2020,41 +1865,6 @@ final class MenuRegistrar
         <?php
     }
 
-    /**
-     * @return array<string, mixed>|null
-     */
-    private function getLatestWeeklyDigest(int $siteId): ?array
-    {
-        if ($siteId <= 0) {
-            return null;
-        }
-
-        global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_weekly_digests';
-        $row = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
-            $wpdb->prepare(
-                "SELECT digest_payload, generated_at, period_start, period_end FROM {$table} WHERE site_id = %d ORDER BY generated_at DESC, id DESC LIMIT 1",
-                $siteId
-            ),
-            ARRAY_A
-        );
-
-        if (!is_array($row) || empty($row['digest_payload'])) {
-            return null;
-        }
-
-        $payload = json_decode((string) $row['digest_payload'], true);
-        if (!is_array($payload)) {
-            return null;
-        }
-
-        $payload['generated_at'] = isset($row['generated_at']) && is_string($row['generated_at']) ? $row['generated_at'] : ($payload['generated_at'] ?? '');
-        $payload['period_start'] = isset($row['period_start']) && is_string($row['period_start']) ? $row['period_start'] : ($payload['period_start'] ?? '');
-        $payload['period_end'] = isset($row['period_end']) && is_string($row['period_end']) ? $row['period_end'] : ($payload['period_end'] ?? '');
-
-        return $payload;
-    }
-
     // ─── Helpers ──────────────────────────────────────────────────────────────
 
     private function renderNotice(string $notice): void
@@ -2072,10 +1882,6 @@ final class MenuRegistrar
             'rotate_failed'          => ['error',   'Token rotation failed. Check debug logs.'],
             'profile_ok'             => ['success', 'Site profile synced.'],
             'profile_failed'         => ['error',   'Profile sync failed.'],
-            'ads_settings_ok'        => ['success', 'Google Ads settings updated.'],
-            'ads_settings_failed'    => ['error',   'Google Ads settings update failed.'],
-            'digest_sync_ok'         => ['success', 'Weekly digest sync completed.'],
-            'digest_sync_failed'     => ['error',   'Weekly digest sync failed.'],
             'task_update_ok'         => ['success', 'Task configuration saved.'],
             'task_update_failed'     => ['error',   'Task configuration update failed.'],
             'task_schedule_ok'       => ['success', 'Task scheduled successfully.'],

@@ -23,7 +23,6 @@ final class Schema
         $changeLogs = $wpdb->prefix . 'seoauto_change_logs';
         $actionItems = $wpdb->prefix . 'seoauto_admin_action_items';
         $briefs = $wpdb->prefix . 'seoauto_content_briefs';
-        $digests = $wpdb->prefix . 'seoauto_weekly_digests';
         $locks = $wpdb->prefix . 'seoauto_locks';
         $redirects = $wpdb->prefix . 'seoauto_redirects';
 
@@ -153,23 +152,6 @@ final class Schema
             KEY article_status_idx (article_status),
             KEY assignment_status_idx (assignment_status),
             KEY assigned_user_idx (assigned_wp_user_id),
-            KEY synced_at_idx (synced_at)
-        ) {$charset};";
-
-        $sql[] = "CREATE TABLE {$digests} (
-            id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-            laravel_digest_id bigint(20) unsigned NOT NULL,
-            site_id bigint(20) unsigned NOT NULL,
-            digest_payload longtext NOT NULL,
-            generated_at datetime DEFAULT NULL,
-            period_start date DEFAULT NULL,
-            period_end date DEFAULT NULL,
-            synced_at datetime NOT NULL,
-            created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-            updated_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            PRIMARY KEY  (id),
-            UNIQUE KEY laravel_digest_id (laravel_digest_id),
-            KEY site_generated_idx (site_id, generated_at),
             KEY synced_at_idx (synced_at)
         ) {$charset};";
 
