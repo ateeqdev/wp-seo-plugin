@@ -544,3 +544,137 @@ Primary route map:
 - WP: `seoauto_activity_logs`, `seoauto_change_logs`, `seoauto_actions`
 - Laravel: `seo_action_queues`, `seo_execution_sync_logs`, `seo_execution_logs`
 
+## 14. Seeded Detection and Decision Logic (If This, Then That)
+
+This section is derived from:
+- `database/seeders/SeoExecutionTaskSeeder.php`
+- `database/seeders/AiSchemas.php`
+- `database/seeders/AiPrompts.php`
+- `app/Jobs/Seo/RunSeoExecutionTaskJob.php`
+
+### 14.1 Decision gates and how they work
+
+Decision gates are explicit `DecisionGate` task steps with `decision_config`:
+- `path`: where to read value from execution context
+- `operator`: comparison (`eq`, `neq`, `gt`, `gte`, `lt`, `lte`, `contains`, `in`, `exists`, `empty`, `not-empty`, `true`, `false`)
+- `value`: expected value (for operators that need it)
+- `store_as`: writes boolean result into `flags.<name>`
+- optional `store_path`: writes boolean result into an arbitrary context path
+
+Execution behavior:
+1. Step resolves templates like `{{steps.x.result...}}`.
+2. Job evaluates condition.
+3. Result is stored (typically in flags).
+4. Later steps can use `run_if` to execute only when a flag condition passes.
+
+This is how the system does deterministic branching instead of free-form AI flow control.
+
+### 14.2 Seeded gate inventory (current)
+
+- `ownership_detected` -> sets `flags.gsc_verified` when GSC permission level is present.
+- `has_prioritized_issues` -> sets `flags.has_onpage_actions` when prioritized on-page issue list is non-empty.
+- `significant_rank_change` -> sets `flags.rank_change_detected` when rank-change analysis has non-empty result payload.
+- `has_daily_actions` -> sets `flags.daily_actions_ready` when GA-driven structured actions array is non-empty.
+- `schema_requires_fix` -> sets `flags.schema_fix_needed` when schema validation returns fixable issues.
+- `meta_suggestion_ready` -> sets `flags.meta_ready` when title/meta suggestions are available.
+- `redirect_suggestion_ready` -> sets `flags.redirect_ready` when redirect map output is available.
+- `alt_generated` -> sets `flags.alt_ready` when ALT text is produced.
+- `manual_redirect_ready` -> sets `flags.manual_redirect_ready` when manual redirect map output exists.
+
+### 14.3 If-Then action branching implemented in seeders
+
+Event-driven deterministic branches:
+- If `flags.meta_ready = true`, then queue `add-meta-description` action for that post.
+- If `flags.redirect_ready = true`, then queue `add-redirect` action for deleted page URL.
+- If `flags.alt_ready = true`, then queue `add-alt-text` action for uploaded attachment.
+
+These are implemented as `ActionDispatch` steps with `run_if` conditions.
+
+### 14.4 What kinds of issues are detected
+
+#### 14.4.1 Real-time/event detectors (WP event -> Laravel orchestration)
+
+From on-page/event analysis services and seeded event tasks, the system can detect:
+- Missing meta descriptions.
+- Missing/invalid schema markup patterns.
+- Missing social tags (Open Graph/Twitter fields).
+- Missing publish/modified date metadata.
+- Heading-structure problems (for example, first heading not H1).
+- Missing image ALT attributes.
+- Broken/deleted URL follow-up needs (redirect planning and impact analysis).
+- Internal linking opportunities from page context.
+- Content compliance gaps (word count, heading structure, keyword density, supporting keyword coverage, readability).
+- Ranking volatility/significant movement signals.
+- Cannibalization patterns (same-intent URL overlap).
+- Crawl/index coverage issue clusters (404/soft404/noindex/robots/redirect errors).
+- Competitive content gaps and keyword opportunities.
+- Technology stack change impact cues.
+
+#### 14.4.2 Structured AI output constraints
+
+Seeded schemas enforce strict output shape so downstream automation can trust data contracts:
+- Title/meta suggestions constrained by count/length rules.
+- Redirect map requires source/target URLs, type, relevance score, low-confidence flag.
+- Structured daily actions constrained to known action enums.
+- Compliance checks return boolean checks + scored issues + actionable recommendations.
+- Cannibalization output requires recommended action type (`canonical`, `consolidate`, `differentiate`).
+
+### 14.5 Seeded recurring/registration/manual capabilities
+
+The task catalog spans:
+- Registration baseline: ownership verification, site profile derivation, initial GSC/data pulls, crawl/error analysis, initial plan generation.
+- Recurring monitoring: daily/weekly/monthly loops for rankings, coverage, crawl, cannibalization, content gaps, schema, backlinks, technical audits, plan regeneration.
+- Event tasks: page update/deletion, media upload, schema/meta/compliance/internal links/indexing, tech stack updates.
+- Manual tasks: on-demand sync/research/briefs/schema/linking/redirect maps/technical audits.
+
+### 14.6 Automated action scope: what plugin can execute directly
+
+At runtime, WordPress has handlers for:
+- `add-meta-description`, `update-meta-description`
+- `update-title`
+- `add-canonical`
+- `add-schema` / `add-schema-markup`
+- `add-redirect`
+- `fix-broken-link`
+- `add-internal-link`
+- `adjust-headings`
+- `technical-seo-flags`
+- `sitemap-update`
+- `robots-directives`
+- `submit-for-indexing`
+- `set-social-tags`
+- `set-post-dates`
+- `add-alt-text`
+- `monitor-only`
+- `human-action-required` (creates tracked admin item instead of direct content mutation)
+
+### 14.7 What still needs an SEO specialist (critical responsibilities)
+
+The platform automates detection + queueing + many on-site edits, but specialist ownership is still needed for:
+- Strategy and prioritization:
+  - Business goals, market positioning, page-level intent strategy, and tradeoff decisions.
+- Quality control of AI suggestions:
+  - Validate brand tone, legal/compliance constraints, and factual correctness.
+- Cannibalization resolution choice:
+  - Deciding between canonicalization vs consolidation vs differentiation requires business/context judgment.
+- Redirect governance:
+  - Approving low-confidence redirect targets and migration-level redirect architecture.
+- Content depth and E-E-A-T:
+  - Author expertise, citation quality, and editorial quality standards.
+- Technical implementation beyond plugin scope:
+  - Theme/template architecture, Core Web Vitals engineering, JS rendering constraints, faceted navigation controls.
+- External SEO work:
+  - Link acquisition/digital PR, local SEO operations, SERP feature strategy, competitor-led campaign planning.
+- Risk management:
+  - Reviewing high-impact queued changes before rollout on revenue-critical pages.
+
+### 14.8 Practical operating model
+
+Recommended division of labor:
+1. Let platform run continuous detection, scheduling, and low-risk deterministic fixes.
+2. Route medium/high-risk or low-confidence recommendations to human review.
+3. SEO specialist runs weekly review of:
+   - Open `human-action-required` items
+   - Failed/rolled-back actions
+   - Cannibalization/redirect/compliance recommendations
+4. Specialist owns monthly strategy updates; platform executes the operational loop.
