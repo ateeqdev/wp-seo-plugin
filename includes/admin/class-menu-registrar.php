@@ -327,8 +327,27 @@ final class MenuRegistrar
         $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
         $notice = 'action_revert_failed';
         if ($actionId > 0) {
-            $result = $this->actionExecutor->revertByLaravelId($actionId);
-            if (($result['status'] ?? '') === 'rolled_back') $notice = 'action_revert_ok';
+            try {
+                $result = $this->actionExecutor->revertByLaravelId($actionId);
+                if (($result['status'] ?? '') === 'rolled_back') {
+                    $notice = 'action_revert_ok';
+                } else {
+                    $error = trim((string)($result['error'] ?? 'Rollback failed.'));
+                    $this->actionRepository->logAdminFailure($actionId, 'Rollback failed: ' . $error, ['source' => 'manual_revert']);
+                    $this->logger->warning('admin_revert_failed', [
+                        'entity_type' => 'action',
+                        'entity_id' => (string)$actionId,
+                        'error' => $error,
+                    ], 'admin');
+                }
+            } catch (\Throwable $e) {
+                $this->actionRepository->logAdminFailure($actionId, 'Rollback failed: ' . $e->getMessage(), ['source' => 'manual_revert_exception']);
+                $this->logger->error('admin_revert_exception', [
+                    'entity_type' => 'action',
+                    'entity_id' => (string)$actionId,
+                    'error' => $e->getMessage(),
+                ], 'admin');
+            }
         }
         $returnPage = $this->resolveActionRedirectPage();
         wp_safe_redirect(add_query_arg(['page' => $returnPage, 'seoauto_notice' => $notice], admin_url('admin.php')));
@@ -347,23 +366,53 @@ final class MenuRegistrar
         if ($actionId > 0) {
             $action = $this->actionRepository->findByLaravelId($actionId);
             $basePayload = [];
+            $actionType = is_array($action) ? (string)($action['action_type'] ?? '') : '';
             if (is_array($action)) {
                 $decoded = json_decode((string) ($action['action_payload'] ?? '{}'), true);
                 $basePayload = is_array($decoded) ? $decoded : [];
             }
-            if (is_array($payloadFields) && !empty($payloadFields)) {
-                $payload = $this->applyPayloadFieldEdits($basePayload, $payloadFields);
-            }
-            if (is_array($payload)) {
-                $updated = $this->actionRepository->updatePayload($actionId, $payload, get_current_user_id());
-                if ($updated) {
-                    $notice = 'action_edit_ok';
-                    if (is_array($action) && ($action['status'] ?? '') === 'applied') {
-                        \SEOAutomation\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 10);
-                        $this->actionRepository->markQueued($actionId);
-                        $notice = 'action_edit_ok_reapply';
+            try {
+                if (is_array($payloadFields) && !empty($payloadFields)) {
+                    $payload = $this->applyPayloadFieldEdits($basePayload, $payloadFields);
+                }
+
+                if ($payloadJson !== '' && !is_array($payload)) {
+                    throw new \RuntimeException('Payload JSON is invalid.');
+                }
+
+                if (!is_array($payload)) {
+                    throw new \RuntimeException('No editable payload received.');
+                }
+
+                $validationError = $this->validateEditedPayload($actionType, $payload);
+                if ($validationError !== null) {
+                    $this->actionRepository->logAdminFailure($actionId, 'Edit failed validation: ' . $validationError, ['source' => 'payload_validation']);
+                    $this->logger->warning('admin_edit_validation_failed', [
+                        'entity_type' => 'action',
+                        'entity_id' => (string)$actionId,
+                        'error' => $validationError,
+                    ], 'admin');
+                    $notice = 'action_edit_validation_failed';
+                } else {
+                    $updated = $this->actionRepository->updatePayload($actionId, $payload, get_current_user_id());
+                    if ($updated) {
+                        $notice = 'action_edit_ok';
+                        if (is_array($action) && ($action['status'] ?? '') === 'applied') {
+                            \SEOAutomation\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 10);
+                            $this->actionRepository->markQueued($actionId);
+                            $notice = 'action_edit_ok_reapply';
+                        }
+                    } else {
+                        $this->actionRepository->logAdminFailure($actionId, 'Edit failed: payload update returned false.', ['source' => 'payload_update']);
                     }
                 }
+            } catch (\Throwable $e) {
+                $this->actionRepository->logAdminFailure($actionId, 'Edit failed: ' . $e->getMessage(), ['source' => 'payload_exception']);
+                $this->logger->error('admin_edit_exception', [
+                    'entity_type' => 'action',
+                    'entity_id' => (string)$actionId,
+                    'error' => $e->getMessage(),
+                ], 'admin');
             }
         }
         wp_safe_redirect(add_query_arg(['page' => 'seoauto-logs', 'seoauto_notice' => $notice], admin_url('admin.php')));
@@ -385,6 +434,55 @@ final class MenuRegistrar
             $payload[$k] = $v;
         }
         return $payload;
+    }
+
+    /**
+     * @param array<string,mixed> $payload
+     */
+    private function validateEditedPayload(string $actionType, array $payload): ?string
+    {
+        if (in_array($actionType, ['add-meta-description', 'update-meta-description'], true)) {
+            $meta = trim((string)($payload['meta_description'] ?? $payload['recommended_meta_description'] ?? ''));
+            $len = function_exists('mb_strlen') ? mb_strlen($meta) : strlen($meta);
+            if ($len < 70 || $len > 160) {
+                return 'Meta description must be between 70 and 160 characters.';
+            }
+        }
+
+        if ($actionType === 'set-social-tags') {
+            $ogDesc = trim((string)($payload['social_tags']['og']['description'] ?? ''));
+            $ogDescLen = function_exists('mb_strlen') ? mb_strlen($ogDesc) : strlen($ogDesc);
+            if ($ogDesc !== '' && $ogDescLen > 200) {
+                return 'OG description must be 200 characters or fewer.';
+            }
+
+            $twitterSite = trim((string)($payload['social_tags']['twitter']['site'] ?? ''));
+            if ($twitterSite !== '' && !preg_match('/^@?[A-Za-z0-9_]{1,15}$/', $twitterSite)) {
+                return 'Twitter/X handle must be 1-15 characters using letters, numbers, or underscore.';
+            }
+        }
+
+        if (in_array($actionType, ['add-schema', 'add-schema-markup'], true)) {
+            foreach (['schema', 'schema_data'] as $key) {
+                if (!array_key_exists($key, $payload)) {
+                    continue;
+                }
+                $value = $payload[$key];
+                if (is_array($value)) {
+                    continue;
+                }
+                if (!is_string($value) || trim($value) === '') {
+                    return 'Schema payload must be valid JSON.';
+                }
+                $decoded = json_decode($value, true);
+                if (json_last_error() !== JSON_ERROR_NONE || !is_array($decoded)) {
+                    return 'Schema payload must be valid JSON.';
+                }
+                $payload[$key] = $decoded;
+            }
+        }
+
+        return null;
     }
 
     public function handleUpdateActionItem(): void
@@ -936,12 +1034,28 @@ final class MenuRegistrar
                                                         $fl = (string)($field['label'] ?? $fk);
                                                         $ft = (string)($field['type']  ?? 'text');
                                                         $fv = (string)($field['value'] ?? '');
+                                                        $fmin = isset($field['min_length']) ? (int)$field['min_length'] : 0;
+                                                        $fmax = isset($field['max_length']) ? (int)$field['max_length'] : 0;
+                                                        $fvalidation = (string)($field['validation'] ?? '');
                                                         ?>
                                                         <label><?php echo esc_html($fl); ?>
                                                             <?php if ($ft === 'textarea') : ?>
-                                                                <textarea name="payload_fields[<?php echo esc_attr($fk); ?>]" rows="3"><?php echo esc_textarea($fv); ?></textarea>
+                                                                <textarea
+                                                                    name="payload_fields[<?php echo esc_attr($fk); ?>]"
+                                                                    rows="3"
+                                                                    <?php if ($fmin > 0) : ?>data-min-length="<?php echo esc_attr((string)$fmin); ?>"<?php endif; ?>
+                                                                    <?php if ($fmax > 0) : ?>data-max-length="<?php echo esc_attr((string)$fmax); ?>"<?php endif; ?>
+                                                                    <?php if ($fvalidation !== '') : ?>data-validation="<?php echo esc_attr($fvalidation); ?>"<?php endif; ?>
+                                                                ><?php echo esc_textarea($fv); ?></textarea>
                                                             <?php else : ?>
-                                                                <input type="text" name="payload_fields[<?php echo esc_attr($fk); ?>]" value="<?php echo esc_attr($fv); ?>">
+                                                                <input
+                                                                    type="text"
+                                                                    name="payload_fields[<?php echo esc_attr($fk); ?>]"
+                                                                    value="<?php echo esc_attr($fv); ?>"
+                                                                    <?php if ($fmin > 0) : ?>data-min-length="<?php echo esc_attr((string)$fmin); ?>"<?php endif; ?>
+                                                                    <?php if ($fmax > 0) : ?>data-max-length="<?php echo esc_attr((string)$fmax); ?>"<?php endif; ?>
+                                                                    <?php if ($fvalidation !== '') : ?>data-validation="<?php echo esc_attr($fvalidation); ?>"<?php endif; ?>
+                                                                >
                                                             <?php endif; ?>
                                                         </label>
                                                     <?php endforeach; ?>
@@ -1783,6 +1897,7 @@ final class MenuRegistrar
             'action_revert_failed'   => ['error',   'Revert failed — the change may not be reversible.'],
             'action_edit_ok'         => ['success', 'Change updated.'],
             'action_edit_ok_reapply' => ['success', 'Change updated and re-queued for application.'],
+            'action_edit_validation_failed' => ['error', 'Validation failed. Please fix field values and try again.'],
             'action_edit_failed'     => ['error',   'Failed to update change.'],
             'action_item_updated'    => ['success', 'Action item updated.'],
         ];
@@ -1839,13 +1954,20 @@ final class MenuRegistrar
     private function buildEditableFields(string $actionType, array $payload): array
     {
         return match ($actionType) {
-            'add-meta-description','update-meta-description' => [['key'=>'meta_description','label'=>'Meta Description','type'=>'textarea','value'=>(string)($payload['meta_description']??$payload['recommended_meta_description']??'')]],
+            'add-meta-description','update-meta-description' => [[
+                'key'=>'meta_description',
+                'label'=>'Meta Description',
+                'type'=>'textarea',
+                'value'=>(string)($payload['meta_description']??$payload['recommended_meta_description']??''),
+                'min_length'=>70,
+                'max_length'=>160,
+            ]],
             'add-alt-text' => [['key'=>'alt_text','label'=>'Image Alt Text','type'=>'text','value'=>(string)($payload['alt_text']??$payload['suggested_alt']??'')]],
             'update-title' => [['key'=>'seo_title','label'=>'SEO Title','type'=>'text','value'=>(string)($payload['seo_title']??$payload['title']??'')]],
             'set-social-tags' => [
                 ['key'=>'social_tags_og_title','label'=>'OG Title','type'=>'text','value'=>(string)($payload['social_tags']['og']['title']??'')],
-                ['key'=>'social_tags_og_description','label'=>'OG Description','type'=>'textarea','value'=>(string)($payload['social_tags']['og']['description']??'')],
-                ['key'=>'social_tags_twitter_site','label'=>'Twitter/X Handle','type'=>'text','value'=>(string)($payload['social_tags']['twitter']['site']??'')],
+                ['key'=>'social_tags_og_description','label'=>'OG Description','type'=>'textarea','value'=>(string)($payload['social_tags']['og']['description']??''),'max_length'=>200],
+                ['key'=>'social_tags_twitter_site','label'=>'Twitter/X Handle','type'=>'text','value'=>(string)($payload['social_tags']['twitter']['site']??''),'validation'=>'twitter_handle','max_length'=>16],
             ],
             default => [],
         };

@@ -274,6 +274,61 @@
     }
   });
 
+  // Inline edit validation before submit
+  document.addEventListener("submit", function (e) {
+    var form = e.target;
+    if (!form || form.tagName !== "FORM") return;
+    var actionInput = form.querySelector('input[name="action"]');
+    if (!actionInput || actionInput.value !== "seoauto_edit_action_payload") return;
+
+    var errors = [];
+    var fields = form.querySelectorAll(
+      ".seoauto-inline-edit-fields input[name^='payload_fields'], .seoauto-inline-edit-fields textarea[name^='payload_fields']",
+    );
+
+    fields.forEach(function (field) {
+      var raw = field.value || "";
+      var val = raw.trim();
+      var label = field.closest("label")
+        ? field.closest("label").childNodes[0].textContent.trim()
+        : "Field";
+      var minLen = parseInt(field.getAttribute("data-min-length") || "0", 10);
+      var maxLen = parseInt(field.getAttribute("data-max-length") || "0", 10);
+      var validation = field.getAttribute("data-validation") || "";
+
+      if (minLen > 0 && val.length < minLen) {
+        errors.push(label + " must be at least " + minLen + " characters.");
+      }
+
+      if (maxLen > 0 && val.length > maxLen) {
+        errors.push(label + " must be " + maxLen + " characters or fewer.");
+      }
+
+      if (validation === "twitter_handle" && val) {
+        var re = /^@?[A-Za-z0-9_]{1,15}$/;
+        if (!re.test(val)) {
+          errors.push(
+            label +
+              " must be a valid handle (1-15 chars, letters/numbers/underscore).",
+          );
+        }
+      }
+
+      if (validation === "json" && val) {
+        try {
+          JSON.parse(val);
+        } catch (_err) {
+          errors.push(label + " must be valid JSON.");
+        }
+      }
+    });
+
+    if (errors.length > 0) {
+      e.preventDefault();
+      alert(errors.join("\n"));
+    }
+  });
+
   // ─── 4. Excluded Pages Tag-Chip UI ─────────────────────────────────────────
   function initExclusionTagUI() {
     var container = document.getElementById("seoauto-exclusion-tag-ui");

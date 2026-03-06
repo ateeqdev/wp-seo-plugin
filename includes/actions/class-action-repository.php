@@ -228,6 +228,20 @@ final class ActionRepository
         $this->updateStatus($laravelActionId, 'ack_failed', $error);
     }
 
+    /**
+     * @param array<string, mixed> $metadata
+     */
+    public function logAdminFailure(int $laravelActionId, string $note, array $metadata = []): void
+    {
+        $this->logChange(
+            laravelActionId: $laravelActionId,
+            eventType: 'failed',
+            status: 'failed',
+            note: $note,
+            metadata: $metadata
+        );
+    }
+
     public function updateStatus(int $laravelActionId, string $status, ?string $error = null): void
     {
         global $wpdb;
@@ -651,7 +665,8 @@ final class ActionRepository
         string $status,
         ?string $note = null,
         array $before = [],
-        array $after = []
+        array $after = [],
+        array $metadata = []
     ): void {
         if ($laravelActionId <= 0) {
             return;
@@ -673,7 +688,7 @@ final class ActionRepository
                 'note' => $note,
                 'before_snapshot' => empty($before) ? null : JsonHelper::encode($before),
                 'after_snapshot' => empty($after) ? null : JsonHelper::encode($after),
-                'metadata' => null,
+                'metadata' => empty($metadata) ? null : JsonHelper::encode($metadata),
                 'created_at' => current_time('mysql'),
             ],
             ['%d', '%d', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s']
