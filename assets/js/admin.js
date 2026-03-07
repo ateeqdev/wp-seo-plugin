@@ -257,15 +257,199 @@
     });
   }
 
+  function initSiteSettingsTemplatePicker() {
+    var select = document.getElementById("seoauto-site-settings-template-id");
+    if (!select) return;
+
+    var rawConfigs = select.getAttribute("data-template-configs") || "[]";
+    var templates = [];
+    try {
+      templates = JSON.parse(rawConfigs);
+    } catch (_err) {
+      templates = [];
+    }
+
+    var templateMap = {};
+    templates.forEach(function (template) {
+      templateMap[String(template.id || 0)] = template;
+    });
+
+    var fieldMap = {
+      min_search_volume: document.getElementById("seoauto-site-settings-min-search-volume"),
+      max_search_volume: document.getElementById("seoauto-site-settings-max-search-volume"),
+      max_keyword_difficulty: document.getElementById("seoauto-site-settings-max-keyword-difficulty"),
+      preferred_keyword_type: document.getElementById("seoauto-site-settings-preferred-keyword-type"),
+      content_briefs_per_run: document.getElementById("seoauto-site-settings-content-briefs-per-run"),
+      selection_notes: document.getElementById("seoauto-site-settings-selection-notes"),
+      prefer_low_difficulty: document.querySelector('input[name="site_settings_prefer_low_difficulty"]'),
+      allow_low_volume: document.querySelector('input[name="site_settings_allow_low_volume"]'),
+    };
+
+    select.addEventListener("change", function () {
+      var template = templateMap[String(select.value || "0")];
+      if (!template) return;
+
+      if (fieldMap.min_search_volume) fieldMap.min_search_volume.value = String(template.min_search_volume ?? 0);
+      if (fieldMap.max_search_volume) fieldMap.max_search_volume.value = template.max_search_volume === null ? "" : String(template.max_search_volume);
+      if (fieldMap.max_keyword_difficulty) fieldMap.max_keyword_difficulty.value = String(template.max_keyword_difficulty ?? 100);
+      if (fieldMap.preferred_keyword_type) fieldMap.preferred_keyword_type.value = String(template.preferred_keyword_type || "");
+      if (fieldMap.content_briefs_per_run) fieldMap.content_briefs_per_run.value = String(template.content_briefs_per_run ?? 3);
+      if (fieldMap.selection_notes) fieldMap.selection_notes.value = String(template.selection_notes || "");
+      if (fieldMap.prefer_low_difficulty) fieldMap.prefer_low_difficulty.checked = !!template.prefer_low_difficulty;
+      if (fieldMap.allow_low_volume) fieldMap.allow_low_volume.checked = !!template.allow_low_volume;
+    });
+  }
+
+  function initLocationsTable() {
+    var wrap = document.querySelector(".seoauto-locations-table-wrap");
+    var tbody = document.getElementById("seoauto-locations-body");
+    var addButton = document.getElementById("seoauto-add-location-row");
+    if (!wrap || !tbody || !addButton) return;
+
+    var rawOptions = wrap.getAttribute("data-location-options") || "[]";
+    var options = [];
+    try {
+      options = JSON.parse(rawOptions);
+    } catch (_err) {
+      options = [];
+    }
+    if (!Array.isArray(options) || options.length === 0) return;
+
+    function escHtml(s) {
+      return String(s)
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+    }
+
+    function buildOptions(selectedCode) {
+      return options
+        .map(function (option) {
+          var selected =
+            String(option.code) === String(selectedCode)
+              ? ' selected="selected"'
+              : "";
+          return (
+            '<option value="' +
+            String(option.code) +
+            '" data-location-name="' +
+            escHtml(option.name) +
+            '"' +
+            selected +
+            ">" +
+            escHtml(option.label) +
+            "</option>"
+          );
+        })
+        .join("");
+    }
+
+    function syncRow(row) {
+      var select = row.querySelector(".seoauto-location-select");
+      var hiddenName = row.querySelector(".seoauto-location-name");
+      var codeCell = row.querySelector(".seoauto-location-code-cell");
+      if (!select || !hiddenName || !codeCell) return;
+
+      var selectedOption = select.options[select.selectedIndex];
+      hiddenName.value = selectedOption
+        ? selectedOption.getAttribute("data-location-name") || ""
+        : "";
+      codeCell.textContent = select.value || "";
+    }
+
+    function syncPrimaryState(changedSelect) {
+      if (!changedSelect || changedSelect.value !== "primary") return;
+      tbody.querySelectorAll(".seoauto-location-type").forEach(function (select) {
+        if (select !== changedSelect) select.value = "secondary";
+      });
+    }
+
+    function ensurePrimary() {
+      var foundPrimary = false;
+      tbody.querySelectorAll(".seoauto-location-type").forEach(function (select) {
+        if (select.value === "primary") foundPrimary = true;
+      });
+      if (!foundPrimary) {
+        var firstType = tbody.querySelector(".seoauto-location-type");
+        if (firstType) firstType.value = "primary";
+      }
+    }
+
+    function reindexRows() {
+      tbody.querySelectorAll(".seoauto-location-row").forEach(function (row, index) {
+        row.querySelectorAll("select, input").forEach(function (field) {
+          var name = field.getAttribute("name") || "";
+          field.setAttribute(
+            "name",
+            name.replace(/site_locations\[\d+\]/, "site_locations[" + index + "]"),
+          );
+        });
+      });
+    }
+
+    function appendRow(selectedCode, locationType) {
+      var row = document.createElement("tr");
+      row.className = "seoauto-location-row";
+      row.innerHTML =
+        '<td><select name="site_locations[0][location_code]" class="seoauto-location-select">' +
+        buildOptions(selectedCode || options[0].code) +
+        '</select><input type="hidden" name="site_locations[0][location_name]" value="" class="seoauto-location-name"></td>' +
+        '<td class="seoauto-location-code-cell"></td>' +
+        '<td><select name="site_locations[0][location_type]" class="seoauto-location-type"><option value="primary">Primary</option><option value="secondary">Secondary</option></select></td>' +
+        '<td><button type="button" class="button-link-delete seoauto-remove-location">Remove</button></td>';
+      tbody.appendChild(row);
+      row.querySelector(".seoauto-location-type").value =
+        locationType || "secondary";
+      syncRow(row);
+      reindexRows();
+      ensurePrimary();
+      syncPrimaryState(row.querySelector(".seoauto-location-type"));
+    }
+
+    tbody.querySelectorAll(".seoauto-location-row").forEach(syncRow);
+    ensurePrimary();
+
+    addButton.addEventListener("click", function () {
+      appendRow(options[0].code, tbody.children.length === 0 ? "primary" : "secondary");
+    });
+
+    tbody.addEventListener("change", function (event) {
+      if (event.target.classList.contains("seoauto-location-select")) {
+        syncRow(event.target.closest(".seoauto-location-row"));
+      }
+      if (event.target.classList.contains("seoauto-location-type")) {
+        syncPrimaryState(event.target);
+        ensurePrimary();
+      }
+    });
+
+    tbody.addEventListener("click", function (event) {
+      var removeButton = event.target.closest(".seoauto-remove-location");
+      if (!removeButton) return;
+
+      var rows = tbody.querySelectorAll(".seoauto-location-row");
+      if (rows.length <= 1) return;
+
+      removeButton.closest(".seoauto-location-row").remove();
+      reindexRows();
+      ensurePrimary();
+    });
+  }
+
   // Run on DOM ready
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
       initAllFilterBars();
       initPostPickers();
+      initSiteSettingsTemplatePicker();
+      initLocationsTable();
     });
   } else {
     initAllFilterBars();
     initPostPickers();
+    initSiteSettingsTemplatePicker();
+    initLocationsTable();
   }
 
   // ─── 2. Progression Timeline Toggle ────────────────────────────────────────

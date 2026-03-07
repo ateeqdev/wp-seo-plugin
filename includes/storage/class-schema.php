@@ -144,6 +144,7 @@ final class Schema
             brief_title varchar(255) DEFAULT NULL,
             focus_keyword varchar(255) DEFAULT NULL,
             keyword_type varchar(32) DEFAULT NULL,
+            search_intent varchar(64) DEFAULT NULL,
             search_volume int(11) DEFAULT NULL,
             keyword_difficulty smallint(5) unsigned DEFAULT NULL,
             topic_priority_score int(11) DEFAULT NULL,
@@ -164,6 +165,7 @@ final class Schema
             KEY article_status_idx (article_status),
             KEY assignment_status_idx (assignment_status),
             KEY keyword_type_idx (keyword_type),
+            KEY search_intent_idx (search_intent),
             KEY linked_post_idx (linked_wp_post_id),
             KEY assigned_user_idx (assigned_wp_user_id),
             KEY synced_at_idx (synced_at)
@@ -215,7 +217,7 @@ final class Schema
         }
 
         foreach ($rows as $row) {
-            $payload = JsonHelper::decode((string) ($row['payload'] ?? ''), true);
+            $payload = JsonHelper::decodeArray((string) ($row['payload'] ?? ''));
             if (!is_array($payload)) {
                 continue;
             }
@@ -226,6 +228,7 @@ final class Schema
                     'brief_title' => sanitize_text_field((string) ($payload['brief_title'] ?? '')),
                     'focus_keyword' => sanitize_text_field((string) ($payload['focus_keyword'] ?? '')),
                     'keyword_type' => sanitize_text_field((string) ($payload['keyword_type'] ?? '')),
+                    'search_intent' => sanitize_text_field((string) ($payload['search_intent'] ?? '')),
                     'search_volume' => isset($payload['search_volume']) ? (int) $payload['search_volume'] : null,
                     'keyword_difficulty' => isset($payload['keyword_difficulty']) ? (int) $payload['keyword_difficulty'] : null,
                     'topic_priority_score' => isset($payload['topic_priority_score']) ? (int) $payload['topic_priority_score'] : null,
@@ -235,7 +238,7 @@ final class Schema
                     'linked_wp_post_type' => sanitize_text_field((string) ($payload['linked_wp_post_type'] ?? '')),
                 ],
                 ['id' => (int) $row['id']],
-                ['%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s'],
+                ['%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s'],
                 ['%d']
             );
         }

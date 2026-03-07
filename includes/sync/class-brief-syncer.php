@@ -52,6 +52,7 @@ final class BriefSyncer
                     'brief_title' => sanitize_text_field((string) ($brief['brief_title'] ?? '')),
                     'focus_keyword' => sanitize_text_field((string) ($brief['focus_keyword'] ?? '')),
                     'keyword_type' => sanitize_text_field((string) ($brief['keyword_type'] ?? '')),
+                    'search_intent' => sanitize_text_field((string) ($brief['search_intent'] ?? '')),
                     'search_volume' => isset($brief['search_volume']) ? (int) $brief['search_volume'] : null,
                     'keyword_difficulty' => isset($brief['keyword_difficulty']) ? (int) $brief['keyword_difficulty'] : null,
                     'topic_priority_score' => isset($brief['topic_priority_score']) ? (int) $brief['topic_priority_score'] : null,
@@ -78,7 +79,7 @@ final class BriefSyncer
                         $table,
                         $row,
                         ['laravel_content_brief_id' => (int) $brief['id']],
-                        ['%d', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s'],
+                        ['%d', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s'],
                         ['%d']
                     );
                 } else {
@@ -87,7 +88,7 @@ final class BriefSyncer
                     $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
                         $table,
                         $row,
-                        ['%d', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s']
+                        ['%d', '%s', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s']
                     );
                 }
             }

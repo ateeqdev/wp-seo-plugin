@@ -187,6 +187,21 @@
   gap: 16px;
 }
 
+.seoauto-locations-table-wrap {
+  overflow-x: auto;
+}
+
+.seoauto-locations-table th,
+.seoauto-locations-table td {
+  vertical-align: middle;
+}
+
+.seoauto-locations-table select,
+.seoauto-filter-range-input {
+  width: 100%;
+  min-width: 110px;
+}
+
 /* ============================================================
    Google Connect CTA — prominent hero button
    ============================================================ */

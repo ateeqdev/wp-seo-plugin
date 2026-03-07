@@ -194,20 +194,20 @@ final class SiteRegistrar
             $taste = 'Use a clear, factual, SEO-first writing style: concise headings, plain language, and actionable recommendations.';
         }
 
-        $locationName = trim((string) get_option('seoauto_site_location_name', 'United States'));
-        if ($locationName === '') {
-            $locationName = 'United States';
+        $locations = $this->normalizeLocationsOption(get_option('seoauto_site_locations', []));
+        if ($locations === []) {
+            $locations = [[
+                'location_type' => 'primary',
+                'location_code' => (int) get_option('seoauto_site_location_code', 2840),
+                'location_name' => trim((string) get_option('seoauto_site_location_name', 'United States')) ?: 'United States',
+                'priority' => 0,
+            ]];
         }
 
         return [
             'description' => $description,
             'taste' => $taste,
-            'locations' => [[
-                'location_type' => 'primary',
-                'location_code' => (int) get_option('seoauto_site_location_code', 2840),
-                'location_name' => $locationName,
-                'priority' => 0,
-            ]],
+            'locations' => $locations,
         ];
     }
 
@@ -229,7 +229,9 @@ final class SiteRegistrar
 
         $locations = isset($response['locations']) && is_array($response['locations']) ? $response['locations'] : [];
         if (!empty($locations) && is_array($locations[0])) {
-            $primaryLocation = $locations[0];
+            $normalizedLocations = $this->normalizeLocationsOption($locations);
+            $primaryLocation = $normalizedLocations[0];
+            update_option('seoauto_site_locations', $normalizedLocations, false);
             update_option('seoauto_site_location_code', (int) ($primaryLocation['location_code'] ?? 2840), false);
             update_option('seoauto_site_location_name', sanitize_text_field((string) ($primaryLocation['location_name'] ?? 'United States')), false);
         }
@@ -259,5 +261,57 @@ final class SiteRegistrar
             'allow_low_volume' => !empty($settings['allow_low_volume']),
             'selection_notes' => sanitize_textarea_field((string) ($settings['selection_notes'] ?? '')),
         ];
+    }
+
+    /**
+     * @param mixed $locations
+     * @return array<int, array{location_type:string,location_code:int,location_name:string,priority:int}>
+     */
+    public function normalizeLocationsOption($locations): array
+    {
+        if (!is_array($locations)) {
+            return [];
+        }
+
+        $rows = [];
+        foreach ($locations as $index => $location) {
+            if (!is_array($location)) {
+                continue;
+            }
+
+            $locationCode = isset($location['location_code']) ? (int) $location['location_code'] : 0;
+            $locationName = sanitize_text_field((string) ($location['location_name'] ?? ''));
+            $locationType = sanitize_text_field((string) ($location['location_type'] ?? 'secondary'));
+
+            if ($locationCode <= 0 || $locationName === '') {
+                continue;
+            }
+
+            $rows[] = [
+                'location_type' => $locationType === 'primary' ? 'primary' : 'secondary',
+                'location_code' => $locationCode,
+                'location_name' => $locationName,
+                'priority' => (int) ($location['priority'] ?? $index),
+            ];
+        }
+
+        usort($rows, static fn (array $left, array $right): int => $left['priority'] <=> $right['priority']);
+
+        $seenPrimary = false;
+        foreach ($rows as $index => $row) {
+            if ($row['location_type'] === 'primary') {
+                if ($seenPrimary) {
+                    $rows[$index]['location_type'] = 'secondary';
+                }
+                $seenPrimary = true;
+            }
+            $rows[$index]['priority'] = $index;
+        }
+
+        if ($rows !== [] && !$seenPrimary) {
+            $rows[0]['location_type'] = 'primary';
+        }
+
+        return array_values($rows);
     }
 }

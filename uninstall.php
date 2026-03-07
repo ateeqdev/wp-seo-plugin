@@ -26,6 +26,7 @@ $options = [
     'seoauto_owner_platform_user_id',
     'seoauto_site_profile_description',
     'seoauto_site_profile_taste',
+    'seoauto_site_locations',
     'seoauto_site_location_code',
     'seoauto_site_location_name',
     'seoauto_site_seo_settings',

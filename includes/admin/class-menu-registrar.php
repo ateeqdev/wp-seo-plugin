@@ -178,13 +178,19 @@ final class MenuRegistrar
         check_admin_referer('seoauto_update_site_profile');
         $description = isset($_POST['site_profile_description']) ? sanitize_textarea_field((string) wp_unslash($_POST['site_profile_description'])) : '';
         $taste = isset($_POST['site_profile_taste']) ? sanitize_textarea_field((string) wp_unslash($_POST['site_profile_taste'])) : '';
-        $locationCode = isset($_POST['site_location_code']) ? max(1, (int) $_POST['site_location_code']) : 2840;
-        $locationName = isset($_POST['site_location_name']) ? sanitize_text_field((string) wp_unslash($_POST['site_location_name'])) : 'United States';
+        $locations = $this->sanitizePostedLocations($_POST);
+        $primaryLocation = $locations[0] ?? [
+            'location_type' => 'primary',
+            'location_code' => 2840,
+            'location_name' => 'United States',
+            'priority' => 0,
+        ];
 
         update_option('seoauto_site_profile_description', $description, false);
         update_option('seoauto_site_profile_taste', $taste, false);
-        update_option('seoauto_site_location_code', $locationCode, false);
-        update_option('seoauto_site_location_name', $locationName, false);
+        update_option('seoauto_site_locations', $locations, false);
+        update_option('seoauto_site_location_code', (int) $primaryLocation['location_code'], false);
+        update_option('seoauto_site_location_name', (string) $primaryLocation['location_name'], false);
 
         $siteSettings = $this->sanitizePostedSiteSettings($_POST);
         update_option('seoauto_site_seo_settings', $siteSettings, false);
@@ -599,11 +605,19 @@ final class MenuRegistrar
         $lastBriefSync  = (int) get_option('seoauto_last_brief_sync', 0);
         $siteDescription = (string) get_option('seoauto_site_profile_description', '');
         $siteTaste = (string) get_option('seoauto_site_profile_taste', '');
-        $siteLocationCode = (int) get_option('seoauto_site_location_code', 2840);
-        $siteLocationName = (string) get_option('seoauto_site_location_name', 'United States');
+        $siteLocations = $this->siteRegistrar->normalizeLocationsOption(get_option('seoauto_site_locations', []));
+        if ($siteLocations === []) {
+            $siteLocations = [[
+                'location_type' => 'primary',
+                'location_code' => (int) get_option('seoauto_site_location_code', 2840),
+                'location_name' => (string) get_option('seoauto_site_location_name', 'United States'),
+                'priority' => 0,
+            ]];
+        }
         $siteSeoSettings = get_option('seoauto_site_seo_settings', []);
         if (!is_array($siteSeoSettings)) $siteSeoSettings = [];
         $siteSettingTemplates = [];
+        $availableLocations = $this->getAvailableLocationOptions();
 
         $excludedRaw    = (string) get_option('seoauto_excluded_change_audit_pages', '');
         $excludedItems  = array_values(array_filter(array_map('trim', explode("\n", $excludedRaw))));
@@ -621,6 +635,9 @@ final class MenuRegistrar
                     update_option('seoauto_site_seo_settings', $siteSeoSettings, false);
                 }
                 $siteSettingTemplates = isset($settingsResponse['templates']) && is_array($settingsResponse['templates']) ? $settingsResponse['templates'] : [];
+                if (isset($settingsResponse['locations']) && is_array($settingsResponse['locations'])) {
+                    $siteLocations = $this->siteRegistrar->normalizeLocationsOption($settingsResponse['locations']);
+                }
             } catch (\Throwable $e) {
                 $this->logger->warning('admin_fetch_site_settings_failed', ['error' => $e->getMessage()], 'admin');
             }
@@ -691,14 +708,52 @@ final class MenuRegistrar
                             <label for="seoauto-site-profile-taste">Brand Taste</label>
                             <textarea id="seoauto-site-profile-taste" name="site_profile_taste" rows="4"><?php echo esc_textarea($siteTaste); ?></textarea>
                         </div>
-                        <div class="seoauto-form-grid seoauto-form-grid--two">
-                            <div class="seoauto-form-field">
-                                <label for="seoauto-site-location-code">Primary Location Code</label>
-                                <input id="seoauto-site-location-code" type="number" min="1" name="site_location_code" value="<?php echo esc_attr((string) $siteLocationCode); ?>">
-                            </div>
-                            <div class="seoauto-form-field">
-                                <label for="seoauto-site-location-name">Primary Location Name</label>
-                                <input id="seoauto-site-location-name" type="text" name="site_location_name" value="<?php echo esc_attr($siteLocationName); ?>">
+                        <div class="seoauto-form-field">
+                            <label>Locations</label>
+                            <div class="seoauto-locations-table-wrap" data-location-options="<?php echo esc_attr(wp_json_encode(array_values($availableLocations))); ?>">
+                                <table class="widefat seoauto-locations-table">
+                                    <thead>
+                                        <tr>
+                                            <th>Location</th>
+                                            <th>Code</th>
+                                            <th>Type</th>
+                                            <th></th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="seoauto-locations-body">
+                                        <?php foreach ($siteLocations as $index => $location) : ?>
+                                            <tr class="seoauto-location-row">
+                                                <td>
+                                                    <select name="site_locations[<?php echo esc_attr((string) $index); ?>][location_code]" class="seoauto-location-select">
+                                                        <?php foreach ($availableLocations as $option) : ?>
+                                                            <option
+                                                                value="<?php echo esc_attr((string) $option['code']); ?>"
+                                                                data-location-name="<?php echo esc_attr((string) $option['name']); ?>"
+                                                                <?php selected((int) $location['location_code'], (int) $option['code']); ?>
+                                                            >
+                                                                <?php echo esc_html((string) $option['label']); ?>
+                                                            </option>
+                                                        <?php endforeach; ?>
+                                                    </select>
+                                                    <input type="hidden" name="site_locations[<?php echo esc_attr((string) $index); ?>][location_name]" value="<?php echo esc_attr((string) $location['location_name']); ?>" class="seoauto-location-name">
+                                                </td>
+                                                <td class="seoauto-location-code-cell"><?php echo esc_html((string) $location['location_code']); ?></td>
+                                                <td>
+                                                    <select name="site_locations[<?php echo esc_attr((string) $index); ?>][location_type]" class="seoauto-location-type">
+                                                        <option value="primary" <?php selected((string) $location['location_type'], 'primary'); ?>>Primary</option>
+                                                        <option value="secondary" <?php selected((string) $location['location_type'], 'secondary'); ?>>Secondary</option>
+                                                    </select>
+                                                </td>
+                                                <td>
+                                                    <button type="button" class="button-link-delete seoauto-remove-location">Remove</button>
+                                                </td>
+                                            </tr>
+                                        <?php endforeach; ?>
+                                    </tbody>
+                                </table>
+                                <div class="seoauto-button-row" style="margin-top:10px;">
+                                    <button type="button" class="button" id="seoauto-add-location-row">Add Location</button>
+                                </div>
                             </div>
                         </div>
 
@@ -711,7 +766,21 @@ final class MenuRegistrar
 
                         <div class="seoauto-form-field">
                             <label for="seoauto-site-settings-template-id">Seeded Strategy Template</label>
-                            <select id="seoauto-site-settings-template-id" name="site_settings_template_id">
+                            <select
+                                id="seoauto-site-settings-template-id"
+                                name="site_settings_template_id"
+                                data-template-configs="<?php echo esc_attr(wp_json_encode(array_map(fn (array $template): array => [
+                                    'id' => (int) ($template['id'] ?? 0),
+                                    'min_search_volume' => (int) ($template['min_search_volume'] ?? 0),
+                                    'max_search_volume' => ($template['max_search_volume'] ?? null) !== null ? (int) $template['max_search_volume'] : null,
+                                    'max_keyword_difficulty' => (int) ($template['max_keyword_difficulty'] ?? 100),
+                                    'preferred_keyword_type' => (string) ($template['preferred_keyword_type'] ?? ''),
+                                    'content_briefs_per_run' => (int) ($template['content_briefs_per_run'] ?? 3),
+                                    'prefer_low_difficulty' => !empty($template['prefer_low_difficulty']),
+                                    'allow_low_volume' => !empty($template['allow_low_volume']),
+                                    'selection_notes' => (string) ($template['selection_notes'] ?? ''),
+                                ], $siteSettingTemplates))); ?>"
+                            >
                                 <option value="0">Keep current custom settings</option>
                                 <?php foreach ($siteSettingTemplates as $template) : if (!is_array($template)) continue; ?>
                                     <option value="<?php echo esc_attr((string) ($template['id'] ?? 0)); ?>" <?php selected((int) ($siteSeoSettings['template_id'] ?? 0), (int) ($template['id'] ?? 0)); ?>>
@@ -1566,7 +1635,11 @@ final class MenuRegistrar
         $articleStatusArr = isset($_GET['article_status']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['article_status'])) : [];
         $assignmentStatusArr = isset($_GET['assignment_status']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['assignment_status'])) : [];
         $keywordTypeArr = isset($_GET['keyword_type']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['keyword_type'])) : [];
-        $linkedStateArr = isset($_GET['linked_state']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['linked_state'])) : [];
+        $searchIntentArr = isset($_GET['search_intent']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['search_intent'])) : [];
+        $minSearchVolume = isset($_GET['search_volume_min']) && $_GET['search_volume_min'] !== '' ? max(0, (int) $_GET['search_volume_min']) : null;
+        $maxSearchVolume = isset($_GET['search_volume_max']) && $_GET['search_volume_max'] !== '' ? max(0, (int) $_GET['search_volume_max']) : null;
+        $minKeywordDifficulty = isset($_GET['keyword_difficulty_min']) && $_GET['keyword_difficulty_min'] !== '' ? max(0, min(100, (int) $_GET['keyword_difficulty_min'])) : null;
+        $maxKeywordDifficulty = isset($_GET['keyword_difficulty_max']) && $_GET['keyword_difficulty_max'] !== '' ? max(0, min(100, (int) $_GET['keyword_difficulty_max'])) : null;
         $search = isset($_GET['q']) ? sanitize_text_field((string) $_GET['q']) : '';
 
         $where = ['1=1'];
@@ -1583,18 +1656,25 @@ final class MenuRegistrar
             $where[] = 'keyword_type IN (' . implode(',', array_fill(0, count($keywordTypeArr), '%s')) . ')';
             $params = array_merge($params, $keywordTypeArr);
         }
-        if (!empty($linkedStateArr)) {
-            $linkedClauses = [];
-            foreach ($linkedStateArr as $state) {
-                if ($state === 'linked') {
-                    $linkedClauses[] = 'linked_wp_post_id IS NOT NULL';
-                } elseif ($state === 'unlinked') {
-                    $linkedClauses[] = 'linked_wp_post_id IS NULL';
-                }
-            }
-            if (!empty($linkedClauses)) {
-                $where[] = '(' . implode(' OR ', $linkedClauses) . ')';
-            }
+        if (!empty($searchIntentArr)) {
+            $where[] = 'search_intent IN (' . implode(',', array_fill(0, count($searchIntentArr), '%s')) . ')';
+            $params = array_merge($params, $searchIntentArr);
+        }
+        if ($minSearchVolume !== null) {
+            $where[] = 'search_volume >= %d';
+            $params[] = $minSearchVolume;
+        }
+        if ($maxSearchVolume !== null) {
+            $where[] = 'search_volume <= %d';
+            $params[] = $maxSearchVolume;
+        }
+        if ($minKeywordDifficulty !== null) {
+            $where[] = 'keyword_difficulty >= %d';
+            $params[] = $minKeywordDifficulty;
+        }
+        if ($maxKeywordDifficulty !== null) {
+            $where[] = 'keyword_difficulty <= %d';
+            $params[] = $maxKeywordDifficulty;
         }
         if ($search !== '') {
             $like = '%' . $wpdb->esc_like($search) . '%';
@@ -1615,6 +1695,7 @@ final class MenuRegistrar
         $articleStatusOptions = (array) $wpdb->get_col("SELECT DISTINCT article_status FROM {$table} WHERE article_status <> '' ORDER BY article_status ASC"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
         $assignmentStatusOptions = (array) $wpdb->get_col("SELECT DISTINCT assignment_status FROM {$table} WHERE assignment_status <> '' ORDER BY assignment_status ASC"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
         $keywordTypeOptions = (array) $wpdb->get_col("SELECT DISTINCT keyword_type FROM {$table} WHERE keyword_type <> '' ORDER BY keyword_type ASC"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $searchIntentOptions = (array) $wpdb->get_col("SELECT DISTINCT search_intent FROM {$table} WHERE search_intent <> '' ORDER BY search_intent ASC"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 
         $allPosts = get_posts([
             'post_type' => ['post', 'page'],
@@ -1629,7 +1710,7 @@ final class MenuRegistrar
             'article_status' => array_combine($articleStatusOptions, array_map('ucfirst', $articleStatusOptions)),
             'assignment_status' => array_combine($assignmentStatusOptions, array_map('ucfirst', $assignmentStatusOptions)),
             'keyword_type' => array_combine($keywordTypeOptions, array_map('ucfirst', $keywordTypeOptions)),
-            'linked_state' => ['linked' => 'Linked', 'unlinked' => 'Unlinked'],
+            'search_intent' => array_combine($searchIntentOptions, array_map(static fn (string $value): string => ucwords(str_replace(['_', '-'], ' ', $value)), $searchIntentOptions)),
         ]);
         ?>
         <div class="wrap seoauto-admin-page">
@@ -1654,14 +1735,14 @@ final class MenuRegistrar
                                 ['key' => 'article_status', 'label' => 'Article Status', 'options' => array_combine($articleStatusOptions, array_map('ucfirst', $articleStatusOptions))],
                                 ['key' => 'assignment_status', 'label' => 'Assignment', 'options' => array_combine($assignmentStatusOptions, array_map('ucfirst', $assignmentStatusOptions))],
                                 ['key' => 'keyword_type', 'label' => 'Keyword Type', 'options' => array_combine($keywordTypeOptions, array_map('ucfirst', $keywordTypeOptions))],
-                                ['key' => 'linked_state', 'label' => 'Linked State', 'options' => ['linked' => 'Linked', 'unlinked' => 'Unlinked']],
+                                ['key' => 'search_intent', 'label' => 'Intent', 'options' => array_combine($searchIntentOptions, array_map(static fn (string $value): string => ucwords(str_replace(['_', '-'], ' ', $value)), $searchIntentOptions))],
                             ];
                             foreach ($filterDefs as $fd) :
                                 $activeVals = match ($fd['key']) {
                                     'article_status' => $articleStatusArr,
                                     'assignment_status' => $assignmentStatusArr,
                                     'keyword_type' => $keywordTypeArr,
-                                    'linked_state' => $linkedStateArr,
+                                    'search_intent' => $searchIntentArr,
                                     default => [],
                                 };
                             ?>
@@ -1689,9 +1770,13 @@ final class MenuRegistrar
                             <?php endforeach; ?>
 
                             <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+                                <input type="number" min="0" name="search_volume_min" value="<?php echo esc_attr($minSearchVolume === null ? '' : (string) $minSearchVolume); ?>" placeholder="Min SV" class="seoauto-filter-range-input">
+                                <input type="number" min="0" name="search_volume_max" value="<?php echo esc_attr($maxSearchVolume === null ? '' : (string) $maxSearchVolume); ?>" placeholder="Max SV" class="seoauto-filter-range-input">
+                                <input type="number" min="0" max="100" name="keyword_difficulty_min" value="<?php echo esc_attr($minKeywordDifficulty === null ? '' : (string) $minKeywordDifficulty); ?>" placeholder="Min KD" class="seoauto-filter-range-input">
+                                <input type="number" min="0" max="100" name="keyword_difficulty_max" value="<?php echo esc_attr($maxKeywordDifficulty === null ? '' : (string) $maxKeywordDifficulty); ?>" placeholder="Max KD" class="seoauto-filter-range-input">
                                 <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="Search brief…" style="height:32px;padding:0 10px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;width:180px;">
                                 <button class="button button-primary" type="submit">Search</button>
-                                <?php if (!empty($articleStatusArr) || !empty($assignmentStatusArr) || !empty($keywordTypeArr) || !empty($linkedStateArr) || $search !== '') : ?>
+                                <?php if (!empty($articleStatusArr) || !empty($assignmentStatusArr) || !empty($keywordTypeArr) || !empty($searchIntentArr) || $minSearchVolume !== null || $maxSearchVolume !== null || $minKeywordDifficulty !== null || $maxKeywordDifficulty !== null || $search !== '') : ?>
                                     <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-briefs')); ?>">Reset</a>
                                 <?php endif; ?>
                             </div>
@@ -2393,6 +2478,65 @@ final class MenuRegistrar
         }
 
         return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $source
+     * @return list<array{location_type:string,location_code:int,location_name:string,priority:int}>
+     */
+    private function sanitizePostedLocations(array $source): array
+    {
+        $rows = isset($source['site_locations']) && is_array($source['site_locations']) ? wp_unslash($source['site_locations']) : [];
+        $available = [];
+        foreach ($this->getAvailableLocationOptions() as $option) {
+            $available[(int) $option['code']] = (string) $option['name'];
+        }
+
+        $locations = [];
+        foreach ($rows as $row) {
+            if (!is_array($row)) {
+                continue;
+            }
+
+            $locationCode = isset($row['location_code']) ? (int) $row['location_code'] : 0;
+            if ($locationCode <= 0 || !isset($available[$locationCode])) {
+                continue;
+            }
+
+            $locationType = isset($row['location_type']) ? sanitize_text_field((string) $row['location_type']) : 'secondary';
+            if (!in_array($locationType, ['primary', 'secondary'], true)) {
+                $locationType = 'secondary';
+            }
+
+            $locations[] = [
+                'location_type' => $locationType,
+                'location_code' => $locationCode,
+                'location_name' => $available[$locationCode],
+                'priority' => 0,
+            ];
+        }
+
+        return $this->siteRegistrar->normalizeLocationsOption($locations);
+    }
+
+    /**
+     * @return list<array{code:int,name:string,label:string}>
+     */
+    private function getAvailableLocationOptions(): array
+    {
+        return [
+            ['code' => 2036, 'name' => 'Australia', 'label' => 'Australia (2036)'],
+            ['code' => 2124, 'name' => 'Canada', 'label' => 'Canada (2124)'],
+            ['code' => 2356, 'name' => 'India', 'label' => 'India (2356)'],
+            ['code' => 2504, 'name' => 'Morocco', 'label' => 'Morocco (2504)'],
+            ['code' => 2554, 'name' => 'New Zealand', 'label' => 'New Zealand (2554)'],
+            ['code' => 2586, 'name' => 'Pakistan', 'label' => 'Pakistan (2586)'],
+            ['code' => 2682, 'name' => 'Saudi Arabia', 'label' => 'Saudi Arabia (2682)'],
+            ['code' => 2702, 'name' => 'Singapore', 'label' => 'Singapore (2702)'],
+            ['code' => 2784, 'name' => 'United Arab Emirates', 'label' => 'United Arab Emirates (2784)'],
+            ['code' => 2826, 'name' => 'United Kingdom', 'label' => 'United Kingdom (2826)'],
+            ['code' => 2840, 'name' => 'United States', 'label' => 'United States (2840)'],
+        ];
     }
 
     /** @param array<string,mixed> $payload @return list<string> */

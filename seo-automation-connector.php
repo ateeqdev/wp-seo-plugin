@@ -19,7 +19,7 @@ define('SEOAUTO_VERSION', '2.0.0');
 define('SEOAUTO_PLUGIN_FILE', __FILE__);
 define('SEOAUTO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SEOAUTO_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('SEOAUTO_DB_VERSION', '1.2.0');
+define('SEOAUTO_DB_VERSION', '1.2.1');
 define('SEOAUTO_LARAVEL_BASE_URL', 'https://automatedseolaravel.com/');
 
 require_once SEOAUTO_PLUGIN_DIR . 'includes/class-autoloader.php';
