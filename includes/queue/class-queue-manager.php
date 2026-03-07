@@ -114,8 +114,8 @@ final class QueueManager
         global $wpdb;
 
         $actions = $wpdb->prefix . 'seoauto_actions';
-        $events = $wpdb->prefix . 'seoauto_event_outbox';
-        $logs = $wpdb->prefix . 'seoauto_activity_logs';
+        $events = $wpdb->prefix . 'seoauto_outbox';
+        $logs = $wpdb->prefix . 'seoauto_logs';
         $locks = $wpdb->prefix . 'seoauto_locks';
 
         $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery

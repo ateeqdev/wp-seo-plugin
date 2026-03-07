@@ -462,7 +462,7 @@ final class ActionRepository
     public function listChangeLogs(int $laravelActionId = 0, int $limit = 200, array $filters = []): array
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_change_logs';
+        $table = $wpdb->prefix . 'seoauto_changes';
         $where = ['1=1'];
         $params = [];
 
@@ -506,7 +506,7 @@ final class ActionRepository
             return [];
         }
 
-        $table = $wpdb->prefix . 'seoauto_change_logs';
+        $table = $wpdb->prefix . 'seoauto_changes';
         $where = ['laravel_action_id IN (' . implode(',', array_fill(0, count($ids), '%d')) . ')'];
         $params = $ids;
 
@@ -574,7 +574,7 @@ final class ActionRepository
     public function addAdminActionItem(int $laravelActionId, array $payload): void
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_admin_action_items';
+        $table = $wpdb->prefix . 'seoauto_action_items';
         $action = $this->findByLaravelId($laravelActionId);
         $payloadTitle = sanitize_text_field((string) ($payload['title'] ?? 'Manual action required'));
         $contextPrefix = '';
@@ -673,7 +673,7 @@ final class ActionRepository
         }
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_change_logs';
+        $table = $wpdb->prefix . 'seoauto_changes';
         $action = $this->findByLaravelId($laravelActionId);
         $actionId = isset($action['id']) ? (int) $action['id'] : null;
 

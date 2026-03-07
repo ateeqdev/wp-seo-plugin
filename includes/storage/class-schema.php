@@ -20,11 +20,11 @@ final class Schema
         $charset = $wpdb->get_charset_collate();
 
         $actions = $wpdb->prefix . 'seoauto_actions';
-        $outbox = $wpdb->prefix . 'seoauto_event_outbox';
-        $activityLogs = $wpdb->prefix . 'seoauto_activity_logs';
-        $changeLogs = $wpdb->prefix . 'seoauto_change_logs';
-        $actionItems = $wpdb->prefix . 'seoauto_admin_action_items';
-        $briefs = $wpdb->prefix . 'seoauto_content_briefs';
+        $outbox = $wpdb->prefix . 'seoauto_outbox';
+        $activityLogs = $wpdb->prefix . 'seoauto_logs';
+        $changeLogs = $wpdb->prefix . 'seoauto_changes';
+        $actionItems = $wpdb->prefix . 'seoauto_action_items';
+        $briefs = $wpdb->prefix . 'seoauto_briefs';
         $locks = $wpdb->prefix . 'seoauto_locks';
         $redirects = $wpdb->prefix . 'seoauto_redirects';
 
@@ -210,7 +210,7 @@ final class Schema
     {
         global $wpdb;
 
-        $table = $wpdb->prefix . 'seoauto_content_briefs';
+        $table = $wpdb->prefix . 'seoauto_briefs';
         $rows = $wpdb->get_results("SELECT id, payload FROM {$table} WHERE brief_title IS NULL OR focus_keyword IS NULL OR keyword_type IS NULL LIMIT 500", ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
         if (!is_array($rows) || $rows === []) {
             return;

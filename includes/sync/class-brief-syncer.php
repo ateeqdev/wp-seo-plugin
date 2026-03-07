@@ -39,7 +39,7 @@ final class BriefSyncer
                 : [];
 
             global $wpdb;
-            $table = $wpdb->prefix . 'seoauto_content_briefs';
+            $table = $wpdb->prefix . 'seoauto_briefs';
 
             foreach ($briefs as $brief) {
                 if (!is_array($brief) || empty($brief['id'])) {

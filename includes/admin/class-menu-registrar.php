@@ -326,7 +326,7 @@ final class MenuRegistrar
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_delete_logs');
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_change_logs';
+        $table = $wpdb->prefix . 'seoauto_changes';
         $deleted = $wpdb->query("DELETE FROM {$table}"); // phpcs:ignore
         $notice = $deleted === false ? 'logs_delete_failed' : 'logs_delete_ok';
         $deletedCount = $deleted === false ? 0 : (int) $deleted;
@@ -342,7 +342,7 @@ final class MenuRegistrar
         $allowed = ['all', 'error', 'warning'];
         if (!in_array($severity, $allowed, true)) $severity = 'all';
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_activity_logs';
+        $table = $wpdb->prefix . 'seoauto_logs';
         if ($severity === 'error') {
             $deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE severity = %s", 'error')); // phpcs:ignore
         } elseif ($severity === 'warning') {
@@ -540,7 +540,7 @@ final class MenuRegistrar
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_update_action_item');
         global $wpdb;
-        $table  = $wpdb->prefix . 'seoauto_admin_action_items';
+        $table  = $wpdb->prefix . 'seoauto_action_items';
         $itemId = isset($_POST['item_id']) ? (int) $_POST['item_id'] : 0;
         $status = isset($_POST['status']) ? sanitize_text_field((string) $_POST['status']) : 'open';
         $valid  = ['open', 'in_progress', 'resolved'];
@@ -1022,7 +1022,7 @@ final class MenuRegistrar
 
         $siteId = (int) get_option('seoauto_site_id', 0);
         global $wpdb;
-        $itemsTable = $wpdb->prefix . 'seoauto_admin_action_items';
+        $itemsTable = $wpdb->prefix . 'seoauto_action_items';
         $humanItems = $siteId > 0
             ? $wpdb->get_results($wpdb->prepare("SELECT * FROM {$itemsTable} WHERE site_id = %d ORDER BY updated_at DESC LIMIT 200", $siteId), ARRAY_A) // phpcs:ignore
             : [];
@@ -1389,7 +1389,7 @@ final class MenuRegistrar
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
 
         global $wpdb;
-        $table        = $wpdb->prefix . 'seoauto_admin_action_items';
+        $table        = $wpdb->prefix . 'seoauto_action_items';
         $actionsTable = $wpdb->prefix . 'seoauto_actions';
         $siteId       = (int) get_option('seoauto_site_id', 0);
         
@@ -1631,7 +1631,7 @@ final class MenuRegistrar
         $this->briefSyncer->sync();
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_content_briefs';
+        $table = $wpdb->prefix . 'seoauto_briefs';
         $articleStatusArr = isset($_GET['article_status']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['article_status'])) : [];
         $assignmentStatusArr = isset($_GET['assignment_status']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['assignment_status'])) : [];
         $keywordTypeArr = isset($_GET['keyword_type']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['keyword_type'])) : [];
@@ -2052,7 +2052,7 @@ final class MenuRegistrar
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_activity_logs';
+        $table = $wpdb->prefix . 'seoauto_logs';
 
         $notice       = isset($_GET['seoauto_notice'])  ? sanitize_text_field((string)$_GET['seoauto_notice'])  : '';
         $deletedCount = isset($_GET['deleted_count'])   ? max(0,(int)$_GET['deleted_count'])                    : 0;
@@ -2413,7 +2413,7 @@ final class MenuRegistrar
     {
         global $wpdb;
         $wpdb->update( // phpcs:ignore
-            $wpdb->prefix . 'seoauto_content_briefs',
+            $wpdb->prefix . 'seoauto_briefs',
             [
                 'linked_wp_post_id' => $postId,
                 'linked_wp_post_url' => $postUrl,

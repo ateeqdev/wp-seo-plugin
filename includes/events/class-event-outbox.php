@@ -13,7 +13,7 @@ final class EventOutbox
     public function __construct()
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'seoauto_event_outbox';
+        $this->table = $wpdb->prefix . 'seoauto_outbox';
     }
 
     /**
