@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace SEOAutomation\Connector\Storage;
 
+use SEOAutomation\Connector\Utils\JsonHelper;
+
 final class Schema
 {
     public static function createOrUpgrade(): void
@@ -139,10 +141,20 @@ final class Schema
             id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
             laravel_content_brief_id bigint(20) unsigned NOT NULL,
             payload longtext NOT NULL,
+            brief_title varchar(255) DEFAULT NULL,
+            focus_keyword varchar(255) DEFAULT NULL,
+            keyword_type varchar(32) DEFAULT NULL,
+            search_volume int(11) DEFAULT NULL,
+            keyword_difficulty smallint(5) unsigned DEFAULT NULL,
+            topic_priority_score int(11) DEFAULT NULL,
+            strategy_template_name varchar(255) DEFAULT NULL,
+            primary_subreddit varchar(120) DEFAULT NULL,
             article_status varchar(32) NOT NULL,
             assigned_wp_user_id bigint(20) unsigned DEFAULT NULL,
             assignment_status enum('unassigned','assigned','started','completed') NOT NULL DEFAULT 'unassigned',
             linked_wp_post_id bigint(20) unsigned DEFAULT NULL,
+            linked_wp_post_title varchar(255) DEFAULT NULL,
+            linked_wp_post_type varchar(32) DEFAULT NULL,
             linked_wp_post_url text DEFAULT NULL,
             synced_at datetime NOT NULL,
             created_at datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -151,6 +163,8 @@ final class Schema
             UNIQUE KEY laravel_brief_id (laravel_content_brief_id),
             KEY article_status_idx (article_status),
             KEY assignment_status_idx (assignment_status),
+            KEY keyword_type_idx (keyword_type),
+            KEY linked_post_idx (linked_wp_post_id),
             KEY assigned_user_idx (assigned_wp_user_id),
             KEY synced_at_idx (synced_at)
         ) {$charset};";
@@ -185,6 +199,45 @@ final class Schema
             dbDelta($statement);
         }
 
+        self::backfillBriefMetadata();
+
         update_option('seoauto_db_version', SEOAUTO_DB_VERSION, false);
+    }
+
+    private static function backfillBriefMetadata(): void
+    {
+        global $wpdb;
+
+        $table = $wpdb->prefix . 'seoauto_content_briefs';
+        $rows = $wpdb->get_results("SELECT id, payload FROM {$table} WHERE brief_title IS NULL OR focus_keyword IS NULL OR keyword_type IS NULL LIMIT 500", ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        if (!is_array($rows) || $rows === []) {
+            return;
+        }
+
+        foreach ($rows as $row) {
+            $payload = JsonHelper::decode((string) ($row['payload'] ?? ''), true);
+            if (!is_array($payload)) {
+                continue;
+            }
+
+            $wpdb->update( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+                $table,
+                [
+                    'brief_title' => sanitize_text_field((string) ($payload['brief_title'] ?? '')),
+                    'focus_keyword' => sanitize_text_field((string) ($payload['focus_keyword'] ?? '')),
+                    'keyword_type' => sanitize_text_field((string) ($payload['keyword_type'] ?? '')),
+                    'search_volume' => isset($payload['search_volume']) ? (int) $payload['search_volume'] : null,
+                    'keyword_difficulty' => isset($payload['keyword_difficulty']) ? (int) $payload['keyword_difficulty'] : null,
+                    'topic_priority_score' => isset($payload['topic_priority_score']) ? (int) $payload['topic_priority_score'] : null,
+                    'strategy_template_name' => sanitize_text_field((string) ($payload['strategy_template_name'] ?? '')),
+                    'primary_subreddit' => sanitize_text_field((string) ($payload['primary_subreddit'] ?? '')),
+                    'linked_wp_post_title' => sanitize_text_field((string) ($payload['linked_wp_post_title'] ?? '')),
+                    'linked_wp_post_type' => sanitize_text_field((string) ($payload['linked_wp_post_type'] ?? '')),
+                ],
+                ['id' => (int) $row['id']],
+                ['%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%s'],
+                ['%d']
+            );
+        }
     }
 }

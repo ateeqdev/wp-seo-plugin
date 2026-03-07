@@ -453,6 +453,16 @@
   min-height: 80px;
   resize: vertical;
 }
+.seoauto-form-grid {
+  display: grid;
+  gap: 12px;
+}
+.seoauto-form-grid--two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.seoauto-form-grid--three {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
 .seoauto-form-field .description {
   margin-top: 5px;
   font-size: 12px;
@@ -1175,6 +1185,63 @@
   background: var(--white);
   color: var(--gray-900);
 }
+.seoauto-post-picker {
+  position: relative;
+  min-width: 280px;
+}
+.seoauto-post-picker-display {
+  min-height: 32px;
+  padding: 7px 10px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  font-size: 13px;
+  color: var(--gray-900);
+  cursor: pointer;
+}
+.seoauto-post-picker-dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  width: 100%;
+  min-width: 320px;
+  display: none;
+  z-index: 30;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow-md);
+  padding: 10px;
+}
+.seoauto-post-picker-dropdown.is-open {
+  display: block;
+}
+.seoauto-post-picker-search {
+  width: 100%;
+  margin-bottom: 8px;
+}
+.seoauto-post-picker-options {
+  max-height: 240px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.seoauto-post-picker-option {
+  width: 100%;
+  text-align: left;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  background: var(--gray-50);
+  color: var(--gray-900);
+  cursor: pointer;
+  font-size: 13px;
+}
+.seoauto-post-picker-option:hover {
+  background: var(--blue-bg);
+  border-color: var(--blue-light);
+}
 
 /* ============================================================
    Schedules — prevent horizontal overflow
@@ -1367,6 +1434,10 @@
     padding: 14px;
   }
   .seoauto-brief-body {
+    grid-template-columns: 1fr;
+  }
+  .seoauto-form-grid--two,
+  .seoauto-form-grid--three {
     grid-template-columns: 1fr;
   }
   .seoauto-kpi-grid {

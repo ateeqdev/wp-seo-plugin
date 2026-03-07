@@ -176,8 +176,44 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoauto_update_site_profile');
-        $this->siteRegistrar->registerOrUpdate(true);
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => 'profile_ok'], admin_url('admin.php')));
+        $description = isset($_POST['site_profile_description']) ? sanitize_textarea_field((string) wp_unslash($_POST['site_profile_description'])) : '';
+        $taste = isset($_POST['site_profile_taste']) ? sanitize_textarea_field((string) wp_unslash($_POST['site_profile_taste'])) : '';
+        $locationCode = isset($_POST['site_location_code']) ? max(1, (int) $_POST['site_location_code']) : 2840;
+        $locationName = isset($_POST['site_location_name']) ? sanitize_text_field((string) wp_unslash($_POST['site_location_name'])) : 'United States';
+
+        update_option('seoauto_site_profile_description', $description, false);
+        update_option('seoauto_site_profile_taste', $taste, false);
+        update_option('seoauto_site_location_code', $locationCode, false);
+        update_option('seoauto_site_location_name', $locationName, false);
+
+        $siteSettings = $this->sanitizePostedSiteSettings($_POST);
+        update_option('seoauto_site_seo_settings', $siteSettings, false);
+
+        $result = $this->siteRegistrar->registerOrUpdate(true);
+        $notice = 'profile_ok';
+
+        if (isset($result['error'])) {
+            $notice = 'profile_failed';
+        } else {
+            $siteId = (int) ($result['site_id'] ?? get_option('seoauto_site_id', 0));
+            if ($siteId > 0) {
+                try {
+                    $settingsResponse = $this->client->updateSiteSettings($siteId, $this->buildRemoteSiteSettingsPayload($siteSettings));
+                    if (isset($settingsResponse['settings']) && is_array($settingsResponse['settings'])) {
+                        update_option(
+                            'seoauto_site_seo_settings',
+                            $this->siteRegistrar->sanitizeSiteSettingsPayload($settingsResponse['settings']),
+                            false
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    $this->logger->warning('admin_update_site_settings_failed', ['error' => $e->getMessage()], 'admin');
+                    $notice = 'profile_failed';
+                }
+            }
+        }
+
+        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
@@ -257,11 +293,19 @@ final class MenuRegistrar
                 'wp_post_id'    => $postId,
                 'wp_post_url'   => get_permalink($postId),
                 'wp_post_title' => get_the_title($postId),
+                'wp_post_type'  => get_post_type($postId),
                 'article_status' => $articleStatus,
                 'published_at'  => get_post_status($postId) === 'publish' ? gmdate('c', (int) get_post_time('U', true, $postId)) : null,
             ];
             $this->client->linkArticleToBrief($siteId, $briefId, $payload);
-            $this->updateLocalBriefLinkState($briefId, $postId, (string) get_permalink($postId), $articleStatus);
+            $this->updateLocalBriefLinkState(
+                $briefId,
+                $postId,
+                (string) get_permalink($postId),
+                (string) get_the_title($postId),
+                (string) get_post_type($postId),
+                $articleStatus
+            );
             $notice = 'brief_link_ok';
         } catch (\Throwable $e) {
             $this->logger->warning('admin_brief_link_failed', ['error' => $e->getMessage()], 'admin');
@@ -553,6 +597,13 @@ final class MenuRegistrar
         $lastCron       = (int) get_option('seoauto_last_cron_run', 0);
         $lastUserSync   = (int) get_option('seoauto_last_user_sync', 0);
         $lastBriefSync  = (int) get_option('seoauto_last_brief_sync', 0);
+        $siteDescription = (string) get_option('seoauto_site_profile_description', '');
+        $siteTaste = (string) get_option('seoauto_site_profile_taste', '');
+        $siteLocationCode = (int) get_option('seoauto_site_location_code', 2840);
+        $siteLocationName = (string) get_option('seoauto_site_location_name', 'United States');
+        $siteSeoSettings = get_option('seoauto_site_seo_settings', []);
+        if (!is_array($siteSeoSettings)) $siteSeoSettings = [];
+        $siteSettingTemplates = [];
 
         $excludedRaw    = (string) get_option('seoauto_excluded_change_audit_pages', '');
         $excludedItems  = array_values(array_filter(array_map('trim', explode("\n", $excludedRaw))));
@@ -561,6 +612,19 @@ final class MenuRegistrar
 
         $providerAlerts = get_option('seoauto_provider_connection_alerts', []);
         if (!is_array($providerAlerts)) $providerAlerts = [];
+
+        if ($siteId > 0 && $this->tokenManager->hasToken()) {
+            try {
+                $settingsResponse = $this->client->getSiteSettings($siteId);
+                if (isset($settingsResponse['settings']) && is_array($settingsResponse['settings'])) {
+                    $siteSeoSettings = $this->siteRegistrar->sanitizeSiteSettingsPayload($settingsResponse['settings']);
+                    update_option('seoauto_site_seo_settings', $siteSeoSettings, false);
+                }
+                $siteSettingTemplates = isset($settingsResponse['templates']) && is_array($settingsResponse['templates']) ? $settingsResponse['templates'] : [];
+            } catch (\Throwable $e) {
+                $this->logger->warning('admin_fetch_site_settings_failed', ['error' => $e->getMessage()], 'admin');
+            }
+        }
 
         // Fetch all published posts + pages for the exclusion tag UI
         $allPosts = get_posts([
@@ -612,6 +676,105 @@ final class MenuRegistrar
             </div>
 
             <div class="seoauto-settings-grid">
+
+                <section class="seoauto-card seoauto-card--settings">
+                    <h2>Site Profile &amp; Strategy</h2>
+                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                        <?php wp_nonce_field('seoauto_update_site_profile'); ?>
+                        <input type="hidden" name="action" value="seoauto_update_site_profile">
+
+                        <div class="seoauto-form-field">
+                            <label for="seoauto-site-profile-description">Site Description</label>
+                            <textarea id="seoauto-site-profile-description" name="site_profile_description" rows="4"><?php echo esc_textarea($siteDescription); ?></textarea>
+                        </div>
+                        <div class="seoauto-form-field">
+                            <label for="seoauto-site-profile-taste">Brand Taste</label>
+                            <textarea id="seoauto-site-profile-taste" name="site_profile_taste" rows="4"><?php echo esc_textarea($siteTaste); ?></textarea>
+                        </div>
+                        <div class="seoauto-form-grid seoauto-form-grid--two">
+                            <div class="seoauto-form-field">
+                                <label for="seoauto-site-location-code">Primary Location Code</label>
+                                <input id="seoauto-site-location-code" type="number" min="1" name="site_location_code" value="<?php echo esc_attr((string) $siteLocationCode); ?>">
+                            </div>
+                            <div class="seoauto-form-field">
+                                <label for="seoauto-site-location-name">Primary Location Name</label>
+                                <input id="seoauto-site-location-name" type="text" name="site_location_name" value="<?php echo esc_attr($siteLocationName); ?>">
+                            </div>
+                        </div>
+
+                        <div class="seoauto-card-head" style="margin-top:18px;">
+                            <h2 style="font-size:16px;">Content Brief Settings</h2>
+                            <?php if (!empty($siteSeoSettings['domain_rating'])) : ?>
+                                <span class="seoauto-muted">Domain rating: <?php echo esc_html((string) $siteSeoSettings['domain_rating']); ?></span>
+                            <?php endif; ?>
+                        </div>
+
+                        <div class="seoauto-form-field">
+                            <label for="seoauto-site-settings-template-id">Seeded Strategy Template</label>
+                            <select id="seoauto-site-settings-template-id" name="site_settings_template_id">
+                                <option value="0">Keep current custom settings</option>
+                                <?php foreach ($siteSettingTemplates as $template) : if (!is_array($template)) continue; ?>
+                                    <option value="<?php echo esc_attr((string) ($template['id'] ?? 0)); ?>" <?php selected((int) ($siteSeoSettings['template_id'] ?? 0), (int) ($template['id'] ?? 0)); ?>>
+                                        <?php echo esc_html((string) ($template['name'] ?? 'Template')); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+
+                        <div class="seoauto-form-grid seoauto-form-grid--three">
+                            <div class="seoauto-form-field">
+                                <label for="seoauto-site-settings-min-search-volume">Minimum Search Volume</label>
+                                <input id="seoauto-site-settings-min-search-volume" type="number" min="0" name="site_settings_min_search_volume" value="<?php echo esc_attr((string) ($siteSeoSettings['min_search_volume'] ?? 0)); ?>">
+                            </div>
+                            <div class="seoauto-form-field">
+                                <label for="seoauto-site-settings-max-search-volume">Maximum Search Volume</label>
+                                <input id="seoauto-site-settings-max-search-volume" type="number" min="0" name="site_settings_max_search_volume" value="<?php echo esc_attr(($siteSeoSettings['max_search_volume'] ?? null) === null ? '' : (string) $siteSeoSettings['max_search_volume']); ?>">
+                            </div>
+                            <div class="seoauto-form-field">
+                                <label for="seoauto-site-settings-max-keyword-difficulty">Maximum Keyword Difficulty</label>
+                                <input id="seoauto-site-settings-max-keyword-difficulty" type="number" min="0" max="100" name="site_settings_max_keyword_difficulty" value="<?php echo esc_attr((string) ($siteSeoSettings['max_keyword_difficulty'] ?? 100)); ?>">
+                            </div>
+                        </div>
+
+                        <div class="seoauto-form-grid seoauto-form-grid--two">
+                            <div class="seoauto-form-field">
+                                <label for="seoauto-site-settings-preferred-keyword-type">Preferred Keyword Type</label>
+                                <select id="seoauto-site-settings-preferred-keyword-type" name="site_settings_preferred_keyword_type">
+                                    <option value="">Auto</option>
+                                    <?php foreach (['informational', 'commercial', 'transactional', 'navigational'] as $keywordType) : ?>
+                                        <option value="<?php echo esc_attr($keywordType); ?>" <?php selected((string) ($siteSeoSettings['preferred_keyword_type'] ?? ''), $keywordType); ?>>
+                                            <?php echo esc_html(ucwords($keywordType)); ?>
+                                        </option>
+                                    <?php endforeach; ?>
+                                </select>
+                            </div>
+                            <div class="seoauto-form-field">
+                                <label for="seoauto-site-settings-content-briefs-per-run">Content Briefs Per Run</label>
+                                <input id="seoauto-site-settings-content-briefs-per-run" type="number" min="1" max="10" name="site_settings_content_briefs_per_run" value="<?php echo esc_attr((string) ($siteSeoSettings['content_briefs_per_run'] ?? 3)); ?>">
+                            </div>
+                        </div>
+
+                        <div class="seoauto-form-field">
+                            <label for="seoauto-site-settings-selection-notes">Selection Notes</label>
+                            <textarea id="seoauto-site-settings-selection-notes" name="site_settings_selection_notes" rows="4"><?php echo esc_textarea((string) ($siteSeoSettings['selection_notes'] ?? '')); ?></textarea>
+                        </div>
+                        <div class="seoauto-form-grid seoauto-form-grid--two">
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" name="site_settings_prefer_low_difficulty" value="1" <?php checked(!empty($siteSeoSettings['prefer_low_difficulty'])); ?>>
+                                <span>Prefer easier keywords first</span>
+                            </label>
+                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                <input type="checkbox" name="site_settings_allow_low_volume" value="1" <?php checked(!empty($siteSeoSettings['allow_low_volume'])); ?>>
+                                <span>Allow low-volume opportunities</span>
+                            </label>
+                        </div>
+
+                        <div class="seoauto-button-row" style="margin-top:16px;">
+                            <button type="submit" class="button button-primary">Save Site Settings</button>
+                            <span class="seoauto-muted">This syncs description, taste, location, and per-site topic thresholds to Laravel.</span>
+                        </div>
+                    </form>
+                </section>
 
                 <!-- Google Connection -->
                 <section class="seoauto-card">
@@ -1400,7 +1563,74 @@ final class MenuRegistrar
 
         global $wpdb;
         $table = $wpdb->prefix . 'seoauto_content_briefs';
-        $rows  = $wpdb->get_results("SELECT * FROM {$table} ORDER BY synced_at DESC LIMIT 100"); // phpcs:ignore
+        $articleStatusArr = isset($_GET['article_status']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['article_status'])) : [];
+        $assignmentStatusArr = isset($_GET['assignment_status']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['assignment_status'])) : [];
+        $keywordTypeArr = isset($_GET['keyword_type']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['keyword_type'])) : [];
+        $linkedStateArr = isset($_GET['linked_state']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['linked_state'])) : [];
+        $search = isset($_GET['q']) ? sanitize_text_field((string) $_GET['q']) : '';
+
+        $where = ['1=1'];
+        $params = [];
+        if (!empty($articleStatusArr)) {
+            $where[] = 'article_status IN (' . implode(',', array_fill(0, count($articleStatusArr), '%s')) . ')';
+            $params = array_merge($params, $articleStatusArr);
+        }
+        if (!empty($assignmentStatusArr)) {
+            $where[] = 'assignment_status IN (' . implode(',', array_fill(0, count($assignmentStatusArr), '%s')) . ')';
+            $params = array_merge($params, $assignmentStatusArr);
+        }
+        if (!empty($keywordTypeArr)) {
+            $where[] = 'keyword_type IN (' . implode(',', array_fill(0, count($keywordTypeArr), '%s')) . ')';
+            $params = array_merge($params, $keywordTypeArr);
+        }
+        if (!empty($linkedStateArr)) {
+            $linkedClauses = [];
+            foreach ($linkedStateArr as $state) {
+                if ($state === 'linked') {
+                    $linkedClauses[] = 'linked_wp_post_id IS NOT NULL';
+                } elseif ($state === 'unlinked') {
+                    $linkedClauses[] = 'linked_wp_post_id IS NULL';
+                }
+            }
+            if (!empty($linkedClauses)) {
+                $where[] = '(' . implode(' OR ', $linkedClauses) . ')';
+            }
+        }
+        if ($search !== '') {
+            $like = '%' . $wpdb->esc_like($search) . '%';
+            $where[] = '(brief_title LIKE %s OR focus_keyword LIKE %s OR strategy_template_name LIKE %s OR primary_subreddit LIKE %s)';
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
+        }
+
+        $whereSql = implode(' AND ', $where);
+        $query = "SELECT * FROM {$table} WHERE {$whereSql} ORDER BY synced_at DESC LIMIT 100";
+        $rows = !empty($params)
+            ? $wpdb->get_results($wpdb->prepare($query, ...$params))
+            : $wpdb->get_results($query); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        if (!is_array($rows)) $rows = [];
+
+        $articleStatusOptions = (array) $wpdb->get_col("SELECT DISTINCT article_status FROM {$table} WHERE article_status <> '' ORDER BY article_status ASC"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $assignmentStatusOptions = (array) $wpdb->get_col("SELECT DISTINCT assignment_status FROM {$table} WHERE assignment_status <> '' ORDER BY assignment_status ASC"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $keywordTypeOptions = (array) $wpdb->get_col("SELECT DISTINCT keyword_type FROM {$table} WHERE keyword_type <> '' ORDER BY keyword_type ASC"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+
+        $allPosts = get_posts([
+            'post_type' => ['post', 'page'],
+            'post_status' => ['publish', 'draft', 'future', 'pending', 'private'],
+            'posts_per_page' => 500,
+            'orderby' => 'title',
+            'order' => 'ASC',
+            'fields' => 'ids',
+        ]);
+
+        $labelMapsJson = wp_json_encode([
+            'article_status' => array_combine($articleStatusOptions, array_map('ucfirst', $articleStatusOptions)),
+            'assignment_status' => array_combine($assignmentStatusOptions, array_map('ucfirst', $assignmentStatusOptions)),
+            'keyword_type' => array_combine($keywordTypeOptions, array_map('ucfirst', $keywordTypeOptions)),
+            'linked_state' => ['linked' => 'Linked', 'unlinked' => 'Unlinked'],
+        ]);
         ?>
         <div class="wrap seoauto-admin-page">
             <?php $this->renderAdminShellHeader('Content Briefs', 'seoauto-briefs', 'Review synced content briefs and link them to published posts.'); ?>
@@ -1414,6 +1644,62 @@ final class MenuRegistrar
                     </div>
                 </div>
             <?php else : ?>
+                <div class="seoauto-chip-filter-bar" id="seoauto-briefs-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
+                    <form method="get" class="seoauto-filter-form" id="seoauto-briefs-filter-form">
+                        <input type="hidden" name="page" value="seoauto-briefs">
+                        <div class="seoauto-active-chips" id="seoauto-briefs-active-chips"></div>
+                        <div class="seoauto-filter-dropdowns">
+                            <?php
+                            $filterDefs = [
+                                ['key' => 'article_status', 'label' => 'Article Status', 'options' => array_combine($articleStatusOptions, array_map('ucfirst', $articleStatusOptions))],
+                                ['key' => 'assignment_status', 'label' => 'Assignment', 'options' => array_combine($assignmentStatusOptions, array_map('ucfirst', $assignmentStatusOptions))],
+                                ['key' => 'keyword_type', 'label' => 'Keyword Type', 'options' => array_combine($keywordTypeOptions, array_map('ucfirst', $keywordTypeOptions))],
+                                ['key' => 'linked_state', 'label' => 'Linked State', 'options' => ['linked' => 'Linked', 'unlinked' => 'Unlinked']],
+                            ];
+                            foreach ($filterDefs as $fd) :
+                                $activeVals = match ($fd['key']) {
+                                    'article_status' => $articleStatusArr,
+                                    'assignment_status' => $assignmentStatusArr,
+                                    'keyword_type' => $keywordTypeArr,
+                                    'linked_state' => $linkedStateArr,
+                                    default => [],
+                                };
+                            ?>
+                            <div class="seoauto-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
+                                <button type="button" class="seoauto-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
+                                    <?php echo esc_html($fd['label']); ?>
+                                    <?php if (!empty($activeVals)) echo '<span class="seoauto-filter-count">' . count($activeVals) . '</span>'; ?>
+                                    <span class="seoauto-filter-chevron">▾</span>
+                                </button>
+                                <div class="seoauto-filter-panel" style="display:none;">
+                                    <div class="seoauto-filter-panel-inner">
+                                        <?php foreach ($fd['options'] as $val => $label) : ?>
+                                            <label class="seoauto-filter-option">
+                                                <input type="checkbox" name="<?php echo esc_attr($fd['key']); ?>[]" value="<?php echo esc_attr((string) $val); ?>" <?php checked(in_array((string) $val, $activeVals, true)); ?>>
+                                                <?php echo esc_html((string) $label); ?>
+                                            </label>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <div class="seoauto-filter-panel-footer">
+                                        <button type="button" class="seoauto-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
+                                        <button type="button" class="button button-small button-primary seoauto-filter-apply">Apply</button>
+                                    </div>
+                                </div>
+                            </div>
+                            <?php endforeach; ?>
+
+                            <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
+                                <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="Search brief…" style="height:32px;padding:0 10px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;width:180px;">
+                                <button class="button button-primary" type="submit">Search</button>
+                                <?php if (!empty($articleStatusArr) || !empty($assignmentStatusArr) || !empty($keywordTypeArr) || !empty($linkedStateArr) || $search !== '') : ?>
+                                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-briefs')); ?>">Reset</a>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div id="seoauto-briefs-filter-hidden-inputs" class="seoauto-filter-hidden-inputs"></div>
+                    </form>
+                </div>
+
                 <div class="seoauto-briefs-list">
                     <?php foreach ($rows as $row) : ?>
                         <?php
@@ -1424,6 +1710,11 @@ final class MenuRegistrar
                         $searchIntent = (string)($payload['search_intent'] ?? '');
                         $briefSummary = (string)($payload['brief_summary'] ?? '');
                         $writerNotes  = (string)($payload['writer_notes'] ?? '');
+                        $strategyTemplate = (string)($row->strategy_template_name ?? '');
+                        $primarySubreddit = (string)($row->primary_subreddit ?? '');
+                        $keywordType = (string)($row->keyword_type ?? '');
+                        $searchVolume = isset($row->search_volume) ? (int) $row->search_volume : null;
+                        $keywordDifficulty = isset($row->keyword_difficulty) ? (int) $row->keyword_difficulty : null;
                         $outlineItems = $this->collectInsightItemsByType($payload, 'outline-item', 10);
                         $painPoints   = $this->collectInsightItemsByType($payload, 'pain-point', 6);
                         $contentIdeas = $this->collectInsightItemsByType($payload, 'content-idea', 6);
@@ -1444,6 +1735,11 @@ final class MenuRegistrar
                                     <div class="seoauto-brief-meta">
                                         <?php if ($focusKw !== '') : ?><span>🔑 <?php echo esc_html($focusKw); ?></span><?php endif; ?>
                                         <?php if ($searchIntent !== '') : ?><span>🎯 <?php echo esc_html($searchIntent); ?></span><?php endif; ?>
+                                        <?php if ($keywordType !== '') : ?><span>Type: <?php echo esc_html(ucfirst($keywordType)); ?></span><?php endif; ?>
+                                        <?php if ($strategyTemplate !== '') : ?><span>Template: <?php echo esc_html($strategyTemplate); ?></span><?php endif; ?>
+                                        <?php if ($primarySubreddit !== '') : ?><span>r/<?php echo esc_html($primarySubreddit); ?></span><?php endif; ?>
+                                        <?php if ($searchVolume !== null) : ?><span>SV: <?php echo esc_html((string) $searchVolume); ?></span><?php endif; ?>
+                                        <?php if ($keywordDifficulty !== null) : ?><span>KD: <?php echo esc_html((string) $keywordDifficulty); ?></span><?php endif; ?>
                                         <span><?php echo esc_html(ucfirst((string)$row->article_status)); ?> · <?php echo esc_html(ucfirst((string)$row->assignment_status)); ?></span>
                                     </div>
                                 </div>
@@ -1503,7 +1799,7 @@ final class MenuRegistrar
                             <div class="seoauto-brief-footer">
                                 <div class="seoauto-brief-linked">
                                     <?php if (!empty($row->linked_wp_post_id)) : ?>
-                                        Linked to: <a href="<?php echo esc_url((string)get_edit_post_link((int)$row->linked_wp_post_id)); ?>"><?php echo esc_html(get_the_title((int)$row->linked_wp_post_id)); ?></a>
+                                        Linked to: <a href="<?php echo esc_url((string)get_edit_post_link((int)$row->linked_wp_post_id)); ?>"><?php echo esc_html((string) ($row->linked_wp_post_title ?: get_the_title((int)$row->linked_wp_post_id))); ?></a>
                                     <?php else : ?>
                                         <span class="seoauto-muted">Not linked to a post yet</span>
                                     <?php endif; ?>
@@ -1512,7 +1808,31 @@ final class MenuRegistrar
                                     <?php wp_nonce_field('seoauto_link_brief'); ?>
                                     <input type="hidden" name="action" value="seoauto_link_brief">
                                     <input type="hidden" name="brief_id" value="<?php echo esc_attr((string)$row->laravel_content_brief_id); ?>">
-                                    <input type="number" min="1" name="wp_post_id" placeholder="Post ID" style="width:100px;">
+                                    <div class="seoauto-post-picker" data-hidden-input-name="wp_post_id">
+                                        <input type="hidden" name="wp_post_id" value="<?php echo esc_attr((string) ($row->linked_wp_post_id ?? '')); ?>">
+                                        <div class="seoauto-post-picker-display"><?php echo !empty($row->linked_wp_post_id) ? esc_html((string) ($row->linked_wp_post_title ?: get_the_title((int) $row->linked_wp_post_id))) : 'Select a post or page'; ?></div>
+                                        <div class="seoauto-post-picker-dropdown">
+                                            <input type="text" class="seoauto-post-picker-search" placeholder="Search posts or pages…">
+                                            <div class="seoauto-post-picker-options">
+                                                <?php foreach ($allPosts as $postId) :
+                                                    $postTitle = (string) get_the_title($postId);
+                                                    $postType = (string) get_post_type($postId);
+                                                    if ($postTitle === '') continue;
+                                                ?>
+                                                    <button
+                                                        type="button"
+                                                        class="seoauto-post-picker-option"
+                                                        data-post-id="<?php echo esc_attr((string) $postId); ?>"
+                                                        data-post-title="<?php echo esc_attr($postTitle); ?>"
+                                                        data-post-type="<?php echo esc_attr($postType); ?>"
+                                                    >
+                                                        <span class="seoauto-excl-type-tag"><?php echo esc_html(ucfirst($postType)); ?></span>
+                                                        <?php echo esc_html($postTitle); ?>
+                                                    </button>
+                                                <?php endforeach; ?>
+                                            </div>
+                                        </div>
+                                    </div>
                                     <select name="article_status">
                                         <option value="drafted">Drafted</option>
                                         <option value="published">Published</option>
@@ -2004,16 +2324,75 @@ final class MenuRegistrar
         return [];
     }
 
-    private function updateLocalBriefLinkState(int $briefId, int $postId, string $postUrl, string $articleStatus): void
+    private function updateLocalBriefLinkState(int $briefId, int $postId, string $postUrl, string $postTitle, string $postType, string $articleStatus): void
     {
         global $wpdb;
         $wpdb->update( // phpcs:ignore
             $wpdb->prefix . 'seoauto_content_briefs',
-            ['linked_wp_post_id'=>$postId,'linked_wp_post_url'=>$postUrl,'article_status'=>$articleStatus,'assignment_status'=>'completed','updated_at'=>current_time('mysql')],
+            [
+                'linked_wp_post_id' => $postId,
+                'linked_wp_post_url' => $postUrl,
+                'linked_wp_post_title' => $postTitle,
+                'linked_wp_post_type' => $postType,
+                'article_status' => $articleStatus,
+                'assignment_status' => 'completed',
+                'updated_at' => current_time('mysql'),
+            ],
             ['laravel_content_brief_id'=>$briefId],
-            ['%d','%s','%s','%s','%s'],
+            ['%d', '%s', '%s', '%s', '%s', '%s', '%s'],
             ['%d']
         );
+    }
+
+    /**
+     * @param array<string, mixed> $source
+     * @return array<string, mixed>
+     */
+    private function sanitizePostedSiteSettings(array $source): array
+    {
+        return [
+            'template_id' => isset($source['site_settings_template_id']) ? max(0, (int) $source['site_settings_template_id']) : 0,
+            'provider_name' => 'dataforseo',
+            'min_search_volume' => isset($source['site_settings_min_search_volume']) ? max(0, (int) $source['site_settings_min_search_volume']) : 0,
+            'max_search_volume' => isset($source['site_settings_max_search_volume']) && $source['site_settings_max_search_volume'] !== ''
+                ? max(0, (int) $source['site_settings_max_search_volume'])
+                : null,
+            'max_keyword_difficulty' => isset($source['site_settings_max_keyword_difficulty']) ? max(0, min(100, (int) $source['site_settings_max_keyword_difficulty'])) : 100,
+            'preferred_keyword_type' => isset($source['site_settings_preferred_keyword_type']) ? sanitize_text_field((string) wp_unslash($source['site_settings_preferred_keyword_type'])) : '',
+            'content_briefs_per_run' => isset($source['site_settings_content_briefs_per_run']) ? max(1, min(10, (int) $source['site_settings_content_briefs_per_run'])) : 3,
+            'prefer_low_difficulty' => !empty($source['site_settings_prefer_low_difficulty']),
+            'allow_low_volume' => !empty($source['site_settings_allow_low_volume']),
+            'selection_notes' => isset($source['site_settings_selection_notes']) ? sanitize_textarea_field((string) wp_unslash($source['site_settings_selection_notes'])) : '',
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     * @return array<string, mixed>
+     */
+    private function buildRemoteSiteSettingsPayload(array $settings): array
+    {
+        $payload = [
+            'provider_name' => 'dataforseo',
+            'min_search_volume' => (int) ($settings['min_search_volume'] ?? 0),
+            'max_search_volume' => $settings['max_search_volume'] ?? null,
+            'max_keyword_difficulty' => (int) ($settings['max_keyword_difficulty'] ?? 100),
+            'preferred_keyword_type' => (string) ($settings['preferred_keyword_type'] ?? ''),
+            'content_briefs_per_run' => (int) ($settings['content_briefs_per_run'] ?? 3),
+            'prefer_low_difficulty' => !empty($settings['prefer_low_difficulty']),
+            'allow_low_volume' => !empty($settings['allow_low_volume']),
+            'selection_notes' => (string) ($settings['selection_notes'] ?? ''),
+        ];
+
+        if (!empty($settings['template_id'])) {
+            $payload['template_id'] = (int) $settings['template_id'];
+        }
+
+        if ($payload['preferred_keyword_type'] === '') {
+            unset($payload['preferred_keyword_type']);
+        }
+
+        return $payload;
     }
 
     /** @param array<string,mixed> $payload @return list<string> */

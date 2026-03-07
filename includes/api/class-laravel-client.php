@@ -231,6 +231,39 @@ final class LaravelClient
     }
 
     /**
+     * @return array<string, mixed>
+     */
+    public function getSiteSettings(int $siteId): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($siteId): array {
+            return $this->apiClient->request('GET', '/api/sites/' . $siteId . '/settings', [], null, [], true, 20);
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    public function updateSiteSettings(int $siteId, array $payload): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {
+            return $this->apiClient->request(
+                'PATCH',
+                '/api/sites/' . $siteId . '/settings',
+                [],
+                $payload,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */

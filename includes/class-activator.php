@@ -39,6 +39,9 @@ final class Activator
         add_option('seoauto_owner_platform_user_id', '1', '', 'no');
         add_option('seoauto_site_profile_description', '', '', 'no');
         add_option('seoauto_site_profile_taste', '', '', 'no');
+        add_option('seoauto_site_location_code', 2840, '', 'no');
+        add_option('seoauto_site_location_name', 'United States', '', 'no');
+        add_option('seoauto_site_seo_settings', [], '', 'no');
         add_option('seoauto_excluded_change_audit_pages', '', '', 'no');
         add_option(
             'seoauto_features',

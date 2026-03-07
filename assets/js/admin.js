@@ -210,11 +210,62 @@
       });
   }
 
+  function initPostPickers() {
+    document.querySelectorAll(".seoauto-post-picker").forEach(function (picker) {
+      if (picker.getAttribute("data-init") === "1") return;
+      picker.setAttribute("data-init", "1");
+
+      var hiddenInput = picker.querySelector('input[type="hidden"]');
+      var display = picker.querySelector(".seoauto-post-picker-display");
+      var dropdown = picker.querySelector(".seoauto-post-picker-dropdown");
+      var search = picker.querySelector(".seoauto-post-picker-search");
+
+      if (!hiddenInput || !display || !dropdown || !search) return;
+
+      display.addEventListener("click", function () {
+        document.querySelectorAll(".seoauto-post-picker-dropdown.is-open").forEach(function (openDropdown) {
+          if (openDropdown !== dropdown) openDropdown.classList.remove("is-open");
+        });
+        dropdown.classList.toggle("is-open");
+        if (dropdown.classList.contains("is-open")) search.focus();
+      });
+
+      search.addEventListener("input", function () {
+        var query = search.value.toLowerCase().trim();
+        picker.querySelectorAll(".seoauto-post-picker-option").forEach(function (option) {
+          var title = (option.getAttribute("data-post-title") || "").toLowerCase();
+          var type = (option.getAttribute("data-post-type") || "").toLowerCase();
+          option.style.display = !query || title.indexOf(query) !== -1 || type.indexOf(query) !== -1 ? "" : "none";
+        });
+      });
+
+      picker.querySelectorAll(".seoauto-post-picker-option").forEach(function (option) {
+        option.addEventListener("click", function () {
+          hiddenInput.value = option.getAttribute("data-post-id") || "";
+          display.textContent = option.getAttribute("data-post-title") || "Select a post or page";
+          dropdown.classList.remove("is-open");
+        });
+      });
+    });
+
+    document.addEventListener("click", function (event) {
+      if (!event.target.closest(".seoauto-post-picker")) {
+        document.querySelectorAll(".seoauto-post-picker-dropdown.is-open").forEach(function (dropdown) {
+          dropdown.classList.remove("is-open");
+        });
+      }
+    });
+  }
+
   // Run on DOM ready
   if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", initAllFilterBars);
+    document.addEventListener("DOMContentLoaded", function () {
+      initAllFilterBars();
+      initPostPickers();
+    });
   } else {
     initAllFilterBars();
+    initPostPickers();
   }
 
   // ─── 2. Progression Timeline Toggle ────────────────────────────────────────

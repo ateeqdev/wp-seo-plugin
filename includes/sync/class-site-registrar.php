@@ -167,7 +167,7 @@ final class SiteRegistrar
     }
 
     /**
-     * @return array{description:string,taste:string}
+     * @return array{description:string,taste:string,locations:array<int,array<string,int|string>>}
      */
     private function collectSiteProfile(): array
     {
@@ -194,9 +194,20 @@ final class SiteRegistrar
             $taste = 'Use a clear, factual, SEO-first writing style: concise headings, plain language, and actionable recommendations.';
         }
 
+        $locationName = trim((string) get_option('seoauto_site_location_name', 'United States'));
+        if ($locationName === '') {
+            $locationName = 'United States';
+        }
+
         return [
             'description' => $description,
             'taste' => $taste,
+            'locations' => [[
+                'location_type' => 'primary',
+                'location_code' => (int) get_option('seoauto_site_location_code', 2840),
+                'location_name' => $locationName,
+                'priority' => 0,
+            ]],
         ];
     }
 
@@ -215,5 +226,38 @@ final class SiteRegistrar
         if ($taste !== '') {
             update_option('seoauto_site_profile_taste', $taste, false);
         }
+
+        $locations = isset($response['locations']) && is_array($response['locations']) ? $response['locations'] : [];
+        if (!empty($locations) && is_array($locations[0])) {
+            $primaryLocation = $locations[0];
+            update_option('seoauto_site_location_code', (int) ($primaryLocation['location_code'] ?? 2840), false);
+            update_option('seoauto_site_location_name', sanitize_text_field((string) ($primaryLocation['location_name'] ?? 'United States')), false);
+        }
+
+        if (isset($response['site_settings']) && is_array($response['site_settings'])) {
+            update_option('seoauto_site_seo_settings', $this->sanitizeSiteSettingsPayload($response['site_settings']), false);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $settings
+     * @return array<string, mixed>
+     */
+    public function sanitizeSiteSettingsPayload(array $settings): array
+    {
+        return [
+            'template_id' => isset($settings['template_id']) ? (int) $settings['template_id'] : 0,
+            'template_name' => sanitize_text_field((string) ($settings['template_name'] ?? '')),
+            'provider_name' => sanitize_text_field((string) ($settings['provider_name'] ?? 'dataforseo')),
+            'domain_rating' => isset($settings['domain_rating']) ? (int) $settings['domain_rating'] : null,
+            'min_search_volume' => isset($settings['min_search_volume']) ? (int) $settings['min_search_volume'] : 0,
+            'max_search_volume' => ($settings['max_search_volume'] ?? null) !== null ? (int) $settings['max_search_volume'] : null,
+            'max_keyword_difficulty' => isset($settings['max_keyword_difficulty']) ? (int) $settings['max_keyword_difficulty'] : 100,
+            'preferred_keyword_type' => sanitize_text_field((string) ($settings['preferred_keyword_type'] ?? '')),
+            'content_briefs_per_run' => isset($settings['content_briefs_per_run']) ? (int) $settings['content_briefs_per_run'] : 3,
+            'prefer_low_difficulty' => !empty($settings['prefer_low_difficulty']),
+            'allow_low_volume' => !empty($settings['allow_low_volume']),
+            'selection_notes' => sanitize_textarea_field((string) ($settings['selection_notes'] ?? '')),
+        ];
     }
 }

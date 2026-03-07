@@ -49,7 +49,19 @@ final class BriefSyncer
                 $row = [
                     'laravel_content_brief_id' => (int) $brief['id'],
                     'payload' => JsonHelper::encode($brief),
+                    'brief_title' => sanitize_text_field((string) ($brief['brief_title'] ?? '')),
+                    'focus_keyword' => sanitize_text_field((string) ($brief['focus_keyword'] ?? '')),
+                    'keyword_type' => sanitize_text_field((string) ($brief['keyword_type'] ?? '')),
+                    'search_volume' => isset($brief['search_volume']) ? (int) $brief['search_volume'] : null,
+                    'keyword_difficulty' => isset($brief['keyword_difficulty']) ? (int) $brief['keyword_difficulty'] : null,
+                    'topic_priority_score' => isset($brief['topic_priority_score']) ? (int) $brief['topic_priority_score'] : null,
+                    'strategy_template_name' => sanitize_text_field((string) ($brief['strategy_template_name'] ?? '')),
+                    'primary_subreddit' => sanitize_text_field((string) ($brief['primary_subreddit'] ?? '')),
                     'article_status' => sanitize_text_field((string) ($brief['article_status'] ?? 'unlinked')),
+                    'linked_wp_post_id' => isset($brief['linked_wp_post_id']) ? (int) $brief['linked_wp_post_id'] : null,
+                    'linked_wp_post_title' => sanitize_text_field((string) ($brief['linked_wp_post_title'] ?? '')),
+                    'linked_wp_post_type' => sanitize_text_field((string) ($brief['linked_wp_post_type'] ?? '')),
+                    'linked_wp_post_url' => esc_url_raw((string) ($brief['linked_wp_post_url'] ?? '')),
                     'synced_at' => current_time('mysql'),
                     'updated_at' => current_time('mysql'),
                 ];
@@ -66,7 +78,7 @@ final class BriefSyncer
                         $table,
                         $row,
                         ['laravel_content_brief_id' => (int) $brief['id']],
-                        ['%d', '%s', '%s', '%s', '%s'],
+                        ['%d', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s'],
                         ['%d']
                     );
                 } else {
@@ -75,7 +87,7 @@ final class BriefSyncer
                     $wpdb->insert( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
                         $table,
                         $row,
-                        ['%d', '%s', '%s', '%s', '%s', '%s', '%s']
+                        ['%d', '%s', '%s', '%s', '%s', '%d', '%d', '%d', '%s', '%s', '%s', '%d', '%s', '%s', '%s', '%s', '%s', '%s']
                     );
                 }
             }
