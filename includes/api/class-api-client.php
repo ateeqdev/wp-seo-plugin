@@ -264,6 +264,12 @@ final class ApiClient
         curl_setopt($curl, CURLOPT_HTTPHEADER, $headers);
         curl_setopt($curl, CURLOPT_SSL_VERIFYPEER, $sslVerify);
         curl_setopt($curl, CURLOPT_SSL_VERIFYHOST, $sslVerify ? 2 : 0);
+
+        $resolve = $this->buildLocalResolve($host, $url);
+        if ($resolve !== null) {
+            curl_setopt($curl, CURLOPT_RESOLVE, [$resolve]);
+        }
+
         curl_setopt(
             $curl,
             CURLOPT_HEADERFUNCTION,
@@ -322,6 +328,18 @@ final class ApiClient
             'cookies' => [],
             'filename' => null,
         ];
+    }
+
+    private function buildLocalResolve(string $host, string $url): ?string
+    {
+        if (!in_array($host, ['app.seoworkerai.com', 'automatedseolaravel.com'], true)) {
+            return null;
+        }
+
+        $scheme = strtolower((string) wp_parse_url($url, PHP_URL_SCHEME));
+        $port = $scheme === 'http' ? 80 : 443;
+
+        return sprintf('%s:%d:%s', $host, $port, '127.0.0.1');
     }
 
     /**

@@ -31,7 +31,13 @@ final class HealthChecker
         }
 
         try {
-            return $this->client->health($siteId);
+            $response = $this->client->health($siteId);
+
+            if (isset($response['billing']) && is_array($response['billing'])) {
+                update_option('seoauto_billing', SiteRegistrar::sanitizeBillingPayload($response['billing']), false);
+            }
+
+            return $response;
         } catch (\Throwable $exception) {
             $this->logger->warning('health_check_failed', [
                 'entity_type' => 'site',

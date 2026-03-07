@@ -1,12 +1,12 @@
 <?php
 /**
- * Plugin Name: SEO Automation Connector
- * Plugin URI: https://example.com
- * Description: Connects WordPress to a Laravel SEO automation backend for autonomous SEO execution.
+ * Plugin Name: SEOWorkerAI.com
+ * Plugin URI: https://seoworkerai.com/
+ * Description: Connects WordPress to SEOWorkerAI.com for SEO automation, content briefs, change execution, and analytics-backed recommendations.
  * Version: 2.0.0
- * Author: SEO Automation
+ * Author: SEOWorkerAI.com
  * License: GPL-2.0-or-later
- * Text Domain: seo-automation-connector
+ * Text Domain: seoworkerai
  */
 
 declare(strict_types=1);
@@ -20,7 +20,7 @@ define('SEOAUTO_PLUGIN_FILE', __FILE__);
 define('SEOAUTO_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SEOAUTO_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('SEOAUTO_DB_VERSION', '1.2.2');
-define('SEOAUTO_LARAVEL_BASE_URL', 'https://automatedseolaravel.com/');
+define('SEOAUTO_LARAVEL_BASE_URL', 'https://app.seoworkerai.com/');
 
 require_once SEOAUTO_PLUGIN_DIR . 'includes/class-autoloader.php';
 require_once SEOAUTO_PLUGIN_DIR . 'includes/class-activator.php';

@@ -561,7 +561,7 @@ final class MenuRegistrar
 
     public function registerMenu(): void
     {
-        add_menu_page('SEO Automation', 'SEO Automation', 'manage_options', 'seoauto', [$this, 'renderSettingsPage'], 'dashicons-performance', 80);
+        add_menu_page('SEOWorkerAI', 'SEOWorkerAI', 'manage_options', 'seoauto', [$this, 'renderSettingsPage'], 'dashicons-performance', 80);
         add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto', [$this, 'renderSettingsPage']);
         add_submenu_page('seoauto', 'Change Center', 'Change Center', 'manage_options', 'seoauto-logs', [$this, 'renderLogsPage']);
         add_submenu_page('seoauto', 'Action Items', 'Action Items', 'manage_options', 'seoauto-action-items', [$this, 'renderActionItemsPage']);
@@ -616,6 +616,8 @@ final class MenuRegistrar
         }
         $siteSeoSettings = get_option('seoauto_site_seo_settings', []);
         if (!is_array($siteSeoSettings)) $siteSeoSettings = [];
+        $billing = get_option('seoauto_billing', []);
+        if (!is_array($billing)) $billing = [];
         $siteSettingTemplates = [];
         $availableLocations = $this->getAvailableLocationOptions();
         $domainRatingCheckedAt = !empty($siteSeoSettings['domain_rating_checked_at'])
@@ -636,6 +638,10 @@ final class MenuRegistrar
                 if (isset($settingsResponse['settings']) && is_array($settingsResponse['settings'])) {
                     $siteSeoSettings = $this->siteRegistrar->sanitizeSiteSettingsPayload($settingsResponse['settings']);
                     update_option('seoauto_site_seo_settings', $siteSeoSettings, false);
+                }
+                if (isset($settingsResponse['billing']) && is_array($settingsResponse['billing'])) {
+                    $billing = \SEOAutomation\Connector\Sync\SiteRegistrar::sanitizeBillingPayload($settingsResponse['billing']);
+                    update_option('seoauto_billing', $billing, false);
                 }
                 $siteSettingTemplates = isset($settingsResponse['templates']) && is_array($settingsResponse['templates']) ? $settingsResponse['templates'] : [];
                 if (isset($settingsResponse['locations']) && is_array($settingsResponse['locations'])) {
@@ -663,7 +669,7 @@ final class MenuRegistrar
         }
         ?>
         <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('SEO Automation', 'seoauto', 'Manage your site\'s SEO automation preferences and integrations.'); ?>
+            <?php $this->renderAdminShellHeader('SEOWorkerAI', 'seoauto', 'Manage your site SEO automation preferences, billing, and integrations.'); ?>
 
             <?php $this->renderNotice($notice); ?>
 
@@ -692,6 +698,7 @@ final class MenuRegistrar
                     <div class="seoauto-stat"><span>User Sync</span><strong><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i', $lastUserSync) : 'Never'); ?></strong></div>
                     <div class="seoauto-stat"><span>Brief Sync</span><strong><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i', $lastBriefSync) : 'Never'); ?></strong></div>
                     <div class="seoauto-stat"><span>Google Connection</span><strong><?php echo esc_html($isConnected ? 'Connected' . ($oauthProvider !== '' ? ' (' . $oauthProvider . ')' : '') : 'Not connected'); ?></strong></div>
+                    <div class="seoauto-stat"><span>Billing</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Paid'); ?></strong></div>
                 </div>
             </div>
 
@@ -879,9 +886,31 @@ final class MenuRegistrar
 
                 <!-- Google Connection -->
                 <section class="seoauto-card">
+                    <div class="seoauto-card-head">
+                        <h2>Billing</h2>
+                        <?php if (!empty($billing['payment_url'])) : ?>
+                            <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Pay Now</a>
+                        <?php endif; ?>
+                    </div>
+                    <div class="seoauto-kv-list" style="margin-bottom:16px;">
+                        <div><span>Status</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Active'); ?></strong></div>
+                        <div><span>Plan</span><strong><?php echo esc_html((string) ($billing['plan_name'] ?? 'SEOWorkerAI Starter')); ?></strong></div>
+                        <div><span>Price</span><strong><?php echo esc_html('$' . number_format((float) ($billing['plan_price'] ?? 60), 2) . '/month'); ?></strong></div>
+                    </div>
+                    <?php if (!empty($billing['payment_required'])) : ?>
+                        <p class="seoauto-muted" style="margin:0 0 16px;">Registration, site description, taste, and domain rating remain available. Google OAuth and paid SEO automation stay blocked until payment is completed.</p>
+                    <?php endif; ?>
+
+                    <hr style="border:none;border-top:1px solid var(--gray-200);margin:16px 0;">
+
                     <h2>Google Integration</h2>
 
-                    <?php if (!$isConnected) : ?>
+                    <?php if (!empty($billing['payment_required'])) : ?>
+                        <p class="seoauto-muted" style="margin:0 0 12px;">Payment is required before Google Search Console and Analytics can be connected.</p>
+                        <?php if (!empty($billing['payment_url'])) : ?>
+                            <a class="seoauto-google-cta" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Pay Now to Unlock Google Integration</a>
+                        <?php endif; ?>
+                    <?php elseif (!$isConnected) : ?>
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:16px;">
                             <?php wp_nonce_field('seoauto_start_oauth'); ?>
                             <input type="hidden" name="action" value="seoauto_start_oauth">

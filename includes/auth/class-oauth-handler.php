@@ -7,6 +7,7 @@ namespace SEOAutomation\Connector\Auth;
 use RuntimeException;
 use SEOAutomation\Connector\API\LaravelClient;
 use SEOAutomation\Connector\Sync\HealthChecker;
+use SEOAutomation\Connector\Sync\SiteRegistrar;
 use SEOAutomation\Connector\Utils\Logger;
 
 final class OAuthHandler
@@ -41,6 +42,9 @@ final class OAuthHandler
         ];
 
         $response = $this->client->initializeGoogleOAuth($payload);
+        if (isset($response['billing']) && is_array($response['billing'])) {
+            update_option('seoauto_billing', SiteRegistrar::sanitizeBillingPayload($response['billing']), false);
+        }
         $oauthUrl = isset($response['oauth_url']) ? esc_url_raw((string) $response['oauth_url']) : '';
 
         if ($oauthUrl === '') {

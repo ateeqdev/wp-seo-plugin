@@ -30,6 +30,7 @@ $options = [
     'seoauto_site_location_code',
     'seoauto_site_location_name',
     'seoauto_site_seo_settings',
+    'seoauto_billing',
     'seoauto_features',
     'seoauto_db_version',
     'seoauto_adapter_priority',

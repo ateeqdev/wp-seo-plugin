@@ -247,6 +247,10 @@ final class SiteRegistrar
 
             update_option('seoauto_site_seo_settings', $settings, false);
         }
+
+        if (isset($response['billing']) && is_array($response['billing'])) {
+            update_option('seoauto_billing', self::sanitizeBillingPayload($response['billing']), false);
+        }
     }
 
     /**
@@ -269,6 +273,26 @@ final class SiteRegistrar
             'prefer_low_difficulty' => !empty($settings['prefer_low_difficulty']),
             'allow_low_volume' => !empty($settings['allow_low_volume']),
             'selection_notes' => sanitize_textarea_field((string) ($settings['selection_notes'] ?? '')),
+        ];
+    }
+
+    /**
+     * @param array<string, mixed> $billing
+     * @return array<string, mixed>
+     */
+    public static function sanitizeBillingPayload(array $billing): array
+    {
+        return [
+            'status' => sanitize_text_field((string) ($billing['status'] ?? 'payment_required')),
+            'payment_required' => !empty($billing['payment_required']),
+            'plan_name' => sanitize_text_field((string) ($billing['plan_name'] ?? '')),
+            'plan_slug' => sanitize_text_field((string) ($billing['plan_slug'] ?? '')),
+            'plan_price' => isset($billing['plan_price']) ? (float) $billing['plan_price'] : 0.0,
+            'billing_starts_at' => sanitize_text_field((string) ($billing['billing_starts_at'] ?? '')),
+            'billing_expires_at' => sanitize_text_field((string) ($billing['billing_expires_at'] ?? '')),
+            'payment_url' => esc_url_raw((string) ($billing['payment_url'] ?? '')),
+            'quota_limits' => isset($billing['quota_limits']) && is_array($billing['quota_limits']) ? $billing['quota_limits'] : [],
+            'quota_usage' => isset($billing['quota_usage']) && is_array($billing['quota_usage']) ? $billing['quota_usage'] : [],
         ];
     }
 
