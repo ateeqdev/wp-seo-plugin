@@ -128,7 +128,7 @@ final class MenuRegistrar
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoworkerai_revoke_oauth');
         try {
-            $reason = isset($_POST['revocation_reason']) ? sanitize_text_field((string) $_POST['revocation_reason']) : '';
+            $reason = isset($_POST['revocation_reason']) ? sanitize_text_field((string) wp_unslash($_POST['revocation_reason'])) : '';
             $this->client->revokeGoogleOAuth($reason !== '' ? ['revocation_reason' => $reason] : []);
             $notice = 'oauth_revoke_ok';
         } catch (\Throwable $e) {
@@ -227,14 +227,14 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoworkerai_update_task');
-        $taskId = isset($_POST['task_id']) ? (int) $_POST['task_id'] : 0;
+        $taskId = isset($_POST['task_id']) ? (int) wp_unslash($_POST['task_id']) : 0;
         if ($taskId <= 0) {
             wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-schedules', 'seoworkerai_notice' => 'task_update_failed'], admin_url('admin.php')));
             exit;
         }
         try {
             $isEnabled = !empty($_POST['is_enabled']);
-            $delayMinutes = isset($_POST['delay_minutes']) ? max(0, (int) $_POST['delay_minutes']) : 0;
+            $delayMinutes = isset($_POST['delay_minutes']) ? max(0, (int) wp_unslash($_POST['delay_minutes'])) : 0;
             $this->client->updateTaskConfig($taskId, ['is_enabled' => $isEnabled, 'delay_minutes' => $delayMinutes]);
             $notice = 'task_update_ok';
         } catch (\Throwable $e) {
@@ -249,18 +249,18 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoworkerai_schedule_task');
-        $taskId = isset($_POST['task_id']) ? (int) $_POST['task_id'] : 0;
+        $taskId = isset($_POST['task_id']) ? (int) wp_unslash($_POST['task_id']) : 0;
         if ($taskId <= 0) {
             wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-schedules', 'seoworkerai_notice' => 'task_schedule_failed'], admin_url('admin.php')));
             exit;
         }
         $payload = [];
-        $scheduledFor = isset($_POST['scheduled_for']) ? sanitize_text_field((string) $_POST['scheduled_for']) : '';
+        $scheduledFor = isset($_POST['scheduled_for']) ? sanitize_text_field((string) wp_unslash($_POST['scheduled_for'])) : '';
         if ($scheduledFor !== '') {
             $ts = strtotime($scheduledFor);
             if ($ts !== false) $payload['scheduled_for'] = gmdate('c', $ts);
         }
-        $inputJson = isset($_POST['input_params_json']) ? trim((string) $_POST['input_params_json']) : '';
+        $inputJson = isset($_POST['input_params_json']) ? trim((string) wp_unslash($_POST['input_params_json'])) : '';
         if ($inputJson !== '') {
             $decoded = json_decode($inputJson, true);
             if (is_array($decoded)) $payload['input_params'] = $decoded;
@@ -280,9 +280,9 @@ final class MenuRegistrar
     {
         if (!current_user_can('edit_posts')) wp_die('Unauthorized');
         check_admin_referer('seoworkerai_link_brief');
-        $briefId = isset($_POST['brief_id']) ? (int) $_POST['brief_id'] : 0;
-        $postId  = isset($_POST['wp_post_id']) ? (int) $_POST['wp_post_id'] : 0;
-        $articleStatus = isset($_POST['article_status']) ? sanitize_text_field((string) $_POST['article_status']) : 'drafted';
+        $briefId = isset($_POST['brief_id']) ? (int) wp_unslash($_POST['brief_id']) : 0;
+        $postId  = isset($_POST['wp_post_id']) ? (int) wp_unslash($_POST['wp_post_id']) : 0;
+        $articleStatus = isset($_POST['article_status']) ? sanitize_text_field((string) wp_unslash($_POST['article_status'])) : 'drafted';
         if (!in_array($articleStatus, ['drafted', 'published'], true)) $articleStatus = 'drafted';
         $siteId = (int) get_option('seoworkerai_site_id', 0);
         if ($briefId <= 0 || $postId <= 0 || $siteId <= 0) {
@@ -338,7 +338,7 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoworkerai_delete_local_errors');
-        $severity = isset($_POST['severity']) ? sanitize_text_field((string) $_POST['severity']) : 'all';
+        $severity = isset($_POST['severity']) ? sanitize_text_field((string) wp_unslash($_POST['severity'])) : 'all';
         $allowed = ['all', 'error', 'warning'];
         if (!in_array($severity, $allowed, true)) $severity = 'all';
         global $wpdb;
@@ -360,7 +360,7 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoworkerai_apply_action');
-        $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
+        $actionId = isset($_POST['action_id']) ? (int) wp_unslash($_POST['action_id']) : 0;
         if ($actionId > 0) {
             \SEOWorkerAI\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 50);
             $this->actionRepository->markQueued($actionId);
@@ -374,7 +374,7 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoworkerai_revert_action');
-        $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
+        $actionId = isset($_POST['action_id']) ? (int) wp_unslash($_POST['action_id']) : 0;
         $notice = 'action_revert_failed';
         if ($actionId > 0) {
             try {
@@ -408,7 +408,7 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoworkerai_edit_action_payload');
-        $actionId     = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
+        $actionId     = isset($_POST['action_id']) ? (int) wp_unslash($_POST['action_id']) : 0;
         $payloadJson  = isset($_POST['payload_json']) ? (string) wp_unslash($_POST['payload_json']) : '';
         $payloadFields = isset($_POST['payload_fields']) && is_array($_POST['payload_fields']) ? wp_unslash($_POST['payload_fields']) : [];
         $payload = json_decode($payloadJson, true);
@@ -541,8 +541,8 @@ final class MenuRegistrar
         check_admin_referer('seoworkerai_update_action_item');
         global $wpdb;
         $table  = $wpdb->prefix . 'seoworkerai_action_items';
-        $itemId = isset($_POST['item_id']) ? (int) $_POST['item_id'] : 0;
-        $status = isset($_POST['status']) ? sanitize_text_field((string) $_POST['status']) : 'open';
+        $itemId = isset($_POST['item_id']) ? (int) wp_unslash($_POST['item_id']) : 0;
+        $status = isset($_POST['status']) ? sanitize_text_field((string) wp_unslash($_POST['status'])) : 'open';
         $valid  = ['open', 'in_progress', 'resolved'];
         if ($itemId > 0 && in_array($status, $valid, true)) {
             $wpdb->update( // phpcs:ignore
@@ -2302,8 +2302,22 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
 
-        if (isset($_GET['status'])) { // phpcs:ignore
-            $result   = $this->oauthHandler->handleCallback($_GET); // phpcs:ignore
+        if (isset($_GET['status'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            $query = map_deep(wp_unslash($_GET), 'sanitize_text_field'); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            $nonce = isset($query['seoworkerai_oauth_nonce']) ? (string) $query['seoworkerai_oauth_nonce'] : '';
+
+            if ($nonce === '' || !wp_verify_nonce($nonce, 'seoworkerai_oauth_callback')) {
+                $result = [
+                    'status' => 'failed',
+                    'scopes' => [],
+                    'error' => 'Invalid OAuth callback nonce.',
+                ];
+                update_option('seoworkerai_oauth_status', 'failed', false);
+                update_option('seoworkerai_oauth_last_error', (string) $result['error'], false);
+            } else {
+                $result = $this->oauthHandler->handleCallback($query);
+            }
+
             $status   = sanitize_text_field((string)($result['status'] ?? 'failed'));
             $scopes   = isset($result['scopes']) && is_array($result['scopes']) ? $result['scopes'] : [];
             $error    = sanitize_text_field((string)($result['error'] ?? ''));
@@ -2660,7 +2674,7 @@ final class MenuRegistrar
 
     private function resolveActionRedirectPage(): string
     {
-        $returnPage = isset($_POST['return_page']) ? sanitize_text_field((string)$_POST['return_page']) : ''; // phpcs:ignore
+        $returnPage = isset($_POST['return_page']) ? sanitize_text_field((string) wp_unslash($_POST['return_page'])) : '';
         return in_array($returnPage, ['seoworkerai-logs','seoworkerai-action-items'], true) ? $returnPage : 'seoworkerai-logs';
     }
 

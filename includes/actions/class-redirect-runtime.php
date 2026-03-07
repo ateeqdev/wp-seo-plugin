@@ -20,8 +20,17 @@ final class RedirectRuntime
         global $wpdb;
         $table = $wpdb->prefix . 'seoworkerai_redirects';
 
-        $currentUrl = (is_ssl() ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
+        $host = isset($_SERVER['HTTP_HOST']) ? sanitize_text_field((string) wp_unslash($_SERVER['HTTP_HOST'])) : '';
+        $requestUri = isset($_SERVER['REQUEST_URI']) ? (string) wp_unslash($_SERVER['REQUEST_URI']) : '';
+        if ($host === '' || $requestUri === '') {
+            return;
+        }
+
+        $currentUrl = (is_ssl() ? 'https://' : 'http://') . $host . $requestUri;
         $currentUrl = rtrim(esc_url_raw($currentUrl), '/');
+        if ($currentUrl === '') {
+            return;
+        }
 
         $row = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $wpdb->prepare("SELECT * FROM {$table} WHERE source_url = %s", $currentUrl)

@@ -37,7 +37,11 @@ final class OAuthHandler
         }
 
         $payload = [
-            'return_url' => admin_url('admin.php?page=seoworkerai-oauth-callback'),
+            'return_url' => add_query_arg(
+                'seoworkerai_oauth_nonce',
+                wp_create_nonce('seoworkerai_oauth_callback'),
+                admin_url('admin.php?page=seoworkerai-oauth-callback')
+            ),
             'scopes' => array_values(array_filter(array_map('sanitize_text_field', $scopes))),
         ];
 
