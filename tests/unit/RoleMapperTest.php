@@ -7,9 +7,9 @@ use SEOAutomation\Connector\Sync\RoleMapper;
 
 final class RoleMapperTest extends TestCase
 {
-    public function testAdministratorMapsToAdminContractRole(): void
+    public function testAdministratorMapsToOwnerContractRole(): void
     {
-        self::assertSame(RoleMapper::ADMIN, RoleMapper::mapWordPressRole('administrator'));
+        self::assertSame(RoleMapper::OWNER, RoleMapper::mapWordPressRole('administrator'));
     }
 
     public function testEditorialRolesMapToEditorContractRole(): void
@@ -30,5 +30,12 @@ final class RoleMapperTest extends TestCase
     {
         self::assertSame(RoleMapper::VIEWER, RoleMapper::mapWordPressRole('custom_role'));
         self::assertSame(RoleMapper::VIEWER, RoleMapper::mapWordPressRole(null));
+    }
+
+    public function testRoleArrayUsesHighestPriorityRole(): void
+    {
+        self::assertSame(RoleMapper::OWNER, RoleMapper::mapWordPressRoles(['subscriber', 'administrator']));
+        self::assertSame(RoleMapper::EDITOR, RoleMapper::mapWordPressRoles(['subscriber', 'editor']));
+        self::assertSame(RoleMapper::VIEWER, RoleMapper::mapWordPressRoles(['subscriber', 'customer']));
     }
 }

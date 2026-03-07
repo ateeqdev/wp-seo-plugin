@@ -104,16 +104,10 @@ final class SiteRegistrar
         ]);
 
         $mapped = [];
-        $ownerAssigned = false;
 
         foreach ($users as $user) {
             $roles = is_array($user->roles) ? $user->roles : [];
-            $mappedRole = RoleMapper::mapWordPressRole((string) ($roles[0] ?? ''));
-
-            if (!$ownerAssigned && $mappedRole === RoleMapper::ADMIN) {
-                $mappedRole = RoleMapper::OWNER;
-                $ownerAssigned = true;
-            }
+            $mappedRole = RoleMapper::mapWordPressRoles($roles);
 
             $mapped[] = [
                 'name' => (string) $user->display_name,
@@ -121,10 +115,6 @@ final class SiteRegistrar
                 'platform_user_id' => (string) $user->ID,
                 'role' => $mappedRole,
             ];
-        }
-
-        if (!$ownerAssigned && !empty($mapped)) {
-            $mapped[0]['role'] = RoleMapper::OWNER;
         }
 
         return $mapped;

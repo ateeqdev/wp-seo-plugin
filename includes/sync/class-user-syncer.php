@@ -32,15 +32,9 @@ final class UserSyncer
         ]);
 
         $payloadUsers = [];
-        $ownerAssigned = false;
         foreach ($users as $user) {
             $roles = is_array($user->roles) ? $user->roles : [];
-            $mappedRole = RoleMapper::mapWordPressRole((string) ($roles[0] ?? ''));
-
-            if (!$ownerAssigned && $mappedRole === RoleMapper::ADMIN) {
-                $mappedRole = RoleMapper::OWNER;
-                $ownerAssigned = true;
-            }
+            $mappedRole = RoleMapper::mapWordPressRoles($roles);
 
             $payloadUsers[] = [
                 'name' => (string) $user->display_name,
@@ -48,10 +42,6 @@ final class UserSyncer
                 'platform_user_id' => (string) $user->ID,
                 'role' => $mappedRole,
             ];
-        }
-
-        if (!$ownerAssigned && !empty($payloadUsers)) {
-            $payloadUsers[0]['role'] = RoleMapper::OWNER;
         }
 
         $payload = [
