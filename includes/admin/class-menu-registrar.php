@@ -777,10 +777,11 @@ final class MenuRegistrar
                                 <label for="seoauto-site-settings-domain-rating">Domain Rating</label>
                                 <input
                                     id="seoauto-site-settings-domain-rating"
-                                    type="text"
-                                    value="<?php echo esc_attr(array_key_exists('domain_rating', $siteSeoSettings) && $siteSeoSettings['domain_rating'] !== null ? (string) $siteSeoSettings['domain_rating'] : 'Not available yet'); ?>"
-                                    readonly
-                                    disabled
+                                    type="number"
+                                    min="0"
+                                    max="100"
+                                    name="site_settings_domain_rating"
+                                    value="<?php echo esc_attr((string) ($siteSeoSettings['domain_rating'] ?? 0)); ?>"
                                 >
                             </div>
                             <div class="seoauto-form-field">
@@ -2469,6 +2470,7 @@ final class MenuRegistrar
         return [
             'template_id' => isset($source['site_settings_template_id']) ? max(0, (int) $source['site_settings_template_id']) : 0,
             'provider_name' => 'dataforseo',
+            'domain_rating' => isset($source['site_settings_domain_rating']) ? max(0, min(100, (int) $source['site_settings_domain_rating'])) : 0,
             'min_search_volume' => isset($source['site_settings_min_search_volume']) ? max(0, (int) $source['site_settings_min_search_volume']) : 0,
             'max_search_volume' => isset($source['site_settings_max_search_volume']) && $source['site_settings_max_search_volume'] !== ''
                 ? max(0, (int) $source['site_settings_max_search_volume'])
@@ -2490,6 +2492,7 @@ final class MenuRegistrar
     {
         $payload = [
             'provider_name' => 'dataforseo',
+            'domain_rating' => isset($settings['domain_rating']) ? (int) $settings['domain_rating'] : 0,
             'min_search_volume' => (int) ($settings['min_search_volume'] ?? 0),
             'max_search_volume' => $settings['max_search_volume'] ?? null,
             'max_keyword_difficulty' => (int) ($settings['max_keyword_difficulty'] ?? 100),
