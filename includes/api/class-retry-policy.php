@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\API;
+namespace SEOWorkerAI\Connector\API;
 
 use RuntimeException;
 

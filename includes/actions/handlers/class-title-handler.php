@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions\Handlers;
+namespace SEOWorkerAI\Connector\Actions\Handlers;
 
 use Exception;
-use SEOAutomation\Connector\SEO\InterfaceSeoAdapter;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\SEO\InterfaceSeoAdapter;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class TitleHandler extends AbstractActionHandler
 {
@@ -69,7 +69,7 @@ final class TitleHandler extends AbstractActionHandler
         }
 
         $mirrored = false;
-        if ((bool) get_option('seoauto_mirror_post_title', false)) {
+        if ((bool) get_option('seoworkerai_mirror_post_title', false)) {
             wp_update_post([
                 'ID' => $postId,
                 'post_title' => $title,
@@ -116,7 +116,7 @@ final class TitleHandler extends AbstractActionHandler
         if ($previousSeoTitle !== '') {
             $this->adapter->setTitle($postId, $previousSeoTitle);
         } else {
-            delete_post_meta($postId, '_seoauto_title');
+            delete_post_meta($postId, '_seoworkerai_title');
             delete_post_meta($postId, '_yoast_wpseo_title');
             delete_post_meta($postId, '_rank_math_title');
             delete_post_meta($postId, 'rank_math_title');

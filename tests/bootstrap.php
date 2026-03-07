@@ -8,7 +8,7 @@ if (is_readable($autoload)) {
 }
 
 require_once __DIR__ . '/../includes/class-autoloader.php';
-if (!defined('SEOAUTO_PLUGIN_DIR')) {
-    define('SEOAUTO_PLUGIN_DIR', realpath(__DIR__ . '/..') . '/');
+if (!defined('SEOWORKERAI_PLUGIN_DIR')) {
+    define('SEOWORKERAI_PLUGIN_DIR', realpath(__DIR__ . '/..') . '/');
 }
-SEOAutomation\Connector\Autoloader::register();
+SEOWorkerAI\Connector\Autoloader::register();

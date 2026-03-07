@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions\Handlers;
+namespace SEOWorkerAI\Connector\Actions\Handlers;
 
 use Exception;
-use SEOAutomation\Connector\Content\HtmlMutator;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Content\HtmlMutator;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class InternalLinkHandler extends AbstractActionHandler
 {

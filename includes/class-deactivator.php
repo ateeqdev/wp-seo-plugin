@@ -2,16 +2,16 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector;
+namespace SEOWorkerAI\Connector;
 
-use SEOAutomation\Connector\API\ApiClient;
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\API\RetryPolicy;
-use SEOAutomation\Connector\Auth\OwnershipProofStore;
-use SEOAutomation\Connector\Auth\SiteTokenManager;
-use SEOAutomation\Connector\Auth\TokenEncryption;
-use SEOAutomation\Connector\Queue\QueueManager;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\API\ApiClient;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\API\RetryPolicy;
+use SEOWorkerAI\Connector\Auth\OwnershipProofStore;
+use SEOWorkerAI\Connector\Auth\SiteTokenManager;
+use SEOWorkerAI\Connector\Auth\TokenEncryption;
+use SEOWorkerAI\Connector\Queue\QueueManager;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class Deactivator
 {
@@ -19,16 +19,16 @@ final class Deactivator
     {
         self::attemptVerifiedSiteDeactivation();
         QueueManager::unscheduleRecurringJobs();
-        $timestamp = wp_next_scheduled('seoauto_auto_register_site');
+        $timestamp = wp_next_scheduled('seoworkerai_auto_register_site');
         if ($timestamp) {
-            wp_unschedule_event($timestamp, 'seoauto_auto_register_site');
+            wp_unschedule_event($timestamp, 'seoworkerai_auto_register_site');
         }
         flush_rewrite_rules();
     }
 
     private static function attemptVerifiedSiteDeactivation(): void
     {
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
         if ($siteId <= 0) {
             return;
         }
@@ -57,7 +57,7 @@ final class Deactivator
             OwnershipProofStore::put($challengeId, $challengeToken, $expiresAt);
             $proofUrl = add_query_arg(
                 ['challenge_id' => $challengeId],
-                home_url('/wp-json/seoauto/v1/ownership-proof')
+                home_url('/wp-json/seoworkerai/v1/ownership-proof')
             );
             $client->deactivateSite($siteId, [
                 'ownership_challenge_id' => $challengeId,

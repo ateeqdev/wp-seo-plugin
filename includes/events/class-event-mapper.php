@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Events;
+namespace SEOWorkerAI\Connector\Events;
 
-use SEOAutomation\Connector\SEO\SeoDetector;
+use SEOWorkerAI\Connector\SEO\SeoDetector;
 
 final class EventMapper
 {

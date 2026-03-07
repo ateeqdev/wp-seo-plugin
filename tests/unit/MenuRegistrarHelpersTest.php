@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use SEOAutomation\Connector\Admin\MenuRegistrar;
+use SEOWorkerAI\Connector\Admin\MenuRegistrar;
 
 final class MenuRegistrarHelpersTest extends TestCase
 {

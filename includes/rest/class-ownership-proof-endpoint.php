@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\REST;
+namespace SEOWorkerAI\Connector\REST;
 
-use SEOAutomation\Connector\Auth\OwnershipProofStore;
+use SEOWorkerAI\Connector\Auth\OwnershipProofStore;
 
 final class OwnershipProofEndpoint
 {
     public function registerRoutes(): void
     {
-        foreach (['seoauto/v1', 'seo-platform/v1'] as $namespace) {
+        foreach (['seoworkerai/v1', 'seo-platform/v1'] as $namespace) {
             register_rest_route($namespace, '/ownership-proof', [
                 'methods' => 'GET',
                 'callback' => [$this, 'showProof'],
@@ -28,12 +28,12 @@ final class OwnershipProofEndpoint
 
         $challengeId = sanitize_text_field((string) $request->get_param('challenge_id'));
         if ($challengeId === '') {
-            return new \WP_Error('seoauto_missing_challenge', 'Missing challenge_id.', ['status' => 422]);
+            return new \WP_Error('seoworkerai_missing_challenge', 'Missing challenge_id.', ['status' => 422]);
         }
 
         $token = OwnershipProofStore::getToken($challengeId);
         if ($token === null || $token === '') {
-            return new \WP_Error('seoauto_challenge_not_found', 'Challenge not found.', ['status' => 404]);
+            return new \WP_Error('seoworkerai_challenge_not_found', 'Challenge not found.', ['status' => 404]);
         }
 
         $response = new \WP_REST_Response($token, 200);

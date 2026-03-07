@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\REST;
+namespace SEOWorkerAI\Connector\REST;
 
-use SEOAutomation\Connector\Auth\SiteTokenManager;
+use SEOWorkerAI\Connector\Auth\SiteTokenManager;
 
 final class MediaEndpoint
 {
@@ -17,7 +17,7 @@ final class MediaEndpoint
 
     public function registerRoutes(): void
     {
-        foreach (['seoauto/v1', 'seo-platform/v1'] as $namespace) {
+        foreach (['seoworkerai/v1', 'seo-platform/v1'] as $namespace) {
             register_rest_route($namespace, '/media', [
                 'methods' => 'GET',
                 'callback' => [$this, 'listMedia'],
@@ -31,7 +31,7 @@ final class MediaEndpoint
         $token = (string) $request->get_header('X-Site-Token');
 
         if (!$this->tokenManager->verifyInboundToken($token)) {
-            return new \WP_Error('seoauto_unauthorized', 'Invalid site token.', ['status' => 401]);
+            return new \WP_Error('seoworkerai_unauthorized', 'Invalid site token.', ['status' => 401]);
         }
 
         return true;

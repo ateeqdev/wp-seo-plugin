@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions\Handlers;
+namespace SEOWorkerAI\Connector\Actions\Handlers;
 
 use Exception;
-use SEOAutomation\Connector\SEO\InterfaceSeoAdapter;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\SEO\InterfaceSeoAdapter;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class CanonicalHandler extends AbstractActionHandler
 {
@@ -50,7 +50,7 @@ final class CanonicalHandler extends AbstractActionHandler
             throw new Exception('No canonical_url provided.');
         }
 
-        if ((bool) get_option('seoauto_canonical_same_host', true)) {
+        if ((bool) get_option('seoworkerai_canonical_same_host', true)) {
             $siteHost = (string) wp_parse_url(home_url(), PHP_URL_HOST);
             $canonicalHost = (string) wp_parse_url($canonical, PHP_URL_HOST);
 

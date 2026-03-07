@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use SEOAutomation\Connector\Content\HtmlMutator;
+use SEOWorkerAI\Connector\Content\HtmlMutator;
 
 final class HtmlMutatorTest extends TestCase
 {

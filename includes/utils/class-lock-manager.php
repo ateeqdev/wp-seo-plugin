@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Utils;
+namespace SEOWorkerAI\Connector\Utils;
 
 final class LockManager
 {
@@ -22,7 +22,7 @@ final class LockManager
     {
         global $wpdb;
 
-        $table = $wpdb->prefix . 'seoauto_locks';
+        $table = $wpdb->prefix . 'seoworkerai_locks';
         $owner = wp_generate_uuid4();
         $expiresAt = gmdate('Y-m-d H:i:s', time() + $ttl);
 
@@ -76,7 +76,7 @@ final class LockManager
         }
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_locks';
+        $table = $wpdb->prefix . 'seoworkerai_locks';
 
         $wpdb->delete( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $table,

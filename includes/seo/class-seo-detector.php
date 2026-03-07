@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\SEO;
+namespace SEOWorkerAI\Connector\SEO;
 
 final class SeoDetector
 {
@@ -29,7 +29,7 @@ final class SeoDetector
 
     public function getAdapter(): InterfaceSeoAdapter
     {
-        $forced = (string) get_option('seoauto_primary_seo_adapter', 'auto');
+        $forced = (string) get_option('seoworkerai_primary_seo_adapter', 'auto');
         if ($forced !== 'auto') {
             return $this->createAdapter($forced);
         }
@@ -42,7 +42,7 @@ final class SeoDetector
             return $this->createAdapter($this->detected[0]);
         }
 
-        $priority = (array) get_option('seoauto_adapter_priority', ['yoast', 'rankmath', 'aioseo']);
+        $priority = (array) get_option('seoworkerai_adapter_priority', ['yoast', 'rankmath', 'aioseo']);
         foreach ($priority as $candidate) {
             if (in_array($candidate, $this->detected, true)) {
                 return $this->createAdapter($candidate);

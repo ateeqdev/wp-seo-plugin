@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions;
+namespace SEOWorkerAI\Connector\Actions;
 
-use SEOAutomation\Connector\Queue\QueueManager;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Queue\QueueManager;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class ActionReceiver
 {
@@ -79,7 +79,7 @@ final class ActionReceiver
             ];
         }
 
-        $applicationMode = (string) get_option('seoauto_change_application_mode', 'dangerous_auto_apply');
+        $applicationMode = (string) get_option('seoworkerai_change_application_mode', 'dangerous_auto_apply');
         $isDangerousMode = $applicationMode === 'dangerous_auto_apply';
         $autoApply = !empty($action['auto_apply']);
 

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Sync;
+namespace SEOWorkerAI\Connector\Sync;
 
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\Utils\JsonHelper;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\Utils\JsonHelper;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class BriefSyncer
 {
@@ -22,12 +22,12 @@ final class BriefSyncer
 
     public function sync(): void
     {
-        $features = (array) get_option('seoauto_features', []);
+        $features = (array) get_option('seoworkerai_features', []);
         if (!(bool) ($features['sync_briefs'] ?? true)) {
             return;
         }
 
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
         if ($siteId <= 0) {
             return;
         }
@@ -39,7 +39,7 @@ final class BriefSyncer
                 : [];
 
             global $wpdb;
-            $table = $wpdb->prefix . 'seoauto_briefs';
+            $table = $wpdb->prefix . 'seoworkerai_briefs';
 
             foreach ($briefs as $brief) {
                 if (!is_array($brief) || empty($brief['id'])) {
@@ -93,7 +93,7 @@ final class BriefSyncer
                 }
             }
 
-            update_option('seoauto_last_brief_sync', time(), false);
+            update_option('seoworkerai_last_brief_sync', time(), false);
         } catch (\Throwable $exception) {
             $this->logger->warning('brief_sync_failed', [
                 'entity_type' => 'site',

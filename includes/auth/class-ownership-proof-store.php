@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Auth;
+namespace SEOWorkerAI\Connector\Auth;
 
 final class OwnershipProofStore
 {
@@ -11,7 +11,7 @@ final class OwnershipProofStore
      */
     private static function all(): array
     {
-        $raw = get_option('seoauto_ownership_challenges', []);
+        $raw = get_option('seoworkerai_ownership_challenges', []);
 
         return is_array($raw) ? $raw : [];
     }
@@ -23,7 +23,7 @@ final class OwnershipProofStore
             'token' => $challengeToken,
             'expires_at' => $expiresAtTs,
         ];
-        update_option('seoauto_ownership_challenges', $store, false);
+        update_option('seoworkerai_ownership_challenges', $store, false);
     }
 
     public static function getToken(string $challengeId): ?string
@@ -49,7 +49,7 @@ final class OwnershipProofStore
     {
         $store = self::all();
         unset($store[$challengeId]);
-        update_option('seoauto_ownership_challenges', $store, false);
+        update_option('seoworkerai_ownership_challenges', $store, false);
     }
 
     public static function cleanup(): void
@@ -68,6 +68,6 @@ final class OwnershipProofStore
             }
         }
 
-        update_option('seoauto_ownership_challenges', $store, false);
+        update_option('seoworkerai_ownership_challenges', $store, false);
     }
 }

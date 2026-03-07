@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Utils;
+namespace SEOWorkerAI\Connector\Utils;
 
 final class Logger
 {
@@ -11,7 +11,7 @@ final class Logger
      */
     public function debug(string $eventName, array $context = [], string $source = 'executor'): void
     {
-        if (!((bool) get_option('seoauto_debug_enabled', false))) {
+        if (!((bool) get_option('seoworkerai_debug_enabled', false))) {
             return;
         }
 
@@ -65,12 +65,12 @@ final class Logger
         ];
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_logs';
+        $table = $wpdb->prefix . 'seoworkerai_logs';
 
         $inserted = $wpdb->insert($table, $entry); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 
         if ($inserted === false) {
-            error_log('[seoauto][' . $severity . '] ' . $eventName . ' ' . JsonHelper::encode($context)); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
+            error_log('[seoworkerai][' . $severity . '] ' . $eventName . ' ' . JsonHelper::encode($context)); // phpcs:ignore WordPress.PHP.DevelopmentFunctions.error_log_error_log
         }
     }
 }

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use SEOAutomation\Connector\Auth\OAuthCallbackState;
+use SEOWorkerAI\Connector\Auth\OAuthCallbackState;
 
 final class OAuthCallbackStateTest extends TestCase
 {

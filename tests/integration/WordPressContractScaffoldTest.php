@@ -3,10 +3,10 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\REST\ActionsEndpoint;
-use SEOAutomation\Connector\REST\MediaEndpoint;
-use SEOAutomation\Connector\REST\PagesEndpoint;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\REST\ActionsEndpoint;
+use SEOWorkerAI\Connector\REST\MediaEndpoint;
+use SEOWorkerAI\Connector\REST\PagesEndpoint;
 
 final class WordPressContractScaffoldTest extends TestCase
 {

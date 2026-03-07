@@ -2,13 +2,13 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Auth;
+namespace SEOWorkerAI\Connector\Auth;
 
 use RuntimeException;
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\Sync\HealthChecker;
-use SEOAutomation\Connector\Sync\SiteRegistrar;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\Sync\HealthChecker;
+use SEOWorkerAI\Connector\Sync\SiteRegistrar;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class OAuthHandler
 {
@@ -30,20 +30,20 @@ final class OAuthHandler
      */
     public function beginGoogleOAuth(array $scopes = ['search_console', 'analytics']): string
     {
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
 
         if ($siteId <= 0) {
             throw new RuntimeException('Site must be registered before OAuth.');
         }
 
         $payload = [
-            'return_url' => admin_url('admin.php?page=seoauto-oauth-callback'),
+            'return_url' => admin_url('admin.php?page=seoworkerai-oauth-callback'),
             'scopes' => array_values(array_filter(array_map('sanitize_text_field', $scopes))),
         ];
 
         $response = $this->client->initializeGoogleOAuth($payload);
         if (isset($response['billing']) && is_array($response['billing'])) {
-            update_option('seoauto_billing', SiteRegistrar::sanitizeBillingPayload($response['billing']), false);
+            update_option('seoworkerai_billing', SiteRegistrar::sanitizeBillingPayload($response['billing']), false);
         }
         $oauthUrl = isset($response['oauth_url']) ? esc_url_raw((string) $response['oauth_url']) : '';
 
@@ -51,8 +51,8 @@ final class OAuthHandler
             throw new RuntimeException('Laravel did not return an oauth_url.');
         }
 
-        update_option('seoauto_oauth_status', 'in_progress', false);
-        update_option('seoauto_oauth_last_error', '', false);
+        update_option('seoworkerai_oauth_status', 'in_progress', false);
+        update_option('seoworkerai_oauth_last_error', '', false);
 
         return $oauthUrl;
     }
@@ -66,18 +66,18 @@ final class OAuthHandler
         $state = OAuthCallbackState::fromQuery($query);
 
         if ($state->isSuccess()) {
-            update_option('seoauto_oauth_status', 'active', false);
-            update_option('seoauto_oauth_provider', $state->getProvider(), false);
-            update_option('seoauto_oauth_scopes', $state->getScopes(), false);
-            update_option('seoauto_oauth_connected_at', time(), false);
-            update_option('seoauto_oauth_last_error', '', false);
+            update_option('seoworkerai_oauth_status', 'active', false);
+            update_option('seoworkerai_oauth_provider', $state->getProvider(), false);
+            update_option('seoworkerai_oauth_scopes', $state->getScopes(), false);
+            update_option('seoworkerai_oauth_connected_at', time(), false);
+            update_option('seoworkerai_oauth_last_error', '', false);
 
             $health = $this->healthChecker->check();
 
             if (empty($health['connected'])) {
-                update_option('seoauto_oauth_status', 'error', false);
+                update_option('seoworkerai_oauth_status', 'error', false);
                 $message = 'OAuth completed but health check failed.';
-                update_option('seoauto_oauth_last_error', $message, false);
+                update_option('seoworkerai_oauth_last_error', $message, false);
 
                 return [
                     'status' => 'error',
@@ -99,10 +99,10 @@ final class OAuthHandler
 
         $error = $state->getError() !== '' ? $state->getError() : 'OAuth callback indicated failure.';
 
-        update_option('seoauto_oauth_status', 'failed', false);
-        update_option('seoauto_oauth_provider', $state->getProvider(), false);
-        update_option('seoauto_oauth_scopes', [], false);
-        update_option('seoauto_oauth_last_error', $error, false);
+        update_option('seoworkerai_oauth_status', 'failed', false);
+        update_option('seoworkerai_oauth_provider', $state->getProvider(), false);
+        update_option('seoworkerai_oauth_scopes', [], false);
+        update_option('seoworkerai_oauth_last_error', $error, false);
 
         $this->logger->warning('oauth_callback_failed', [
             'entity_type' => 'oauth',

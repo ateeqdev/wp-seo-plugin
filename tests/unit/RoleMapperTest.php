@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use SEOAutomation\Connector\Sync\RoleMapper;
+use SEOWorkerAI\Connector\Sync\RoleMapper;
 
 final class RoleMapperTest extends TestCase
 {

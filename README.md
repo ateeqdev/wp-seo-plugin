@@ -1,4 +1,4 @@
-# SEO Automation Connector
+# SEOWorkerAI Connector
 
 WordPress plugin that integrates with a Laravel SEO automation backend.
 
@@ -21,7 +21,7 @@ WordPress plugin that integrates with a Laravel SEO automation backend.
 
 ## Installation
 
-1. Copy plugin to `wp-content/plugins/seo-automation-connector`.
+1. Copy plugin to `wp-content/plugins/seoworkerai`.
 2. Activate in WordPress admin.
 3. Configure Laravel base URL in plugin settings.
 4. Register and connect the site.

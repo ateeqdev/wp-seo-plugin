@@ -6,7 +6,7 @@
     var bar = document.getElementById(barId);
     if (!bar) return;
 
-    var form = bar.querySelector(".seoauto-filter-form");
+    var form = bar.querySelector(".seoworkerai-filter-form");
     if (!form) return;
 
     // Build label maps from data attribute on bar
@@ -28,7 +28,7 @@
     function getCheckedValues() {
       var result = {};
       bar
-        .querySelectorAll(".seoauto-filter-option input[type=checkbox]:checked")
+        .querySelectorAll(".seoworkerai-filter-option input[type=checkbox]:checked")
         .forEach(function (cb) {
           var dropdown = cb.closest("[data-filter-key]");
           if (!dropdown) return;
@@ -40,7 +40,7 @@
     }
 
     function refreshChips() {
-      var chipRow = bar.querySelector(".seoauto-active-chips");
+      var chipRow = bar.querySelector(".seoworkerai-active-chips");
       if (!chipRow) return;
       var checked = getCheckedValues();
       var html = "";
@@ -49,7 +49,7 @@
           var label =
             labelMaps[key] && labelMaps[key][val] ? labelMaps[key][val] : val;
           html +=
-            '<span class="seoauto-active-chip">' +
+            '<span class="seoworkerai-active-chip">' +
             "<span>" +
             esc(label) +
             "</span>" +
@@ -63,18 +63,18 @@
       });
       chipRow.innerHTML = html;
       // Update filter btn badge counts
-      bar.querySelectorAll(".seoauto-filter-dropdown").forEach(function (dd) {
+      bar.querySelectorAll(".seoworkerai-filter-dropdown").forEach(function (dd) {
         var key = dd.getAttribute("data-filter-key");
         var vals = checked[key] || [];
-        var btn = dd.querySelector(".seoauto-filter-btn");
+        var btn = dd.querySelector(".seoworkerai-filter-btn");
         if (!btn) return;
         btn.classList.toggle("has-active", vals.length > 0);
-        var countEl = btn.querySelector(".seoauto-filter-count");
+        var countEl = btn.querySelector(".seoworkerai-filter-count");
         if (vals.length > 0) {
           if (!countEl) {
             countEl = document.createElement("span");
-            countEl.className = "seoauto-filter-count";
-            var chevron = btn.querySelector(".seoauto-filter-chevron");
+            countEl.className = "seoworkerai-filter-count";
+            var chevron = btn.querySelector(".seoworkerai-filter-chevron");
             btn.insertBefore(countEl, chevron);
           }
           countEl.textContent = vals.length;
@@ -87,7 +87,7 @@
     function submitForm() {
       // Before submitting, sync checkboxes → hidden inputs
       // Remove all existing hidden filter inputs
-      var hiddenContainer = bar.querySelector(".seoauto-filter-hidden-inputs");
+      var hiddenContainer = bar.querySelector(".seoworkerai-filter-hidden-inputs");
       if (hiddenContainer) hiddenContainer.innerHTML = "";
       var checked = getCheckedValues();
       Object.keys(checked).forEach(function (key) {
@@ -105,14 +105,14 @@
     // Toggle panels
     bar.addEventListener("click", function (e) {
       // Filter button toggle
-      var filterBtn = e.target.closest(".seoauto-filter-btn");
+      var filterBtn = e.target.closest(".seoworkerai-filter-btn");
       if (filterBtn) {
         e.preventDefault();
-        var dropdown = filterBtn.closest(".seoauto-filter-dropdown");
+        var dropdown = filterBtn.closest(".seoworkerai-filter-dropdown");
         var panel = dropdown
-          ? dropdown.querySelector(".seoauto-filter-panel")
+          ? dropdown.querySelector(".seoworkerai-filter-panel")
           : null;
-        var allPanels = bar.querySelectorAll(".seoauto-filter-panel");
+        var allPanels = bar.querySelectorAll(".seoworkerai-filter-panel");
         allPanels.forEach(function (p) {
           if (p !== panel) p.style.display = "none";
         });
@@ -146,7 +146,7 @@
       }
 
       // Clear-one
-      var clrBtn = e.target.closest(".seoauto-filter-clear-one");
+      var clrBtn = e.target.closest(".seoworkerai-filter-clear-one");
       if (clrBtn) {
         e.preventDefault();
         var ckey = clrBtn.getAttribute("data-filter-key");
@@ -166,15 +166,15 @@
       }
 
       // Close on outside click
-      if (!e.target.closest(".seoauto-filter-dropdown")) {
-        bar.querySelectorAll(".seoauto-filter-panel").forEach(function (p) {
+      if (!e.target.closest(".seoworkerai-filter-dropdown")) {
+        bar.querySelectorAll(".seoworkerai-filter-panel").forEach(function (p) {
           p.style.display = "none";
         });
       }
     });
 
     // Apply button submits the form
-    bar.querySelectorAll(".seoauto-filter-apply").forEach(function (btn) {
+    bar.querySelectorAll(".seoworkerai-filter-apply").forEach(function (btn) {
       btn.addEventListener("click", function (e) {
         e.preventDefault();
         submitForm();
@@ -182,12 +182,12 @@
     });
 
     // Post search filter inside panel
-    bar.querySelectorAll(".seoauto-filter-post-search").forEach(function (inp) {
+    bar.querySelectorAll(".seoworkerai-filter-post-search").forEach(function (inp) {
       inp.addEventListener("input", function () {
         var q = inp.value.toLowerCase().trim();
         inp
-          .closest(".seoauto-filter-panel")
-          .querySelectorAll(".seoauto-filter-option")
+          .closest(".seoworkerai-filter-panel")
+          .querySelectorAll(".seoworkerai-filter-option")
           .forEach(function (opt) {
             var lbl = (
               opt.getAttribute("data-label") || opt.textContent
@@ -204,26 +204,26 @@
   // Init all chip filter bars on the page after DOM is ready
   function initAllFilterBars() {
     document
-      .querySelectorAll(".seoauto-chip-filter-bar")
+      .querySelectorAll(".seoworkerai-chip-filter-bar")
       .forEach(function (bar) {
         if (bar.id) initChipFilterBar(bar.id);
       });
   }
 
   function initPostPickers() {
-    document.querySelectorAll(".seoauto-post-picker").forEach(function (picker) {
+    document.querySelectorAll(".seoworkerai-post-picker").forEach(function (picker) {
       if (picker.getAttribute("data-init") === "1") return;
       picker.setAttribute("data-init", "1");
 
       var hiddenInput = picker.querySelector('input[type="hidden"]');
-      var display = picker.querySelector(".seoauto-post-picker-display");
-      var dropdown = picker.querySelector(".seoauto-post-picker-dropdown");
-      var search = picker.querySelector(".seoauto-post-picker-search");
+      var display = picker.querySelector(".seoworkerai-post-picker-display");
+      var dropdown = picker.querySelector(".seoworkerai-post-picker-dropdown");
+      var search = picker.querySelector(".seoworkerai-post-picker-search");
 
       if (!hiddenInput || !display || !dropdown || !search) return;
 
       display.addEventListener("click", function () {
-        document.querySelectorAll(".seoauto-post-picker-dropdown.is-open").forEach(function (openDropdown) {
+        document.querySelectorAll(".seoworkerai-post-picker-dropdown.is-open").forEach(function (openDropdown) {
           if (openDropdown !== dropdown) openDropdown.classList.remove("is-open");
         });
         dropdown.classList.toggle("is-open");
@@ -232,14 +232,14 @@
 
       search.addEventListener("input", function () {
         var query = search.value.toLowerCase().trim();
-        picker.querySelectorAll(".seoauto-post-picker-option").forEach(function (option) {
+        picker.querySelectorAll(".seoworkerai-post-picker-option").forEach(function (option) {
           var title = (option.getAttribute("data-post-title") || "").toLowerCase();
           var type = (option.getAttribute("data-post-type") || "").toLowerCase();
           option.style.display = !query || title.indexOf(query) !== -1 || type.indexOf(query) !== -1 ? "" : "none";
         });
       });
 
-      picker.querySelectorAll(".seoauto-post-picker-option").forEach(function (option) {
+      picker.querySelectorAll(".seoworkerai-post-picker-option").forEach(function (option) {
         option.addEventListener("click", function () {
           hiddenInput.value = option.getAttribute("data-post-id") || "";
           display.textContent = option.getAttribute("data-post-title") || "Select a post or page";
@@ -249,8 +249,8 @@
     });
 
     document.addEventListener("click", function (event) {
-      if (!event.target.closest(".seoauto-post-picker")) {
-        document.querySelectorAll(".seoauto-post-picker-dropdown.is-open").forEach(function (dropdown) {
+      if (!event.target.closest(".seoworkerai-post-picker")) {
+        document.querySelectorAll(".seoworkerai-post-picker-dropdown.is-open").forEach(function (dropdown) {
           dropdown.classList.remove("is-open");
         });
       }
@@ -258,7 +258,7 @@
   }
 
   function initSiteSettingsTemplatePicker() {
-    var select = document.getElementById("seoauto-site-settings-template-id");
+    var select = document.getElementById("seoworkerai-site-settings-template-id");
     if (!select) return;
 
     var rawConfigs = select.getAttribute("data-template-configs") || "[]";
@@ -275,12 +275,12 @@
     });
 
     var fieldMap = {
-      min_search_volume: document.getElementById("seoauto-site-settings-min-search-volume"),
-      max_search_volume: document.getElementById("seoauto-site-settings-max-search-volume"),
-      max_keyword_difficulty: document.getElementById("seoauto-site-settings-max-keyword-difficulty"),
-      preferred_keyword_type: document.getElementById("seoauto-site-settings-preferred-keyword-type"),
-      content_briefs_per_run: document.getElementById("seoauto-site-settings-content-briefs-per-run"),
-      selection_notes: document.getElementById("seoauto-site-settings-selection-notes"),
+      min_search_volume: document.getElementById("seoworkerai-site-settings-min-search-volume"),
+      max_search_volume: document.getElementById("seoworkerai-site-settings-max-search-volume"),
+      max_keyword_difficulty: document.getElementById("seoworkerai-site-settings-max-keyword-difficulty"),
+      preferred_keyword_type: document.getElementById("seoworkerai-site-settings-preferred-keyword-type"),
+      content_briefs_per_run: document.getElementById("seoworkerai-site-settings-content-briefs-per-run"),
+      selection_notes: document.getElementById("seoworkerai-site-settings-selection-notes"),
       prefer_low_difficulty: document.querySelector('input[name="site_settings_prefer_low_difficulty"]'),
       allow_low_volume: document.querySelector('input[name="site_settings_allow_low_volume"]'),
     };
@@ -301,9 +301,9 @@
   }
 
   function initLocationsTable() {
-    var wrap = document.querySelector(".seoauto-locations-table-wrap");
-    var tbody = document.getElementById("seoauto-locations-body");
-    var addButton = document.getElementById("seoauto-add-location-row");
+    var wrap = document.querySelector(".seoworkerai-locations-table-wrap");
+    var tbody = document.getElementById("seoworkerai-locations-body");
+    var addButton = document.getElementById("seoworkerai-add-location-row");
     if (!wrap || !tbody || !addButton) return;
 
     var rawOptions = wrap.getAttribute("data-location-options") || "[]";
@@ -346,9 +346,9 @@
     }
 
     function syncRow(row) {
-      var select = row.querySelector(".seoauto-location-select");
-      var hiddenName = row.querySelector(".seoauto-location-name");
-      var codeCell = row.querySelector(".seoauto-location-code-cell");
+      var select = row.querySelector(".seoworkerai-location-select");
+      var hiddenName = row.querySelector(".seoworkerai-location-name");
+      var codeCell = row.querySelector(".seoworkerai-location-code-cell");
       if (!select || !hiddenName || !codeCell) return;
 
       var selectedOption = select.options[select.selectedIndex];
@@ -360,24 +360,24 @@
 
     function syncPrimaryState(changedSelect) {
       if (!changedSelect || changedSelect.value !== "primary") return;
-      tbody.querySelectorAll(".seoauto-location-type").forEach(function (select) {
+      tbody.querySelectorAll(".seoworkerai-location-type").forEach(function (select) {
         if (select !== changedSelect) select.value = "secondary";
       });
     }
 
     function ensurePrimary() {
       var foundPrimary = false;
-      tbody.querySelectorAll(".seoauto-location-type").forEach(function (select) {
+      tbody.querySelectorAll(".seoworkerai-location-type").forEach(function (select) {
         if (select.value === "primary") foundPrimary = true;
       });
       if (!foundPrimary) {
-        var firstType = tbody.querySelector(".seoauto-location-type");
+        var firstType = tbody.querySelector(".seoworkerai-location-type");
         if (firstType) firstType.value = "primary";
       }
     }
 
     function reindexRows() {
-      tbody.querySelectorAll(".seoauto-location-row").forEach(function (row, index) {
+      tbody.querySelectorAll(".seoworkerai-location-row").forEach(function (row, index) {
         row.querySelectorAll("select, input").forEach(function (field) {
           var name = field.getAttribute("name") || "";
           field.setAttribute(
@@ -390,24 +390,24 @@
 
     function appendRow(selectedCode, locationType) {
       var row = document.createElement("tr");
-      row.className = "seoauto-location-row";
+      row.className = "seoworkerai-location-row";
       row.innerHTML =
-        '<td><select name="site_locations[0][location_code]" class="seoauto-location-select">' +
+        '<td><select name="site_locations[0][location_code]" class="seoworkerai-location-select">' +
         buildOptions(selectedCode || options[0].code) +
-        '</select><input type="hidden" name="site_locations[0][location_name]" value="" class="seoauto-location-name"></td>' +
-        '<td class="seoauto-location-code-cell"></td>' +
-        '<td><select name="site_locations[0][location_type]" class="seoauto-location-type"><option value="primary">Primary</option><option value="secondary">Secondary</option></select></td>' +
-        '<td><button type="button" class="button-link-delete seoauto-remove-location">Remove</button></td>';
+        '</select><input type="hidden" name="site_locations[0][location_name]" value="" class="seoworkerai-location-name"></td>' +
+        '<td class="seoworkerai-location-code-cell"></td>' +
+        '<td><select name="site_locations[0][location_type]" class="seoworkerai-location-type"><option value="primary">Primary</option><option value="secondary">Secondary</option></select></td>' +
+        '<td><button type="button" class="button-link-delete seoworkerai-remove-location">Remove</button></td>';
       tbody.appendChild(row);
-      row.querySelector(".seoauto-location-type").value =
+      row.querySelector(".seoworkerai-location-type").value =
         locationType || "secondary";
       syncRow(row);
       reindexRows();
       ensurePrimary();
-      syncPrimaryState(row.querySelector(".seoauto-location-type"));
+      syncPrimaryState(row.querySelector(".seoworkerai-location-type"));
     }
 
-    tbody.querySelectorAll(".seoauto-location-row").forEach(syncRow);
+    tbody.querySelectorAll(".seoworkerai-location-row").forEach(syncRow);
     ensurePrimary();
 
     addButton.addEventListener("click", function () {
@@ -415,23 +415,23 @@
     });
 
     tbody.addEventListener("change", function (event) {
-      if (event.target.classList.contains("seoauto-location-select")) {
-        syncRow(event.target.closest(".seoauto-location-row"));
+      if (event.target.classList.contains("seoworkerai-location-select")) {
+        syncRow(event.target.closest(".seoworkerai-location-row"));
       }
-      if (event.target.classList.contains("seoauto-location-type")) {
+      if (event.target.classList.contains("seoworkerai-location-type")) {
         syncPrimaryState(event.target);
         ensurePrimary();
       }
     });
 
     tbody.addEventListener("click", function (event) {
-      var removeButton = event.target.closest(".seoauto-remove-location");
+      var removeButton = event.target.closest(".seoworkerai-remove-location");
       if (!removeButton) return;
 
-      var rows = tbody.querySelectorAll(".seoauto-location-row");
+      var rows = tbody.querySelectorAll(".seoworkerai-location-row");
       if (rows.length <= 1) return;
 
-      removeButton.closest(".seoauto-location-row").remove();
+      removeButton.closest(".seoworkerai-location-row").remove();
       reindexRows();
       ensurePrimary();
     });
@@ -455,7 +455,7 @@
   // ─── 2. Progression Timeline Toggle ────────────────────────────────────────
   // Use document-level delegation so it works regardless of bar scope
   document.addEventListener("click", function (e) {
-    var toggler = e.target.closest(".seoauto-progression-toggle");
+    var toggler = e.target.closest(".seoworkerai-progression-toggle");
     if (!toggler) return;
     e.stopPropagation();
     var targetId = toggler.getAttribute("data-target");
@@ -463,13 +463,13 @@
     if (!subRow) return;
     var isOpen = subRow.style.display === "table-row";
     subRow.style.display = isOpen ? "none" : "table-row";
-    var arrow = toggler.querySelector(".seoauto-prog-arrow");
+    var arrow = toggler.querySelector(".seoworkerai-prog-arrow");
     if (arrow) arrow.textContent = isOpen ? "▸" : "▾";
   });
 
   // ─── "Currently applied" toggle ────────────────────────────────────────────
   document.addEventListener("click", function (e) {
-    var btn = e.target.closest(".seoauto-toggle-current");
+    var btn = e.target.closest(".seoworkerai-toggle-current");
     if (!btn) return;
     var panel = btn.nextElementSibling;
     if (!panel) return;
@@ -481,18 +481,18 @@
   // ─── 5. Inline Edit in Proposed-Change Column ──────────────────────────────
   // Edit/Cancel toggle for inline edit panels embedded in the proposed-change td
   document.addEventListener("click", function (e) {
-    var isEdit = e.target.getAttribute("data-seoauto-edit-toggle") === "1";
-    var isCancel = e.target.getAttribute("data-seoauto-cancel-button") === "1";
+    var isEdit = e.target.getAttribute("data-seoworkerai-edit-toggle") === "1";
+    var isCancel = e.target.getAttribute("data-seoworkerai-cancel-button") === "1";
     if (!isEdit && !isCancel) return;
 
-    var container = e.target.closest(".seoauto-inline-edit-container");
+    var container = e.target.closest(".seoworkerai-inline-edit-container");
     if (!container) return;
 
-    var displayView = container.querySelector(".seoauto-inline-display");
-    var editView = container.querySelector(".seoauto-inline-edit-fields");
-    var editBtn = container.querySelector('[data-seoauto-edit-toggle="1"]');
-    var saveBtn = container.querySelector('[data-seoauto-save-button="1"]');
-    var cancelBtn = container.querySelector('[data-seoauto-cancel-button="1"]');
+    var displayView = container.querySelector(".seoworkerai-inline-display");
+    var editView = container.querySelector(".seoworkerai-inline-edit-fields");
+    var editBtn = container.querySelector('[data-seoworkerai-edit-toggle="1"]');
+    var saveBtn = container.querySelector('[data-seoworkerai-save-button="1"]');
+    var cancelBtn = container.querySelector('[data-seoworkerai-cancel-button="1"]');
 
     if (isEdit) {
       if (displayView) displayView.style.display = "none";
@@ -514,11 +514,11 @@
     var form = e.target;
     if (!form || form.tagName !== "FORM") return;
     var actionInput = form.querySelector('input[name="action"]');
-    if (!actionInput || actionInput.value !== "seoauto_edit_action_payload") return;
+    if (!actionInput || actionInput.value !== "seoworkerai_edit_action_payload") return;
 
     var errors = [];
     var fields = form.querySelectorAll(
-      ".seoauto-inline-edit-fields input[name^='payload_fields'], .seoauto-inline-edit-fields textarea[name^='payload_fields']",
+      ".seoworkerai-inline-edit-fields input[name^='payload_fields'], .seoworkerai-inline-edit-fields textarea[name^='payload_fields']",
     );
 
     fields.forEach(function (field) {
@@ -566,14 +566,14 @@
 
   // ─── 4. Excluded Pages Tag-Chip UI ─────────────────────────────────────────
   function initExclusionTagUI() {
-    var container = document.getElementById("seoauto-exclusion-tag-ui");
+    var container = document.getElementById("seoworkerai-exclusion-tag-ui");
     if (!container) return;
 
-    var searchInp = container.querySelector(".seoauto-excl-search");
-    var dropdown = container.querySelector(".seoauto-excl-dropdown");
-    var chipsWrap = container.querySelector(".seoauto-excl-chips");
-    var hiddenInp = document.getElementById("seoauto-exclusion-hidden");
-    var allOptions = container.querySelectorAll(".seoauto-excl-option");
+    var searchInp = container.querySelector(".seoworkerai-excl-search");
+    var dropdown = container.querySelector(".seoworkerai-excl-dropdown");
+    var chipsWrap = container.querySelector(".seoworkerai-excl-chips");
+    var hiddenInp = document.getElementById("seoworkerai-exclusion-hidden");
+    var allOptions = container.querySelectorAll(".seoworkerai-excl-option");
 
     // Parse current excluded IDs from hidden input
     var selectedIds = {};
@@ -589,7 +589,7 @@
 
     function getLabel(id) {
       var opt = container.querySelector(
-        '.seoauto-excl-option[data-id="' + id + '"]',
+        '.seoworkerai-excl-option[data-id="' + id + '"]',
       );
       return opt ? opt.textContent.trim() : id;
     }
@@ -603,7 +603,7 @@
       chipsWrap.innerHTML = "";
       Object.keys(selectedIds).forEach(function (id) {
         var chip = document.createElement("span");
-        chip.className = "seoauto-active-chip";
+        chip.className = "seoworkerai-active-chip";
         chip.innerHTML =
           "<span>" +
           escHtml(getLabel(id)) +
@@ -634,7 +634,7 @@
     allOptions.forEach(function (opt) {
       var id = opt.getAttribute("data-id");
       opt.classList.toggle("is-selected", !!selectedIds[id]);
-      var checkmark = opt.querySelector(".seoauto-excl-checkmark");
+      var checkmark = opt.querySelector(".seoworkerai-excl-checkmark");
       if (checkmark) checkmark.textContent = selectedIds[id] ? "✓" : "";
     });
 
@@ -658,10 +658,10 @@
 
     container.addEventListener("click", function (e) {
       // Option click → toggle selection
-      var opt = e.target.closest(".seoauto-excl-option");
+      var opt = e.target.closest(".seoworkerai-excl-option");
       if (opt) {
         var id = opt.getAttribute("data-id");
-        var checkmark = opt.querySelector(".seoauto-excl-checkmark");
+        var checkmark = opt.querySelector(".seoworkerai-excl-checkmark");
         if (selectedIds[id]) {
           delete selectedIds[id];
           opt.classList.remove("is-selected");
@@ -681,11 +681,11 @@
         var rid = rmBtn.getAttribute("data-excl-remove");
         delete selectedIds[rid];
         var matchOpt = container.querySelector(
-          '.seoauto-excl-option[data-id="' + rid + '"]',
+          '.seoworkerai-excl-option[data-id="' + rid + '"]',
         );
         if (matchOpt) {
           matchOpt.classList.remove("is-selected");
-          var checkmark = matchOpt.querySelector(".seoauto-excl-checkmark");
+          var checkmark = matchOpt.querySelector(".seoworkerai-excl-checkmark");
           if (checkmark) checkmark.textContent = "";
         }
         syncHidden();

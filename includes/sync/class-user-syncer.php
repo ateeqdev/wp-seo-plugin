@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Sync;
+namespace SEOWorkerAI\Connector\Sync;
 
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class UserSyncer
 {
@@ -21,7 +21,7 @@ final class UserSyncer
 
     public function sync(): void
     {
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
 
         if ($siteId <= 0) {
             return;
@@ -55,7 +55,7 @@ final class UserSyncer
 
         try {
             $this->client->updateSiteRegistration($siteId, $payload);
-            update_option('seoauto_last_user_sync', time(), false);
+            update_option('seoworkerai_last_user_sync', time(), false);
         } catch (\Throwable $exception) {
             $this->logger->warning('user_sync_failed', [
                 'entity_type' => 'site',

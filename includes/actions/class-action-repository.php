@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions;
+namespace SEOWorkerAI\Connector\Actions;
 
-use SEOAutomation\Connector\Utils\JsonHelper;
+use SEOWorkerAI\Connector\Utils\JsonHelper;
 
 final class ActionRepository
 {
@@ -13,7 +13,7 @@ final class ActionRepository
     public function __construct()
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'seoauto_actions';
+        $this->table = $wpdb->prefix . 'seoworkerai_actions';
     }
 
     public function existsByLaravelId(int $laravelActionId): bool
@@ -462,7 +462,7 @@ final class ActionRepository
     public function listChangeLogs(int $laravelActionId = 0, int $limit = 200, array $filters = []): array
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_changes';
+        $table = $wpdb->prefix . 'seoworkerai_changes';
         $where = ['1=1'];
         $params = [];
 
@@ -506,7 +506,7 @@ final class ActionRepository
             return [];
         }
 
-        $table = $wpdb->prefix . 'seoauto_changes';
+        $table = $wpdb->prefix . 'seoworkerai_changes';
         $where = ['laravel_action_id IN (' . implode(',', array_fill(0, count($ids), '%d')) . ')'];
         $params = $ids;
 
@@ -574,7 +574,7 @@ final class ActionRepository
     public function addAdminActionItem(int $laravelActionId, array $payload): void
     {
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_action_items';
+        $table = $wpdb->prefix . 'seoworkerai_action_items';
         $action = $this->findByLaravelId($laravelActionId);
         $payloadTitle = sanitize_text_field((string) ($payload['title'] ?? 'Manual action required'));
         $contextPrefix = '';
@@ -602,7 +602,7 @@ final class ActionRepository
             [
                 'action_id' => isset($action['id']) ? (int) $action['id'] : null,
                 'laravel_action_id' => $laravelActionId,
-                'site_id' => (int) get_option('seoauto_site_id', 0),
+                'site_id' => (int) get_option('seoworkerai_site_id', 0),
                 'title' => sanitize_text_field($itemTitle),
                 'details' => sanitize_textarea_field((string) ($payload['details'] ?? '')),
                 'recommended_value' => sanitize_text_field((string) ($payload['recommended_value'] ?? '')),
@@ -673,7 +673,7 @@ final class ActionRepository
         }
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_changes';
+        $table = $wpdb->prefix . 'seoworkerai_changes';
         $action = $this->findByLaravelId($laravelActionId);
         $actionId = isset($action['id']) ? (int) $action['id'] : null;
 

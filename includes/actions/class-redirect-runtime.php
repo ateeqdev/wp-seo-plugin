@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions;
+namespace SEOWorkerAI\Connector\Actions;
 
 final class RedirectRuntime
 {
@@ -18,7 +18,7 @@ final class RedirectRuntime
         }
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_redirects';
+        $table = $wpdb->prefix . 'seoworkerai_redirects';
 
         $currentUrl = (is_ssl() ? 'https://' : 'http://') . $_SERVER['HTTP_HOST'] . $_SERVER['REQUEST_URI']; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput
         $currentUrl = rtrim(esc_url_raw($currentUrl), '/');

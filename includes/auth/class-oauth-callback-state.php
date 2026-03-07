@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Auth;
+namespace SEOWorkerAI\Connector\Auth;
 
 final class OAuthCallbackState
 {

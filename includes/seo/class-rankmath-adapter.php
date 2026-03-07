@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\SEO;
+namespace SEOWorkerAI\Connector\SEO;
 
 final class RankmathAdapter implements InterfaceSeoAdapter
 {
@@ -109,7 +109,7 @@ final class RankmathAdapter implements InterfaceSeoAdapter
      */
     public function getSchema(int $postId): ?array
     {
-        $json = get_post_meta($postId, '_seoauto_schema_json_ld', true);
+        $json = get_post_meta($postId, '_seoworkerai_schema_json_ld', true);
 
         if (!is_string($json) || $json === '') {
             return null;
@@ -125,7 +125,7 @@ final class RankmathAdapter implements InterfaceSeoAdapter
      */
     public function setSchema(int $postId, array $schema): bool
     {
-        return (bool) update_post_meta($postId, '_seoauto_schema_json_ld', wp_json_encode($schema));
+        return (bool) update_post_meta($postId, '_seoworkerai_schema_json_ld', wp_json_encode($schema));
     }
 
     public function getName(): string
@@ -140,18 +140,18 @@ final class RankmathAdapter implements InterfaceSeoAdapter
     {
         return [
             'og' => [
-                'title' => $this->readFirstMeta($postId, ['rank_math_facebook_title', '_rank_math_facebook_title', '_seoauto_og_title']),
-                'type' => $this->readFirstMeta($postId, ['rank_math_facebook_type', '_rank_math_facebook_type', '_seoauto_og_type']),
-                'image' => $this->readFirstMeta($postId, ['rank_math_facebook_image', '_rank_math_facebook_image', '_seoauto_og_image']),
-                'url' => $this->readFirstMeta($postId, ['rank_math_facebook_url', '_rank_math_facebook_url', '_seoauto_og_url']),
-                'description' => $this->readFirstMeta($postId, ['rank_math_facebook_description', '_rank_math_facebook_description', '_seoauto_og_description']),
+                'title' => $this->readFirstMeta($postId, ['rank_math_facebook_title', '_rank_math_facebook_title', '_seoworkerai_og_title']),
+                'type' => $this->readFirstMeta($postId, ['rank_math_facebook_type', '_rank_math_facebook_type', '_seoworkerai_og_type']),
+                'image' => $this->readFirstMeta($postId, ['rank_math_facebook_image', '_rank_math_facebook_image', '_seoworkerai_og_image']),
+                'url' => $this->readFirstMeta($postId, ['rank_math_facebook_url', '_rank_math_facebook_url', '_seoworkerai_og_url']),
+                'description' => $this->readFirstMeta($postId, ['rank_math_facebook_description', '_rank_math_facebook_description', '_seoworkerai_og_description']),
             ],
             'twitter' => [
-                'card' => $this->readFirstMeta($postId, ['rank_math_twitter_card_type', '_rank_math_twitter_card_type', '_seoauto_twitter_card']),
-                'site' => $this->readFirstMeta($postId, ['rank_math_twitter_site', '_rank_math_twitter_site', '_seoauto_twitter_site']),
-                'title' => $this->readFirstMeta($postId, ['rank_math_twitter_title', '_rank_math_twitter_title', '_seoauto_twitter_title']),
-                'description' => $this->readFirstMeta($postId, ['rank_math_twitter_description', '_rank_math_twitter_description', '_seoauto_twitter_description']),
-                'image' => $this->readFirstMeta($postId, ['rank_math_twitter_image', '_rank_math_twitter_image', '_seoauto_twitter_image']),
+                'card' => $this->readFirstMeta($postId, ['rank_math_twitter_card_type', '_rank_math_twitter_card_type', '_seoworkerai_twitter_card']),
+                'site' => $this->readFirstMeta($postId, ['rank_math_twitter_site', '_rank_math_twitter_site', '_seoworkerai_twitter_site']),
+                'title' => $this->readFirstMeta($postId, ['rank_math_twitter_title', '_rank_math_twitter_title', '_seoworkerai_twitter_title']),
+                'description' => $this->readFirstMeta($postId, ['rank_math_twitter_description', '_rank_math_twitter_description', '_seoworkerai_twitter_description']),
+                'image' => $this->readFirstMeta($postId, ['rank_math_twitter_image', '_rank_math_twitter_image', '_seoworkerai_twitter_image']),
             ],
         ];
     }

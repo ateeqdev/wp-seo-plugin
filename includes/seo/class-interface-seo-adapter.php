@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\SEO;
+namespace SEOWorkerAI\Connector\SEO;
 
 interface InterfaceSeoAdapter
 {

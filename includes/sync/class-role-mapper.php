@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Sync;
+namespace SEOWorkerAI\Connector\Sync;
 
 final class RoleMapper
 {

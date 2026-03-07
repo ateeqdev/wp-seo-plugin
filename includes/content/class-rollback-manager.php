@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Content;
+namespace SEOWorkerAI\Connector\Content;
 
 final class RollbackManager
 {
@@ -27,10 +27,10 @@ final class RollbackManager
             '_aioseo_title',
             '_aioseo_description',
             '_aioseo_canonical_url',
-            '_seoauto_title',
-            '_seoauto_meta_description',
-            '_seoauto_canonical',
-            '_seoauto_schema_json_ld',
+            '_seoworkerai_title',
+            '_seoworkerai_meta_description',
+            '_seoworkerai_canonical',
+            '_seoworkerai_schema_json_ld',
         ];
 
         $meta = [];

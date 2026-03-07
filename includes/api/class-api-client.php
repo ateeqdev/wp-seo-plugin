@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\API;
+namespace SEOWorkerAI\Connector\API;
 
 use RuntimeException;
-use SEOAutomation\Connector\Auth\SiteTokenManager;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Auth\SiteTokenManager;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class ApiClient
 {
@@ -35,10 +35,10 @@ final class ApiClient
         bool $includeToken = true,
         int $timeout = 15
     ): array {
-        $baseUrl = rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/');
+        $baseUrl = rtrim((string) SEOWORKERAI_LARAVEL_BASE_URL, '/');
 
         if ($baseUrl === '') {
-            throw new RuntimeException('seoauto_base_url is not configured.');
+            throw new RuntimeException('seoworkerai_base_url is not configured.');
         }
 
         $url = $baseUrl . '/' . ltrim($path, '/');
@@ -70,7 +70,7 @@ final class ApiClient
             'sslverify' => true,
         ];
 
-        $allowInsecureSsl = (bool) get_option('seoauto_allow_insecure_ssl', false);
+        $allowInsecureSsl = (bool) get_option('seoworkerai_allow_insecure_ssl', false);
         $autoAllowInsecureSsl = $this->shouldAutoDisableSslVerifyForBaseUrl($baseUrl);
         $args['sslverify'] = !($allowInsecureSsl || $autoAllowInsecureSsl);
 
@@ -103,9 +103,9 @@ final class ApiClient
         }
 
         if (is_wp_error($response)) {
-            update_option('seoauto_api_blocked', true, false);
-            update_option('seoauto_api_last_error', $response->get_error_message(), false);
-            update_option('seoauto_api_last_error_at', time(), false);
+            update_option('seoworkerai_api_blocked', true, false);
+            update_option('seoworkerai_api_last_error', $response->get_error_message(), false);
+            update_option('seoworkerai_api_last_error_at', time(), false);
             $this->logger->warning('api_transport_error', [
                 'entity_id' => $path,
                 'error' => $response->get_error_message(),
@@ -127,9 +127,9 @@ final class ApiClient
 
         if ($statusCode >= 400) {
             $message = $this->buildHttpErrorMessage($statusCode, $path, $result['body']);
-            update_option('seoauto_api_blocked', $statusCode >= 500, false);
-            update_option('seoauto_api_last_error', $message, false);
-            update_option('seoauto_api_last_error_at', time(), false);
+            update_option('seoworkerai_api_blocked', $statusCode >= 500, false);
+            update_option('seoworkerai_api_last_error', $message, false);
+            update_option('seoworkerai_api_last_error_at', time(), false);
             $this->logger->warning('api_http_error', [
                 'entity_id' => $path,
                 'error' => $message,
@@ -139,9 +139,9 @@ final class ApiClient
             throw new RuntimeException($message, $statusCode);
         }
 
-        update_option('seoauto_api_blocked', false, false);
-        update_option('seoauto_api_last_error', '', false);
-        update_option('seoauto_api_last_error_at', 0, false);
+        update_option('seoworkerai_api_blocked', false, false);
+        update_option('seoworkerai_api_last_error', '', false);
+        update_option('seoworkerai_api_last_error_at', 0, false);
 
         return $result;
     }
@@ -241,7 +241,7 @@ final class ApiClient
         }
 
         $host = strtolower((string) wp_parse_url($url, PHP_URL_HOST));
-        $expectedHost = strtolower((string) wp_parse_url((string) SEOAUTO_LARAVEL_BASE_URL, PHP_URL_HOST));
+        $expectedHost = strtolower((string) wp_parse_url((string) SEOWORKERAI_LARAVEL_BASE_URL, PHP_URL_HOST));
         if ($host === '' || $expectedHost === '' || $host !== $expectedHost) {
             return null;
         }
@@ -332,7 +332,7 @@ final class ApiClient
 
     private function buildLocalResolve(string $host, string $url): ?string
     {
-        if (!in_array($host, ['app.seoworkerai.com', 'automatedseolaravel.com'], true)) {
+        if (!in_array($host, ['app.seoworkerai.com', 'app.seoworkerai.com'], true)) {
             return null;
         }
 

@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Sync;
+namespace SEOWorkerAI\Connector\Sync;
 
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\Auth\OwnershipProofStore;
-use SEOAutomation\Connector\Auth\SiteTokenManager;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\Auth\OwnershipProofStore;
+use SEOWorkerAI\Connector\Auth\SiteTokenManager;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class SiteRegistrar
 {
@@ -29,7 +29,7 @@ final class SiteRegistrar
      */
     public function registerOrUpdate(bool $fast = false): array
     {
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
         $token = $this->tokenManager->getToken();
 
         $payload = [
@@ -71,7 +71,7 @@ final class SiteRegistrar
                     ? $this->client->registerSiteFast($payload)
                     : $this->client->registerSite($payload);
                 if (!empty($response['site_id'])) {
-                    update_option('seoauto_site_id', (int) $response['site_id'], false);
+                    update_option('seoworkerai_site_id', (int) $response['site_id'], false);
                 }
                 if (!empty($response['api_key'])) {
                     $this->tokenManager->storeToken((string) $response['api_key']);
@@ -159,7 +159,7 @@ final class SiteRegistrar
 
     private function buildOwnershipProofUrl(string $challengeId): string
     {
-        $base = home_url('/wp-json/seoauto/v1/ownership-proof');
+        $base = home_url('/wp-json/seoworkerai/v1/ownership-proof');
 
         return add_query_arg(['challenge_id' => $challengeId], $base);
     }
@@ -174,7 +174,7 @@ final class SiteRegistrar
         $host = wp_parse_url(home_url('/'), PHP_URL_HOST);
         $host = is_string($host) ? trim($host) : '';
 
-        $description = trim((string) get_option('seoauto_site_profile_description', ''));
+        $description = trim((string) get_option('seoworkerai_site_profile_description', ''));
         if ($description === '') {
             if ($tagline !== '') {
                 $description = $tagline;
@@ -187,17 +187,17 @@ final class SiteRegistrar
             }
         }
 
-        $taste = trim((string) get_option('seoauto_site_profile_taste', ''));
+        $taste = trim((string) get_option('seoworkerai_site_profile_taste', ''));
         if ($taste === '') {
             $taste = 'Use a clear, factual, SEO-first writing style: concise headings, plain language, and actionable recommendations.';
         }
 
-        $locations = $this->normalizeLocationsOption(get_option('seoauto_site_locations', []));
+        $locations = $this->normalizeLocationsOption(get_option('seoworkerai_site_locations', []));
         if ($locations === []) {
             $locations = [[
                 'location_type' => 'primary',
-                'location_code' => (int) get_option('seoauto_site_location_code', 2840),
-                'location_name' => trim((string) get_option('seoauto_site_location_name', 'United States')) ?: 'United States',
+                'location_code' => (int) get_option('seoworkerai_site_location_code', 2840),
+                'location_name' => trim((string) get_option('seoworkerai_site_location_name', 'United States')) ?: 'United States',
                 'priority' => 0,
             ]];
         }
@@ -218,26 +218,26 @@ final class SiteRegistrar
         $taste = trim((string) ($response['taste'] ?? ''));
 
         if ($description !== '') {
-            update_option('seoauto_site_profile_description', $description, false);
+            update_option('seoworkerai_site_profile_description', $description, false);
         }
 
         if ($taste !== '') {
-            update_option('seoauto_site_profile_taste', $taste, false);
+            update_option('seoworkerai_site_profile_taste', $taste, false);
         }
 
         $locations = isset($response['locations']) && is_array($response['locations']) ? $response['locations'] : [];
         if (!empty($locations) && is_array($locations[0])) {
             $normalizedLocations = $this->normalizeLocationsOption($locations);
             $primaryLocation = $normalizedLocations[0];
-            update_option('seoauto_site_locations', $normalizedLocations, false);
-            update_option('seoauto_site_location_code', (int) ($primaryLocation['location_code'] ?? 2840), false);
-            update_option('seoauto_site_location_name', sanitize_text_field((string) ($primaryLocation['location_name'] ?? 'United States')), false);
+            update_option('seoworkerai_site_locations', $normalizedLocations, false);
+            update_option('seoworkerai_site_location_code', (int) ($primaryLocation['location_code'] ?? 2840), false);
+            update_option('seoworkerai_site_location_name', sanitize_text_field((string) ($primaryLocation['location_name'] ?? 'United States')), false);
         }
 
         if (isset($response['site_settings']) && is_array($response['site_settings'])) {
-            update_option('seoauto_site_seo_settings', $this->sanitizeSiteSettingsPayload($response['site_settings']), false);
+            update_option('seoworkerai_site_seo_settings', $this->sanitizeSiteSettingsPayload($response['site_settings']), false);
         } elseif (array_key_exists('domain_rating', $response)) {
-            $settings = get_option('seoauto_site_seo_settings', []);
+            $settings = get_option('seoworkerai_site_seo_settings', []);
             if (!is_array($settings)) {
                 $settings = [];
             }
@@ -245,11 +245,11 @@ final class SiteRegistrar
             $settings['domain_rating'] = $response['domain_rating'] !== null ? (int) $response['domain_rating'] : null;
             $settings['domain_rating_checked_at'] = isset($response['domain_rating_checked_at']) ? sanitize_text_field((string) $response['domain_rating_checked_at']) : '';
 
-            update_option('seoauto_site_seo_settings', $settings, false);
+            update_option('seoworkerai_site_seo_settings', $settings, false);
         }
 
         if (isset($response['billing']) && is_array($response['billing'])) {
-            update_option('seoauto_billing', self::sanitizeBillingPayload($response['billing']), false);
+            update_option('seoworkerai_billing', self::sanitizeBillingPayload($response['billing']), false);
         }
     }
 

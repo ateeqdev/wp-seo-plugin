@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Sync;
+namespace SEOWorkerAI\Connector\Sync;
 
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class HealthChecker
 {
@@ -24,7 +24,7 @@ final class HealthChecker
      */
     public function check(): array
     {
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
 
         if ($siteId <= 0) {
             return ['connected' => false];
@@ -34,7 +34,7 @@ final class HealthChecker
             $response = $this->client->health($siteId);
 
             if (isset($response['billing']) && is_array($response['billing'])) {
-                update_option('seoauto_billing', SiteRegistrar::sanitizeBillingPayload($response['billing']), false);
+                update_option('seoworkerai_billing', SiteRegistrar::sanitizeBillingPayload($response['billing']), false);
             }
 
             return $response;

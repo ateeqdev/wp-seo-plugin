@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Events;
+namespace SEOWorkerAI\Connector\Events;
 
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\Utils\JsonHelper;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\Utils\JsonHelper;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class EventDispatcher
 {
@@ -25,7 +25,7 @@ final class EventDispatcher
 
     public function flushQueuedEvents(): void
     {
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
 
         if ($siteId <= 0) {
             return;

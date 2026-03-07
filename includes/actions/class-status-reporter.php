@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions;
+namespace SEOWorkerAI\Connector\Actions;
 
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\Queue\QueueManager;
-use SEOAutomation\Connector\Utils\JsonHelper;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\Queue\QueueManager;
+use SEOWorkerAI\Connector\Utils\JsonHelper;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class StatusReporter
 {
@@ -30,7 +30,7 @@ final class StatusReporter
      */
     public function report(array $action, string $status, array $metadata = [], ?string $errorMessage = null): void
     {
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
         $actionId = (int) ($action['laravel_action_id'] ?? 0);
 
         if ($siteId <= 0 || $actionId <= 0) {

@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\API;
+namespace SEOWorkerAI\Connector\API;
 
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class LaravelClient
 {

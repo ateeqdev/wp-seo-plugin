@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions\Handlers;
+namespace SEOWorkerAI\Connector\Actions\Handlers;
 
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class ProviderConnectionIssueHandler extends AbstractActionHandler
 {
@@ -29,7 +29,7 @@ final class ProviderConnectionIssueHandler extends AbstractActionHandler
             ? (int) $payload['status_code']
             : null;
 
-        $alerts = get_option('seoauto_provider_connection_alerts', []);
+        $alerts = get_option('seoworkerai_provider_connection_alerts', []);
         if (!is_array($alerts)) {
             $alerts = [];
         }
@@ -51,7 +51,7 @@ final class ProviderConnectionIssueHandler extends AbstractActionHandler
         ];
 
         $alerts[$alertKey] = $next;
-        update_option('seoauto_provider_connection_alerts', $alerts, false);
+        update_option('seoworkerai_provider_connection_alerts', $alerts, false);
 
         $this->logger->warning('provider_connection_issue_received', [
             'entity_type' => 'provider',

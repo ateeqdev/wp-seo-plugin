@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Events;
+namespace SEOWorkerAI\Connector\Events;
 
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class EventCollector
 {
@@ -193,14 +193,14 @@ final class EventCollector
 
     private function eventsEnabled(): bool
     {
-        $features = (array) get_option('seoauto_features', []);
+        $features = (array) get_option('seoworkerai_features', []);
 
         return (bool) ($features['send_events'] ?? true);
     }
 
     private function isPostExcludedFromChangeAudit(\WP_Post $post): bool
     {
-        $raw = (string) get_option('seoauto_excluded_change_audit_pages', '');
+        $raw = (string) get_option('seoworkerai_excluded_change_audit_pages', '');
         if (trim($raw) === '') {
             return false;
         }

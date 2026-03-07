@@ -2,15 +2,15 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Queue;
+namespace SEOWorkerAI\Connector\Queue;
 
-use SEOAutomation\Connector\Actions\ActionExecutor;
-use SEOAutomation\Connector\Actions\ActionPoller;
-use SEOAutomation\Connector\Actions\StatusReporter;
-use SEOAutomation\Connector\Events\EventDispatcher;
-use SEOAutomation\Connector\Sync\BriefSyncer;
-use SEOAutomation\Connector\Sync\UserSyncer;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Actions\ActionExecutor;
+use SEOWorkerAI\Connector\Actions\ActionPoller;
+use SEOWorkerAI\Connector\Actions\StatusReporter;
+use SEOWorkerAI\Connector\Events\EventDispatcher;
+use SEOWorkerAI\Connector\Sync\BriefSyncer;
+use SEOWorkerAI\Connector\Sync\UserSyncer;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class QueueManager
 {
@@ -48,33 +48,33 @@ final class QueueManager
 
     public function registerHooks(): void
     {
-        add_action('seoauto_flush_events', function (): void {
+        add_action('seoworkerai_flush_events', function (): void {
             $this->touchHeartbeat();
             $this->eventDispatcher->flushQueuedEvents();
         });
 
-        add_action('seoauto_poll_actions', function (): void {
+        add_action('seoworkerai_poll_actions', function (): void {
             $this->touchHeartbeat();
             $this->actionPoller->poll();
         });
 
-        add_action('seoauto_sync_briefs', function (): void {
+        add_action('seoworkerai_sync_briefs', function (): void {
             $this->touchHeartbeat();
             $this->briefSyncer->sync();
         });
 
-        add_action('seoauto_sync_users', function (): void {
+        add_action('seoworkerai_sync_users', function (): void {
             $this->touchHeartbeat();
             $this->userSyncer->sync();
         });
 
-        add_action('seoauto_cleanup', function (): void {
+        add_action('seoworkerai_cleanup', function (): void {
             $this->touchHeartbeat();
             $this->cleanup();
         });
 
-        add_action('seoauto_execute_action', [$this, 'executeAction'], 10, 1);
-        add_action('seoauto_retry_ack', [$this, 'retryAck'], 10, 1);
+        add_action('seoworkerai_execute_action', [$this, 'executeAction'], 10, 1);
+        add_action('seoworkerai_retry_ack', [$this, 'retryAck'], 10, 1);
 
         add_filter('cron_schedules', [$this, 'addCronSchedules']);
     }
@@ -113,10 +113,10 @@ final class QueueManager
     {
         global $wpdb;
 
-        $actions = $wpdb->prefix . 'seoauto_actions';
-        $events = $wpdb->prefix . 'seoauto_outbox';
-        $logs = $wpdb->prefix . 'seoauto_logs';
-        $locks = $wpdb->prefix . 'seoauto_locks';
+        $actions = $wpdb->prefix . 'seoworkerai_actions';
+        $events = $wpdb->prefix . 'seoworkerai_outbox';
+        $logs = $wpdb->prefix . 'seoworkerai_logs';
+        $locks = $wpdb->prefix . 'seoworkerai_locks';
 
         $wpdb->query( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             $wpdb->prepare("DELETE FROM {$events} WHERE created_at < DATE_SUB(%s, INTERVAL 30 DAY)", current_time('mysql'))
@@ -141,24 +141,24 @@ final class QueueManager
      */
     public function addCronSchedules(array $schedules): array
     {
-        if (!isset($schedules['seoauto_every_minute'])) {
-            $schedules['seoauto_every_minute'] = [
+        if (!isset($schedules['seoworkerai_every_minute'])) {
+            $schedules['seoworkerai_every_minute'] = [
                 'interval' => MINUTE_IN_SECONDS,
-                'display' => 'Every Minute (SEO Automation)',
+                'display' => 'Every Minute (SEOWorkerAI)',
             ];
         }
 
-        if (!isset($schedules['seoauto_five_minutes'])) {
-            $schedules['seoauto_five_minutes'] = [
+        if (!isset($schedules['seoworkerai_five_minutes'])) {
+            $schedules['seoworkerai_five_minutes'] = [
                 'interval' => 5 * MINUTE_IN_SECONDS,
-                'display' => 'Every Five Minutes (SEO Automation)',
+                'display' => 'Every Five Minutes (SEOWorkerAI)',
             ];
         }
 
-        if (!isset($schedules['seoauto_ten_minutes'])) {
-            $schedules['seoauto_ten_minutes'] = [
+        if (!isset($schedules['seoworkerai_ten_minutes'])) {
+            $schedules['seoworkerai_ten_minutes'] = [
                 'interval' => 10 * MINUTE_IN_SECONDS,
-                'display' => 'Every Ten Minutes (SEO Automation)',
+                'display' => 'Every Ten Minutes (SEOWorkerAI)',
             ];
         }
 
@@ -183,13 +183,13 @@ final class QueueManager
     public static function unscheduleRecurringJobs(): void
     {
         $hooks = [
-            'seoauto_flush_events',
-            'seoauto_poll_actions',
-            'seoauto_sync_briefs',
-            'seoauto_sync_users',
-            'seoauto_cleanup',
-            'seoauto_execute_action',
-            'seoauto_retry_ack',
+            'seoworkerai_flush_events',
+            'seoworkerai_poll_actions',
+            'seoworkerai_sync_briefs',
+            'seoworkerai_sync_users',
+            'seoworkerai_cleanup',
+            'seoworkerai_execute_action',
+            'seoworkerai_retry_ack',
         ];
 
         if (self::hasActionScheduler() && function_exists('as_unschedule_all_actions')) {
@@ -211,16 +211,16 @@ final class QueueManager
     {
         if (self::hasActionScheduler()) {
             as_enqueue_async_action(
-                'seoauto_execute_action',
+                'seoworkerai_execute_action',
                 ['action_id' => $actionId],
-                'seo-automation-actions',
+                'seoworkerai-actions',
                 true,
                 $priority
             );
             return;
         }
 
-        wp_schedule_single_event(time() + 1, 'seoauto_execute_action', [['action_id' => $actionId]]);
+        wp_schedule_single_event(time() + 1, 'seoworkerai_execute_action', [['action_id' => $actionId]]);
     }
 
     public static function scheduleAckRetry(int $actionId, int $delaySeconds = 60): void
@@ -228,30 +228,30 @@ final class QueueManager
         if (self::hasActionScheduler()) {
             as_schedule_single_action(
                 time() + $delaySeconds,
-                'seoauto_retry_ack',
+                'seoworkerai_retry_ack',
                 ['action_id' => $actionId],
-                'seo-automation-actions'
+                'seoworkerai-actions'
             );
             return;
         }
 
-        wp_schedule_single_event(time() + $delaySeconds, 'seoauto_retry_ack', [['action_id' => $actionId]]);
+        wp_schedule_single_event(time() + $delaySeconds, 'seoworkerai_retry_ack', [['action_id' => $actionId]]);
     }
 
     private static function scheduleActionSchedulerJobs(): void
     {
-        self::maybeScheduleAsRecurring('seoauto_flush_events', MINUTE_IN_SECONDS, 'seo-automation-events');
-        self::maybeScheduleAsRecurring('seoauto_poll_actions', 5 * MINUTE_IN_SECONDS, 'seo-automation-actions');
-        self::maybeScheduleAsRecurring('seoauto_sync_briefs', 10 * MINUTE_IN_SECONDS, 'seo-automation-sync');
-        self::maybeScheduleAsRecurring('seoauto_sync_users', HOUR_IN_SECONDS, 'seo-automation-sync');
+        self::maybeScheduleAsRecurring('seoworkerai_flush_events', MINUTE_IN_SECONDS, 'seoworkerai-events');
+        self::maybeScheduleAsRecurring('seoworkerai_poll_actions', 5 * MINUTE_IN_SECONDS, 'seoworkerai-actions');
+        self::maybeScheduleAsRecurring('seoworkerai_sync_briefs', 10 * MINUTE_IN_SECONDS, 'seoworkerai-sync');
+        self::maybeScheduleAsRecurring('seoworkerai_sync_users', HOUR_IN_SECONDS, 'seoworkerai-sync');
 
-        if (!function_exists('as_has_scheduled_action') || !as_has_scheduled_action('seoauto_cleanup')) {
+        if (!function_exists('as_has_scheduled_action') || !as_has_scheduled_action('seoworkerai_cleanup')) {
             as_schedule_recurring_action(
                 strtotime('tomorrow 3am'),
                 DAY_IN_SECONDS,
-                'seoauto_cleanup',
+                'seoworkerai_cleanup',
                 [],
-                'seo-automation-housekeeping'
+                'seoworkerai-housekeeping'
             );
         }
     }
@@ -259,48 +259,48 @@ final class QueueManager
     private static function scheduleWpCronJobs(): void
     {
         add_filter('cron_schedules', static function (array $schedules): array {
-            if (!isset($schedules['seoauto_every_minute'])) {
-                $schedules['seoauto_every_minute'] = [
+            if (!isset($schedules['seoworkerai_every_minute'])) {
+                $schedules['seoworkerai_every_minute'] = [
                     'interval' => MINUTE_IN_SECONDS,
-                    'display' => 'Every Minute (SEO Automation)',
+                    'display' => 'Every Minute (SEOWorkerAI)',
                 ];
             }
 
-            if (!isset($schedules['seoauto_five_minutes'])) {
-                $schedules['seoauto_five_minutes'] = [
+            if (!isset($schedules['seoworkerai_five_minutes'])) {
+                $schedules['seoworkerai_five_minutes'] = [
                     'interval' => 5 * MINUTE_IN_SECONDS,
-                    'display' => 'Every Five Minutes (SEO Automation)',
+                    'display' => 'Every Five Minutes (SEOWorkerAI)',
                 ];
             }
 
-            if (!isset($schedules['seoauto_ten_minutes'])) {
-                $schedules['seoauto_ten_minutes'] = [
+            if (!isset($schedules['seoworkerai_ten_minutes'])) {
+                $schedules['seoworkerai_ten_minutes'] = [
                     'interval' => 10 * MINUTE_IN_SECONDS,
-                    'display' => 'Every Ten Minutes (SEO Automation)',
+                    'display' => 'Every Ten Minutes (SEOWorkerAI)',
                 ];
             }
 
             return $schedules;
         });
 
-        if (!wp_next_scheduled('seoauto_flush_events')) {
-            wp_schedule_event(time(), 'seoauto_every_minute', 'seoauto_flush_events');
+        if (!wp_next_scheduled('seoworkerai_flush_events')) {
+            wp_schedule_event(time(), 'seoworkerai_every_minute', 'seoworkerai_flush_events');
         }
 
-        if (!wp_next_scheduled('seoauto_poll_actions')) {
-            wp_schedule_event(time(), 'seoauto_five_minutes', 'seoauto_poll_actions');
+        if (!wp_next_scheduled('seoworkerai_poll_actions')) {
+            wp_schedule_event(time(), 'seoworkerai_five_minutes', 'seoworkerai_poll_actions');
         }
 
-        if (!wp_next_scheduled('seoauto_sync_briefs')) {
-            wp_schedule_event(time(), 'seoauto_ten_minutes', 'seoauto_sync_briefs');
+        if (!wp_next_scheduled('seoworkerai_sync_briefs')) {
+            wp_schedule_event(time(), 'seoworkerai_ten_minutes', 'seoworkerai_sync_briefs');
         }
 
-        if (!wp_next_scheduled('seoauto_sync_users')) {
-            wp_schedule_event(time(), 'hourly', 'seoauto_sync_users');
+        if (!wp_next_scheduled('seoworkerai_sync_users')) {
+            wp_schedule_event(time(), 'hourly', 'seoworkerai_sync_users');
         }
 
-        if (!wp_next_scheduled('seoauto_cleanup')) {
-            wp_schedule_event(strtotime('tomorrow 3am'), 'daily', 'seoauto_cleanup');
+        if (!wp_next_scheduled('seoworkerai_cleanup')) {
+            wp_schedule_event(strtotime('tomorrow 3am'), 'daily', 'seoworkerai_cleanup');
         }
     }
 
@@ -315,6 +315,6 @@ final class QueueManager
 
     private function touchHeartbeat(): void
     {
-        update_option('seoauto_last_cron_run', time(), false);
+        update_option('seoworkerai_last_cron_run', time(), false);
     }
 }

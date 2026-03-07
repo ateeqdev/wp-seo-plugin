@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\SEO;
+namespace SEOWorkerAI\Connector\SEO;
 
 final class CoreAdapter implements InterfaceSeoAdapter
 {
-    private const PREFIX = '_seoauto_';
+    private const PREFIX = '_seoworkerai_';
 
     public function getTitle(int $postId): ?string
     {
@@ -115,18 +115,18 @@ final class CoreAdapter implements InterfaceSeoAdapter
     {
         return [
             'og' => [
-                'title' => (string) get_post_meta($postId, '_seoauto_og_title', true),
-                'type' => (string) get_post_meta($postId, '_seoauto_og_type', true),
-                'image' => (string) get_post_meta($postId, '_seoauto_og_image', true),
-                'url' => (string) get_post_meta($postId, '_seoauto_og_url', true),
-                'description' => (string) get_post_meta($postId, '_seoauto_og_description', true),
+                'title' => (string) get_post_meta($postId, '_seoworkerai_og_title', true),
+                'type' => (string) get_post_meta($postId, '_seoworkerai_og_type', true),
+                'image' => (string) get_post_meta($postId, '_seoworkerai_og_image', true),
+                'url' => (string) get_post_meta($postId, '_seoworkerai_og_url', true),
+                'description' => (string) get_post_meta($postId, '_seoworkerai_og_description', true),
             ],
             'twitter' => [
-                'card' => (string) get_post_meta($postId, '_seoauto_twitter_card', true),
-                'site' => (string) get_post_meta($postId, '_seoauto_twitter_site', true),
-                'title' => (string) get_post_meta($postId, '_seoauto_twitter_title', true),
-                'description' => (string) get_post_meta($postId, '_seoauto_twitter_description', true),
-                'image' => (string) get_post_meta($postId, '_seoauto_twitter_image', true),
+                'card' => (string) get_post_meta($postId, '_seoworkerai_twitter_card', true),
+                'site' => (string) get_post_meta($postId, '_seoworkerai_twitter_site', true),
+                'title' => (string) get_post_meta($postId, '_seoworkerai_twitter_title', true),
+                'description' => (string) get_post_meta($postId, '_seoworkerai_twitter_description', true),
+                'image' => (string) get_post_meta($postId, '_seoworkerai_twitter_image', true),
             ],
         ];
     }
@@ -184,16 +184,16 @@ final class CoreAdapter implements InterfaceSeoAdapter
         }
 
         $socialMap = [
-            'og:title' => (string) get_post_meta($postId, '_seoauto_og_title', true),
-            'og:type' => (string) get_post_meta($postId, '_seoauto_og_type', true),
-            'og:image' => (string) get_post_meta($postId, '_seoauto_og_image', true),
-            'og:url' => (string) get_post_meta($postId, '_seoauto_og_url', true),
-            'og:description' => (string) get_post_meta($postId, '_seoauto_og_description', true),
-            'twitter:card' => (string) get_post_meta($postId, '_seoauto_twitter_card', true),
-            'twitter:site' => (string) get_post_meta($postId, '_seoauto_twitter_site', true),
-            'twitter:title' => (string) get_post_meta($postId, '_seoauto_twitter_title', true),
-            'twitter:description' => (string) get_post_meta($postId, '_seoauto_twitter_description', true),
-            'twitter:image' => (string) get_post_meta($postId, '_seoauto_twitter_image', true),
+            'og:title' => (string) get_post_meta($postId, '_seoworkerai_og_title', true),
+            'og:type' => (string) get_post_meta($postId, '_seoworkerai_og_type', true),
+            'og:image' => (string) get_post_meta($postId, '_seoworkerai_og_image', true),
+            'og:url' => (string) get_post_meta($postId, '_seoworkerai_og_url', true),
+            'og:description' => (string) get_post_meta($postId, '_seoworkerai_og_description', true),
+            'twitter:card' => (string) get_post_meta($postId, '_seoworkerai_twitter_card', true),
+            'twitter:site' => (string) get_post_meta($postId, '_seoworkerai_twitter_site', true),
+            'twitter:title' => (string) get_post_meta($postId, '_seoworkerai_twitter_title', true),
+            'twitter:description' => (string) get_post_meta($postId, '_seoworkerai_twitter_description', true),
+            'twitter:image' => (string) get_post_meta($postId, '_seoworkerai_twitter_image', true),
         ];
 
         foreach ($socialMap as $name => $value) {

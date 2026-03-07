@@ -1,8 +1,8 @@
-# SEO Automation Platform Functional Documentation (Laravel + WordPress)
+# SEOWorkerAI Platform Functional Documentation (Laravel + WordPress)
 
 This document describes the full end-to-end behavior of the system across:
-- WordPress plugin repository: `/Users/ateeq/seo-automation-connector`
-- Laravel backend repository: `/Users/ateeq/automate-seo-laravel`
+- WordPress plugin repository: `/Users/ateeq/seoworkerai`
+- Laravel backend repository: `/Users/ateeq/seo/app.seoworkerai.com`
 
 It covers installation, registration, ownership proof, Google OAuth, event processing, on-page optimization, action dispatch/execution, rollback/edit flows, scheduling, content briefs, admin operations, and persistence.
 
@@ -33,7 +33,7 @@ On `plugins_loaded`, plugin bootstraps in this order:
 - runtime handlers
 
 Primary wiring lives in:
-- `seo-automation-connector.php`
+- `seoworkerai.php`
 - `includes/class-plugin.php`
 
 ### 2.2 Site registration flow
@@ -50,7 +50,7 @@ Behavior:
 - Existing `site_id` + token: site-scoped update path.
 - New/unknown site: requests ownership challenge first, stores challenge token locally, sends proof URL, then registers.
 - On success stores:
-- `seoauto_site_id`
+- `seoworkerai_site_id`
 - encrypted API token
 - profile values from backend response
 
@@ -87,7 +87,7 @@ WP exposes proof endpoint and stores challenge token temporarily.
 
 Paths:
 - Laravel: `/api/sites/ownership/challenge`, `/api/sites/{site_id}/ownership/challenge`
-- WP proof endpoint: `/wp-json/seoauto/v1/ownership-proof?challenge_id=...`
+- WP proof endpoint: `/wp-json/seoworkerai/v1/ownership-proof?challenge_id=...`
 
 Key files:
 - `app/Http/Controllers/API/SiteController.php`
@@ -153,7 +153,7 @@ Plugin collects events from WP hooks:
 - theme switch
 
 Skips autosaves/revisions/unpublished posts.
-Respects excluded pages list (`seoauto_excluded_change_audit_pages`) by id/slug/url matching.
+Respects excluded pages list (`seoworkerai_excluded_change_audit_pages`) by id/slug/url matching.
 
 Mapped payload includes:
 - event type
@@ -168,7 +168,7 @@ Key files:
 ### 3.2 Event outbox and dispatch
 
 WordPress writes events to local outbox table, then queue worker flushes to Laravel:
-- recurring queue hook: `seoauto_flush_events`
+- recurring queue hook: `seoworkerai_flush_events`
 - outbox supports retry and status tracking
 
 Laravel receives at:
@@ -302,8 +302,8 @@ WordPress polls Laravel endpoint:
 - `GET /api/sites/{site_id}/actions/pending`
 
 Polling worker:
-- stores new actions in local `seoauto_actions`
-- enqueues execution jobs (`seoauto_execute_action`)
+- stores new actions in local `seoworkerai_actions`
+- enqueues execution jobs (`seoworkerai_execute_action`)
 - supports review mode vs auto-apply mode
 
 Key files:
@@ -360,8 +360,8 @@ Main visible tabs in admin shell:
 - Content Briefs
 
 Hidden (direct URL only) pages:
-- Debug Logs (`page=seoauto-local-errors`)
-- Schedules (`page=seoauto-schedules`)
+- Debug Logs (`page=seoworkerai-local-errors`)
+- Schedules (`page=seoworkerai-schedules`)
 - OAuth callback pages
 
 Key file:
@@ -419,16 +419,16 @@ Related API endpoints:
 Queue manager supports Action Scheduler if available, else WP-Cron fallback.
 
 Recurring hooks:
-- `seoauto_flush_events` (1 min)
-- `seoauto_poll_actions` (5 min)
-- `seoauto_sync_briefs` (10 min)
-- `seoauto_sync_users` (hourly)
-- `seoauto_cleanup` (daily)
+- `seoworkerai_flush_events` (1 min)
+- `seoworkerai_poll_actions` (5 min)
+- `seoworkerai_sync_briefs` (10 min)
+- `seoworkerai_sync_users` (hourly)
+- `seoworkerai_cleanup` (daily)
 
 Also handles:
 - async action execution
 - ack retry scheduling
-- heartbeat update (`seoauto_last_cron_run`)
+- heartbeat update (`seoworkerai_last_cron_run`)
 - data retention cleanup (old outbox/logs/actions/locks)
 
 Key file:
@@ -439,14 +439,14 @@ Key file:
 ### 8.1 WordPress plugin tables
 
 Created/upgraded in `Schema::createOrUpgrade()`:
-- `seoauto_actions`
-- `seoauto_event_outbox`
-- `seoauto_activity_logs`
-- `seoauto_change_logs`
-- `seoauto_admin_action_items`
-- `seoauto_content_briefs`
-- `seoauto_locks`
-- `seoauto_redirects`
+- `seoworkerai_actions`
+- `seoworkerai_event_outbox`
+- `seoworkerai_activity_logs`
+- `seoworkerai_change_logs`
+- `seoworkerai_admin_action_items`
+- `seoworkerai_content_briefs`
+- `seoworkerai_locks`
+- `seoworkerai_redirects`
 
 Each table captures a dedicated concern:
 - action state + snapshots
@@ -541,7 +541,7 @@ Primary route map:
 - WP admin shell intentionally hides Debug Logs and Schedules from visible tabs; they remain direct-link pages.
 - Change Center and Action Items rely on local WP DB mirrors and may diverge from Laravel if sync retries are pending; check both sides when diagnosing.
 - When debugging action failures, inspect:
-- WP: `seoauto_activity_logs`, `seoauto_change_logs`, `seoauto_actions`
+- WP: `seoworkerai_activity_logs`, `seoworkerai_change_logs`, `seoworkerai_actions`
 - Laravel: `seo_action_queues`, `seo_execution_sync_logs`, `seo_execution_logs`
 
 ## 14. Seeded Detection and Decision Logic (If This, Then That)

@@ -1,5 +1,5 @@
 /* ============================================================
-   SEO Automation Admin — Clean, Professional Design
+   SEOWorkerAI Admin — Clean, Professional Design
    ============================================================ */
 
 :root {
@@ -42,7 +42,7 @@
 /* ============================================================
    Base
    ============================================================ */
-.seoauto-admin-page {
+.seoworkerai-admin-page {
   max-width: 100%;
   padding: 0 20px 60px;
   background: var(--gray-50);
@@ -50,16 +50,16 @@
   color: var(--gray-900);
   -webkit-font-smoothing: antialiased;
 }
-.seoauto-admin-page *,
-.seoauto-admin-page *::before,
-.seoauto-admin-page *::after {
+.seoworkerai-admin-page *,
+.seoworkerai-admin-page *::before,
+.seoworkerai-admin-page *::after {
   box-sizing: border-box;
 }
 
 /* ============================================================
    Shell Header + Tabs
    ============================================================ */
-.seoauto-shell-header {
+.seoworkerai-shell-header {
   background: var(--white);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius);
@@ -67,28 +67,28 @@
   margin: 24px 0 20px;
   box-shadow: var(--shadow-sm);
 }
-.seoauto-shell-header h1 {
+.seoworkerai-shell-header h1 {
   margin: 0 0 6px;
   font-size: 26px;
   font-weight: 400;
   color: var(--gray-900);
 }
-.seoauto-shell-header > p {
+.seoworkerai-shell-header > p {
   margin: 0 0 20px;
   font-size: 13px;
   color: var(--gray-700);
 }
-.seoauto-shell-tabs {
+.seoworkerai-shell-tabs {
   display: flex;
   gap: 0;
   border-bottom: 1px solid var(--gray-200);
   overflow-x: auto;
   scrollbar-width: none;
 }
-.seoauto-shell-tabs::-webkit-scrollbar {
+.seoworkerai-shell-tabs::-webkit-scrollbar {
   display: none;
 }
-.seoauto-shell-tab {
+.seoworkerai-shell-tab {
   flex-shrink: 0;
   padding: 10px 16px;
   margin-bottom: -1px;
@@ -102,10 +102,10 @@
     border-color 0.15s;
   white-space: nowrap;
 }
-.seoauto-shell-tab:hover {
+.seoworkerai-shell-tab:hover {
   color: var(--gray-900);
 }
-.seoauto-shell-tab.is-active {
+.seoworkerai-shell-tab.is-active {
   color: var(--blue);
   border-bottom-color: var(--blue);
 }
@@ -113,20 +113,20 @@
 /* ============================================================
    KPI Grid
    ============================================================ */
-.seoauto-kpi-grid {
+.seoworkerai-kpi-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 14px;
   margin-bottom: 18px;
 }
-.seoauto-kpi-card {
+.seoworkerai-kpi-card {
   background: var(--white);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius);
   padding: 18px 20px;
   box-shadow: var(--shadow-sm);
 }
-.seoauto-kpi-label {
+.seoworkerai-kpi-label {
   display: block;
   font-size: 11px;
   font-weight: 600;
@@ -135,7 +135,7 @@
   color: var(--gray-600);
   margin-bottom: 6px;
 }
-.seoauto-kpi-value {
+.seoworkerai-kpi-value {
   display: block;
   font-size: 30px;
   font-weight: 300;
@@ -145,7 +145,7 @@
 /* ============================================================
    Cards
    ============================================================ */
-.seoauto-card {
+.seoworkerai-card {
   background: var(--white);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius);
@@ -154,16 +154,16 @@
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
-.seoauto-card--settings {
+.seoworkerai-card--settings {
   overflow: visible;
 }
-.seoauto-card h2 {
+.seoworkerai-card h2 {
   margin: 0 0 18px;
   font-size: 17px;
   font-weight: 500;
   color: var(--gray-900);
 }
-.seoauto-card-head {
+.seoworkerai-card-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -171,33 +171,33 @@
   padding-bottom: 14px;
   border-bottom: 1px solid var(--gray-200);
 }
-.seoauto-card-head h2 {
+.seoworkerai-card-head h2 {
   margin: 0;
 }
-.seoauto-card-wide {
+.seoworkerai-card-wide {
   grid-column: 1 / -1;
 }
 
 /* ============================================================
    Settings Grid
    ============================================================ */
-.seoauto-settings-grid {
+.seoworkerai-settings-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(380px, 1fr));
   gap: 16px;
 }
 
-.seoauto-locations-table-wrap {
+.seoworkerai-locations-table-wrap {
   overflow-x: auto;
 }
 
-.seoauto-locations-table th,
-.seoauto-locations-table td {
+.seoworkerai-locations-table th,
+.seoworkerai-locations-table td {
   vertical-align: middle;
 }
 
-.seoauto-locations-table select,
-.seoauto-filter-range-input {
+.seoworkerai-locations-table select,
+.seoworkerai-filter-range-input {
   width: 100%;
   min-width: 110px;
 }
@@ -205,7 +205,7 @@
 /* ============================================================
    Google Connect CTA — prominent hero button
    ============================================================ */
-.seoauto-google-cta {
+.seoworkerai-google-cta {
   display: flex;
   align-items: center;
   gap: 10px;
@@ -226,22 +226,22 @@
   justify-content: center;
   margin-bottom: 12px;
 }
-.seoauto-google-cta:hover {
+.seoworkerai-google-cta:hover {
   background: var(--blue-dark);
   box-shadow: 0 3px 10px rgba(26, 115, 232, 0.35);
   color: #fff !important;
 }
-.seoauto-google-cta svg {
+.seoworkerai-google-cta svg {
   flex-shrink: 0;
 }
 
 /* ============================================================
    KV List (Connection panel)
    ============================================================ */
-.seoauto-kv-list {
+.seoworkerai-kv-list {
   margin-bottom: 14px;
 }
-.seoauto-kv-list > div {
+.seoworkerai-kv-list > div {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -250,14 +250,14 @@
   font-size: 13px;
   gap: 10px;
 }
-.seoauto-kv-list > div:last-child {
+.seoworkerai-kv-list > div:last-child {
   border-bottom: none;
 }
-.seoauto-kv-list span {
+.seoworkerai-kv-list span {
   color: var(--gray-700);
   white-space: nowrap;
 }
-.seoauto-kv-list strong {
+.seoworkerai-kv-list strong {
   color: var(--gray-900);
   font-weight: 500;
   text-align: right;
@@ -267,18 +267,18 @@
 /* ============================================================
    Stat Grid
    ============================================================ */
-.seoauto-stat-grid {
+.seoworkerai-stat-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 12px;
 }
-.seoauto-stat {
+.seoworkerai-stat {
   padding: 14px 16px;
   background: var(--gray-50);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius-sm);
 }
-.seoauto-stat span {
+.seoworkerai-stat span {
   display: block;
   font-size: 11px;
   font-weight: 600;
@@ -287,7 +287,7 @@
   color: var(--gray-600);
   margin-bottom: 5px;
 }
-.seoauto-stat strong {
+.seoworkerai-stat strong {
   display: block;
   font-size: 13px;
   font-weight: 400;
@@ -297,7 +297,7 @@
 /* ============================================================
    Status Badges
    ============================================================ */
-.seoauto-badge {
+.seoworkerai-badge {
   display: inline-flex;
   align-items: center;
   padding: 3px 8px;
@@ -308,33 +308,33 @@
   text-transform: uppercase;
   white-space: nowrap;
 }
-.seoauto-status-received,
-.seoauto-status-pending {
+.seoworkerai-status-received,
+.seoworkerai-status-pending {
   background: var(--gray-100);
   color: var(--gray-700);
 }
-.seoauto-status-queued,
-.seoauto-status-running,
-.seoauto-status-in-progress {
+.seoworkerai-status-queued,
+.seoworkerai-status-running,
+.seoworkerai-status-in-progress {
   background: var(--blue-light);
   color: var(--blue-dark);
 }
-.seoauto-status-applied,
-.seoauto-status-resolved {
+.seoworkerai-status-applied,
+.seoworkerai-status-resolved {
   background: var(--green-bg);
   color: var(--green);
 }
-.seoauto-status-failed,
-.seoauto-status-rejected {
+.seoworkerai-status-failed,
+.seoworkerai-status-rejected {
   background: var(--red-bg);
   color: var(--red);
 }
-.seoauto-status-rolled-back,
-.seoauto-status-rolled_back {
+.seoworkerai-status-rolled-back,
+.seoworkerai-status-rolled_back {
   background: var(--yellow-bg);
   color: var(--yellow);
 }
-.seoauto-status-active {
+.seoworkerai-status-active {
   background: var(--green-bg);
   color: var(--green);
 }
@@ -342,9 +342,9 @@
 /* ============================================================
    Buttons
    ============================================================ */
-.seoauto-admin-page .button,
-.seoauto-admin-page .button-primary,
-.seoauto-admin-page .button-secondary {
+.seoworkerai-admin-page .button,
+.seoworkerai-admin-page .button-primary,
+.seoworkerai-admin-page .button-secondary {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -365,84 +365,84 @@
   white-space: nowrap;
   line-height: 34px;
 }
-.seoauto-admin-page .button-primary {
+.seoworkerai-admin-page .button-primary {
   background: var(--blue);
   color: #fff !important;
   border-color: var(--blue);
 }
-.seoauto-admin-page .button-primary:hover {
+.seoworkerai-admin-page .button-primary:hover {
   background: var(--blue-dark);
   border-color: var(--blue-dark);
   color: #fff !important;
 }
-.seoauto-admin-page .button-secondary {
+.seoworkerai-admin-page .button-secondary {
   background: var(--white);
   color: var(--blue) !important;
   border-color: var(--blue);
 }
-.seoauto-admin-page .button-secondary:hover {
+.seoworkerai-admin-page .button-secondary:hover {
   background: var(--blue-bg);
   color: var(--blue-dark) !important;
 }
-.seoauto-admin-page .button {
+.seoworkerai-admin-page .button {
   background: var(--white);
   color: var(--gray-800) !important;
   border-color: var(--gray-300);
 }
-.seoauto-admin-page .button:hover {
+.seoworkerai-admin-page .button:hover {
   background: var(--gray-50);
   border-color: var(--gray-400);
   color: var(--gray-900) !important;
 }
-.seoauto-admin-page .button-small {
+.seoworkerai-admin-page .button-small {
   height: 28px;
   padding: 0 10px;
   font-size: 12px;
   line-height: 28px;
 }
-.seoauto-admin-page .button.disabled,
-.seoauto-admin-page .button:disabled {
+.seoworkerai-admin-page .button.disabled,
+.seoworkerai-admin-page .button:disabled {
   opacity: 0.45;
   pointer-events: none;
 }
-.seoauto-button-row {
+.seoworkerai-button-row {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
   align-items: center;
 }
 /* Danger variant */
-.seoauto-btn-danger {
+.seoworkerai-btn-danger {
   background: var(--white) !important;
   color: var(--red) !important;
   border-color: var(--red) !important;
 }
-.seoauto-btn-danger:hover {
+.seoworkerai-btn-danger:hover {
   background: var(--red-bg) !important;
 }
 
 /* ============================================================
    Forms
    ============================================================ */
-.seoauto-form-field {
+.seoworkerai-form-field {
   margin-bottom: 18px;
 }
-.seoauto-form-field > label,
-.seoauto-form-field > .seoauto-label {
+.seoworkerai-form-field > label,
+.seoworkerai-form-field > .seoworkerai-label {
   display: block;
   margin-bottom: 6px;
   font-size: 13px;
   font-weight: 500;
   color: var(--gray-800);
 }
-.seoauto-form-field input[type="text"],
-.seoauto-form-field input[type="number"],
-.seoauto-form-field input[type="date"],
-.seoauto-form-field input[type="datetime-local"],
-.seoauto-form-field select,
-.seoauto-form-field textarea,
-.seoauto-filter-grid select,
-.seoauto-filter-grid input {
+.seoworkerai-form-field input[type="text"],
+.seoworkerai-form-field input[type="number"],
+.seoworkerai-form-field input[type="date"],
+.seoworkerai-form-field input[type="datetime-local"],
+.seoworkerai-form-field select,
+.seoworkerai-form-field textarea,
+.seoworkerai-filter-grid select,
+.seoworkerai-filter-grid input {
   width: 100%;
   padding: 7px 10px;
   font-size: 13px;
@@ -455,55 +455,55 @@
     box-shadow 0.13s;
   font-family: var(--font);
 }
-.seoauto-form-field input:focus,
-.seoauto-form-field select:focus,
-.seoauto-form-field textarea:focus,
-.seoauto-filter-grid select:focus,
-.seoauto-filter-grid input:focus {
+.seoworkerai-form-field input:focus,
+.seoworkerai-form-field select:focus,
+.seoworkerai-form-field textarea:focus,
+.seoworkerai-filter-grid select:focus,
+.seoworkerai-filter-grid input:focus {
   outline: none;
   border-color: var(--blue);
   box-shadow: 0 0 0 3px rgba(26, 115, 232, 0.12);
 }
-.seoauto-form-field textarea {
+.seoworkerai-form-field textarea {
   min-height: 80px;
   resize: vertical;
 }
-.seoauto-form-grid {
+.seoworkerai-form-grid {
   display: grid;
   gap: 12px;
 }
-.seoauto-form-grid--two {
+.seoworkerai-form-grid--two {
   grid-template-columns: repeat(2, minmax(0, 1fr));
 }
-.seoauto-form-grid--three {
+.seoworkerai-form-grid--three {
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
-.seoauto-form-field .description {
+.seoworkerai-form-field .description {
   margin-top: 5px;
   font-size: 12px;
   color: var(--gray-600);
   line-height: 1.5;
 }
-.seoauto-inline-input-form {
+.seoworkerai-inline-input-form {
   display: flex;
   gap: 8px;
   align-items: center;
 }
-.seoauto-inline-input-form input[type="text"] {
+.seoworkerai-inline-input-form input[type="text"] {
   min-width: 180px;
 }
 
 /* ============================================================
    Tables — fixed overflow, no column shrinkage
    ============================================================ */
-.seoauto-table-wrap {
+.seoworkerai-table-wrap {
   width: 100%;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
 }
-.seoauto-admin-page .wp-list-table {
+.seoworkerai-admin-page .wp-list-table {
   width: 100%;
   background: var(--white);
   border: 1px solid var(--gray-200);
@@ -511,7 +511,7 @@
   border-spacing: 0;
   border-collapse: separate;
 }
-.seoauto-admin-page .wp-list-table thead th {
+.seoworkerai-admin-page .wp-list-table thead th {
   padding: 10px 14px;
   font-size: 11px;
   font-weight: 600;
@@ -523,7 +523,7 @@
   white-space: nowrap;
   text-align: left;
 }
-.seoauto-admin-page .wp-list-table tbody td {
+.seoworkerai-admin-page .wp-list-table tbody td {
   padding: 13px 14px;
   font-size: 13px;
   color: var(--gray-900);
@@ -531,13 +531,13 @@
   vertical-align: top;
   word-break: break-word;
 }
-.seoauto-admin-page .wp-list-table tbody tr:last-child td {
+.seoworkerai-admin-page .wp-list-table tbody tr:last-child td {
   border-bottom: none;
 }
-.seoauto-admin-page .wp-list-table tbody tr:hover td {
+.seoworkerai-admin-page .wp-list-table tbody tr:hover td {
   background: var(--gray-50);
 }
-.seoauto-admin-page .wp-list-table code {
+.seoworkerai-admin-page .wp-list-table code {
   padding: 2px 5px;
   font-family: var(--mono);
   font-size: 11px;
@@ -549,65 +549,65 @@
 /* ============================================================
    Change Center Table — proper column sizing
    ============================================================ */
-.seoauto-changes-table {
+.seoworkerai-changes-table {
   min-width: 900px;
 }
-.seoauto-changes-table th:nth-child(1),
-.seoauto-changes-table td:nth-child(1) {
+.seoworkerai-changes-table th:nth-child(1),
+.seoworkerai-changes-table td:nth-child(1) {
   min-width: 180px;
   max-width: 260px;
 }
-.seoauto-changes-table th:nth-child(2),
-.seoauto-changes-table td:nth-child(2) {
+.seoworkerai-changes-table th:nth-child(2),
+.seoworkerai-changes-table td:nth-child(2) {
   min-width: 130px;
 }
-.seoauto-changes-table th:nth-child(3),
-.seoauto-changes-table td:nth-child(3) {
+.seoworkerai-changes-table th:nth-child(3),
+.seoworkerai-changes-table td:nth-child(3) {
   min-width: 90px;
 }
-.seoauto-changes-table th:nth-child(4),
-.seoauto-changes-table td:nth-child(4) {
+.seoworkerai-changes-table th:nth-child(4),
+.seoworkerai-changes-table td:nth-child(4) {
   min-width: 200px;
 }
-.seoauto-changes-table th:nth-child(5),
-.seoauto-changes-table td:nth-child(5) {
+.seoworkerai-changes-table th:nth-child(5),
+.seoworkerai-changes-table td:nth-child(5) {
   min-width: 110px;
 }
-.seoauto-changes-table th:nth-child(6),
-.seoauto-changes-table td:nth-child(6) {
+.seoworkerai-changes-table th:nth-child(6),
+.seoworkerai-changes-table td:nth-child(6) {
   min-width: 120px;
   white-space: nowrap;
 }
 
 /* Action buttons row */
-.seoauto-action-btns {
+.seoworkerai-action-btns {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   align-items: flex-start;
 }
-.seoauto-action-btns form {
+.seoworkerai-action-btns form {
   margin: 0;
 }
-.seoauto-action-btns .button {
+.seoworkerai-action-btns .button {
   white-space: nowrap;
 }
 
 /* ============================================================
    Chip Filter Bar
    ============================================================ */
-.seoauto-chip-filter-bar {
+.seoworkerai-chip-filter-bar {
   position: relative;
   margin-bottom: 16px;
 }
-.seoauto-active-chips {
+.seoworkerai-active-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
   min-height: 0;
   margin-bottom: 6px;
 }
-.seoauto-active-chip {
+.seoworkerai-active-chip {
   display: inline-flex;
   align-items: center;
   gap: 4px;
@@ -618,7 +618,7 @@
   font-size: 12px;
   font-weight: 500;
 }
-.seoauto-active-chip button {
+.seoworkerai-active-chip button {
   background: none;
   border: none;
   cursor: pointer;
@@ -628,11 +628,11 @@
   padding: 0 0 0 2px;
   opacity: 0.7;
 }
-.seoauto-active-chip button:hover {
+.seoworkerai-active-chip button:hover {
   opacity: 1;
 }
 
-.seoauto-filter-dropdowns {
+.seoworkerai-filter-dropdowns {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -644,11 +644,11 @@
   box-shadow: var(--shadow-sm);
 }
 
-.seoauto-filter-dropdown {
+.seoworkerai-filter-dropdown {
   position: relative;
 }
 
-.seoauto-filter-btn {
+.seoworkerai-filter-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
@@ -666,17 +666,17 @@
     background 0.15s;
   white-space: nowrap;
 }
-.seoauto-filter-btn:hover {
+.seoworkerai-filter-btn:hover {
   border-color: var(--blue);
   color: var(--blue);
 }
-.seoauto-filter-btn.has-active {
+.seoworkerai-filter-btn.has-active {
   background: var(--blue-bg);
   border-color: var(--blue);
   color: var(--blue-dark);
   font-weight: 500;
 }
-.seoauto-filter-count {
+.seoworkerai-filter-count {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -688,12 +688,12 @@
   font-size: 10px;
   font-weight: 700;
 }
-.seoauto-filter-chevron {
+.seoworkerai-filter-chevron {
   font-size: 10px;
   opacity: 0.6;
 }
 
-.seoauto-filter-panel {
+.seoworkerai-filter-panel {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -705,14 +705,14 @@
   box-shadow: var(--shadow-md);
   overflow: hidden;
 }
-.seoauto-filter-panel--wide {
+.seoworkerai-filter-panel--wide {
   min-width: 260px;
 }
-.seoauto-filter-panel-search {
+.seoworkerai-filter-panel-search {
   padding: 10px 12px 6px;
   border-bottom: 1px solid var(--gray-100);
 }
-.seoauto-filter-panel-search input {
+.seoworkerai-filter-panel-search input {
   width: 100%;
   height: 30px;
   padding: 0 8px;
@@ -720,10 +720,10 @@
   border-radius: var(--radius-sm);
   font-size: 13px;
 }
-.seoauto-filter-panel-inner {
+.seoworkerai-filter-panel-inner {
   padding: 6px 0;
 }
-.seoauto-filter-option {
+.seoworkerai-filter-option {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -732,13 +732,13 @@
   cursor: pointer;
   color: var(--gray-800);
 }
-.seoauto-filter-option:hover {
+.seoworkerai-filter-option:hover {
   background: var(--gray-50);
 }
-.seoauto-filter-option input[type="checkbox"] {
+.seoworkerai-filter-option input[type="checkbox"] {
   margin: 0;
 }
-.seoauto-filter-type-tag {
+.seoworkerai-filter-type-tag {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -748,7 +748,7 @@
   color: var(--gray-600);
   border-radius: 3px;
 }
-.seoauto-filter-panel-footer {
+.seoworkerai-filter-panel-footer {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -756,7 +756,7 @@
   border-top: 1px solid var(--gray-100);
   background: var(--gray-50);
 }
-.seoauto-filter-clear-one {
+.seoworkerai-filter-clear-one {
   font-size: 12px;
   color: var(--gray-600);
   text-decoration: none;
@@ -765,17 +765,17 @@
   cursor: pointer;
   padding: 0;
 }
-.seoauto-filter-clear-one:hover {
+.seoworkerai-filter-clear-one:hover {
   color: var(--red);
 }
 
 /* Hidden inputs container — invisible, JS-managed */
-.seoauto-filter-hidden-inputs {
+.seoworkerai-filter-hidden-inputs {
   display: none;
 }
 
 /* Legacy filter grid (Action Items / Debug Logs) */
-.seoauto-filter-grid {
+.seoworkerai-filter-grid {
   display: flex;
   flex-wrap: wrap;
   gap: 12px;
@@ -787,21 +787,21 @@
   align-items: flex-end;
   margin-bottom: 16px;
 }
-.seoauto-filter-grid label {
+.seoworkerai-filter-grid label {
   display: flex;
   flex-direction: column;
   gap: 4px;
   min-width: 140px;
   flex: 1;
 }
-.seoauto-filter-grid label span {
+.seoworkerai-filter-grid label span {
   font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.6px;
   color: var(--gray-600);
 }
-.seoauto-filter-grid > div {
+.seoworkerai-filter-grid > div {
   display: flex;
   gap: 8px;
   align-items: flex-end;
@@ -810,7 +810,7 @@
 /* ============================================================
    Proposed-change field display + inline edit
    ============================================================ */
-.seoauto-field-label {
+.seoworkerai-field-label {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -818,12 +818,12 @@
   color: var(--gray-500);
   margin-bottom: 2px;
 }
-.seoauto-field-value {
+.seoworkerai-field-value {
   font-size: 13px;
   color: var(--gray-800);
   line-height: 1.4;
 }
-.seoauto-toggle-current {
+.seoworkerai-toggle-current {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -836,10 +836,10 @@
   padding: 0;
   font-family: var(--font);
 }
-.seoauto-toggle-current:hover {
+.seoworkerai-toggle-current:hover {
   color: var(--blue);
 }
-.seoauto-current-value {
+.seoworkerai-current-value {
   margin-top: 6px;
   padding: 6px 8px;
   background: var(--gray-50);
@@ -848,17 +848,17 @@
 }
 
 /* Inline edit container (lives in the Proposed Change column) */
-.seoauto-inline-edit-container {
+.seoworkerai-inline-edit-container {
   position: relative;
 }
-.seoauto-inline-display {
+.seoworkerai-inline-display {
   /* default visible */
 }
-.seoauto-inline-edit-fields {
+.seoworkerai-inline-edit-fields {
   display: none;
   margin-top: 8px;
 }
-.seoauto-inline-edit-fields label {
+.seoworkerai-inline-edit-fields label {
   display: block;
   font-size: 11px;
   font-weight: 600;
@@ -867,8 +867,8 @@
   letter-spacing: 0.5px;
   margin-bottom: 3px;
 }
-.seoauto-inline-edit-fields input[type="text"],
-.seoauto-inline-edit-fields textarea {
+.seoworkerai-inline-edit-fields input[type="text"],
+.seoworkerai-inline-edit-fields textarea {
   width: 100%;
   padding: 5px 8px;
   font-size: 12px;
@@ -880,11 +880,11 @@
   font-family: var(--font);
   box-shadow: 0 0 0 2px rgba(26, 115, 232, 0.1);
 }
-.seoauto-inline-edit-fields textarea {
+.seoworkerai-inline-edit-fields textarea {
   min-height: 72px;
   resize: vertical;
 }
-.seoauto-inline-edit-actions {
+.seoworkerai-inline-edit-actions {
   display: flex;
   gap: 6px;
   margin-top: 6px;
@@ -894,7 +894,7 @@
 /* ============================================================
    Progression toggle (inline in title cell)
    ============================================================ */
-.seoauto-progression-toggle {
+.seoworkerai-progression-toggle {
   display: inline-flex;
   align-items: center;
   gap: 3px;
@@ -908,30 +908,30 @@
   font-family: var(--font);
   white-space: nowrap;
 }
-.seoauto-progression-toggle:hover {
+.seoworkerai-progression-toggle:hover {
   color: var(--blue);
 }
-.seoauto-prog-arrow {
+.seoworkerai-prog-arrow {
   font-size: 9px;
 }
 
 /* Progression sub-row — dot timeline */
-.seoauto-progression-row td {
+.seoworkerai-progression-row td {
   border-top: none !important;
 }
-.seoauto-prog-timeline {
+.seoworkerai-prog-timeline {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
   gap: 0;
   padding: 10px 16px 10px 0;
 }
-.seoauto-prog-step {
+.seoworkerai-prog-step {
   display: flex;
   align-items: center;
   gap: 6px;
 }
-.seoauto-prog-step:not(:last-child)::after {
+.seoworkerai-prog-step:not(:last-child)::after {
   content: "";
   display: block;
   width: 28px;
@@ -939,7 +939,7 @@
   background: var(--gray-200);
   margin: 0 4px;
 }
-.seoauto-prog-dot {
+.seoworkerai-prog-dot {
   width: 10px;
   height: 10px;
   border-radius: 100%;
@@ -947,38 +947,38 @@
   background: var(--white);
   flex-shrink: 0;
 }
-.seoauto-prog-dot--received {
+.seoworkerai-prog-dot--received {
   border-color: var(--gray-400);
   background: var(--gray-100);
 }
-.seoauto-prog-dot--queued {
+.seoworkerai-prog-dot--queued {
   border-color: var(--blue);
   background: var(--blue-light);
 }
-.seoauto-prog-dot--running {
+.seoworkerai-prog-dot--running {
   border-color: var(--yellow);
   background: var(--yellow-bg);
 }
-.seoauto-prog-dot--applied {
+.seoworkerai-prog-dot--applied {
   border-color: var(--green);
   background: var(--green-bg);
 }
-.seoauto-prog-dot--failed,
-.seoauto-prog-dot--rolled-back {
+.seoworkerai-prog-dot--failed,
+.seoworkerai-prog-dot--rolled-back {
   border-color: var(--red);
   background: var(--red-bg);
 }
-.seoauto-prog-info {
+.seoworkerai-prog-info {
   display: flex;
   flex-direction: column;
   gap: 1px;
 }
-.seoauto-prog-ts {
+.seoworkerai-prog-ts {
   font-size: 10px;
   color: var(--gray-500);
   font-family: var(--mono);
 }
-.seoauto-prog-note {
+.seoworkerai-prog-note {
   font-size: 11px;
   color: var(--gray-600);
   max-width: 200px;
@@ -987,11 +987,11 @@
 /* ============================================================
    Excluded Pages Tag-Chip UI (Settings page)
    ============================================================ */
-.seoauto-excl-tag-ui {
+.seoworkerai-excl-tag-ui {
   position: relative;
   z-index: 10;
 }
-.seoauto-excl-chips {
+.seoworkerai-excl-chips {
   display: flex;
   flex-wrap: wrap;
   gap: 5px;
@@ -1003,20 +1003,20 @@
   background: var(--white);
   cursor: text;
 }
-.seoauto-excl-chips:empty::before {
+.seoworkerai-excl-chips:empty::before {
   content: "No pages excluded";
   color: var(--gray-400);
   font-size: 12px;
   line-height: 24px;
 }
-.seoauto-excl-search-wrap {
+.seoworkerai-excl-search-wrap {
   border: 1px solid var(--gray-300);
   border-radius: 0 0 var(--radius-sm) var(--radius-sm);
   background: var(--white);
   display: flex;
   align-items: center;
 }
-.seoauto-excl-search {
+.seoworkerai-excl-search {
   width: 100%;
   height: 32px;
   padding: 0 10px;
@@ -1027,10 +1027,10 @@
   background: transparent;
   font-family: var(--font);
 }
-.seoauto-excl-search::placeholder {
+.seoworkerai-excl-search::placeholder {
   color: var(--gray-400);
 }
-.seoauto-excl-dropdown {
+.seoworkerai-excl-dropdown {
   display: none;
   position: absolute;
   top: 100%;
@@ -1046,7 +1046,7 @@
   overscroll-behavior: contain;
   box-shadow: var(--shadow-md);
 }
-.seoauto-excl-option {
+.seoworkerai-excl-option {
   display: flex;
   align-items: center;
   gap: 8px;
@@ -1056,21 +1056,21 @@
   color: var(--gray-800);
   transition: background 0.1s;
 }
-.seoauto-excl-option:hover {
+.seoworkerai-excl-option:hover {
   background: var(--gray-50);
 }
-.seoauto-excl-option.is-selected {
+.seoworkerai-excl-option.is-selected {
   background: var(--blue-bg);
   color: var(--blue-dark);
 }
-.seoauto-excl-checkmark {
+.seoworkerai-excl-checkmark {
   width: 14px;
   flex-shrink: 0;
   font-size: 11px;
   font-weight: 700;
   color: var(--blue);
 }
-.seoauto-excl-type-tag {
+.seoworkerai-excl-type-tag {
   font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
@@ -1085,20 +1085,20 @@
 /* ============================================================
    Content Briefs — full-width, rich layout
    ============================================================ */
-.seoauto-briefs-list {
+.seoworkerai-briefs-list {
   display: flex;
   flex-direction: column;
   gap: 16px;
 }
 
-.seoauto-brief-card {
+.seoworkerai-brief-card {
   background: var(--white);
   border: 1px solid var(--gray-200);
   border-radius: var(--radius);
   box-shadow: var(--shadow-sm);
   overflow: hidden;
 }
-.seoauto-brief-header {
+.seoworkerai-brief-header {
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
@@ -1106,43 +1106,43 @@
   padding: 18px 20px 14px;
   border-bottom: 1px solid var(--gray-100);
 }
-.seoauto-brief-title {
+.seoworkerai-brief-title {
   font-size: 15px;
   font-weight: 600;
   color: var(--gray-900);
   margin: 0 0 6px;
 }
-.seoauto-brief-meta {
+.seoworkerai-brief-meta {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
   font-size: 12px;
   color: var(--gray-600);
 }
-.seoauto-brief-meta span {
+.seoworkerai-brief-meta span {
   display: flex;
   align-items: center;
   gap: 4px;
 }
-.seoauto-brief-body {
+.seoworkerai-brief-body {
   display: grid;
   grid-template-columns: 1fr 1fr 1fr;
   gap: 0;
 }
-.seoauto-brief-col {
+.seoworkerai-brief-col {
   padding: 16px 20px;
   border-right: 1px solid var(--gray-100);
 }
-.seoauto-brief-col:last-child {
+.seoworkerai-brief-col:last-child {
   border-right: none;
 }
-.seoauto-brief-col-full {
+.seoworkerai-brief-col-full {
   padding: 14px 20px;
   border-top: 1px solid var(--gray-100);
   grid-column: 1 / -1;
 }
-.seoauto-brief-col h4,
-.seoauto-brief-col-full h4 {
+.seoworkerai-brief-col h4,
+.seoworkerai-brief-col-full h4 {
   margin: 0 0 10px;
   font-size: 11px;
   font-weight: 600;
@@ -1150,27 +1150,27 @@
   letter-spacing: 0.7px;
   color: var(--gray-600);
 }
-.seoauto-brief-col p {
+.seoworkerai-brief-col p {
   font-size: 13px;
   color: var(--gray-800);
   margin: 0;
   line-height: 1.6;
 }
-.seoauto-brief-ul {
+.seoworkerai-brief-ul {
   margin: 0;
   padding-left: 16px;
   list-style: disc;
 }
-.seoauto-brief-ul li {
+.seoworkerai-brief-ul li {
   font-size: 13px;
   color: var(--gray-800);
   margin-bottom: 4px;
   line-height: 1.5;
 }
-.seoauto-brief-ul li:last-child {
+.seoworkerai-brief-ul li:last-child {
   margin-bottom: 0;
 }
-.seoauto-brief-footer {
+.seoworkerai-brief-footer {
   padding: 14px 20px;
   border-top: 1px solid var(--gray-100);
   display: flex;
@@ -1180,18 +1180,18 @@
   gap: 10px;
   background: var(--gray-50);
 }
-.seoauto-brief-linked {
+.seoworkerai-brief-linked {
   font-size: 13px;
   color: var(--gray-700);
 }
-.seoauto-brief-link-form {
+.seoworkerai-brief-link-form {
   display: flex;
   gap: 8px;
   align-items: center;
   flex-wrap: wrap;
 }
-.seoauto-brief-link-form input,
-.seoauto-brief-link-form select {
+.seoworkerai-brief-link-form input,
+.seoworkerai-brief-link-form select {
   height: 32px;
   padding: 0 8px;
   font-size: 13px;
@@ -1200,11 +1200,11 @@
   background: var(--white);
   color: var(--gray-900);
 }
-.seoauto-post-picker {
+.seoworkerai-post-picker {
   position: relative;
   min-width: 280px;
 }
-.seoauto-post-picker-display {
+.seoworkerai-post-picker-display {
   min-height: 32px;
   padding: 7px 10px;
   border: 1px solid var(--gray-300);
@@ -1214,7 +1214,7 @@
   color: var(--gray-900);
   cursor: pointer;
 }
-.seoauto-post-picker-dropdown {
+.seoworkerai-post-picker-dropdown {
   position: absolute;
   top: calc(100% + 6px);
   left: 0;
@@ -1228,21 +1228,21 @@
   box-shadow: var(--shadow-md);
   padding: 10px;
 }
-.seoauto-post-picker-dropdown.is-open {
+.seoworkerai-post-picker-dropdown.is-open {
   display: block;
 }
-.seoauto-post-picker-search {
+.seoworkerai-post-picker-search {
   width: 100%;
   margin-bottom: 8px;
 }
-.seoauto-post-picker-options {
+.seoworkerai-post-picker-options {
   max-height: 240px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 4px;
 }
-.seoauto-post-picker-option {
+.seoworkerai-post-picker-option {
   width: 100%;
   text-align: left;
   padding: 8px 10px;
@@ -1253,7 +1253,7 @@
   cursor: pointer;
   font-size: 13px;
 }
-.seoauto-post-picker-option:hover {
+.seoworkerai-post-picker-option:hover {
   background: var(--blue-bg);
   border-color: var(--blue-light);
 }
@@ -1261,19 +1261,19 @@
 /* ============================================================
    Schedules — prevent horizontal overflow
    ============================================================ */
-.seoauto-schedules-table {
+.seoworkerai-schedules-table {
   min-width: 800px;
 }
-.seoauto-schedules-table td {
+.seoworkerai-schedules-table td {
   vertical-align: middle;
 }
-.seoauto-task-forms {
+.seoworkerai-task-forms {
   display: flex;
   flex-direction: column;
   gap: 10px;
 }
-.seoauto-task-update-form,
-.seoauto-task-schedule-form {
+.seoworkerai-task-update-form,
+.seoworkerai-task-schedule-form {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -1283,15 +1283,15 @@
   border-radius: var(--radius-sm);
   border: 1px solid var(--gray-200);
 }
-.seoauto-task-update-form label,
-.seoauto-task-schedule-form label {
+.seoworkerai-task-update-form label,
+.seoworkerai-task-schedule-form label {
   font-size: 12px;
   color: var(--gray-700);
   display: flex;
   align-items: center;
   gap: 5px;
 }
-.seoauto-task-update-form input[type="number"] {
+.seoworkerai-task-update-form input[type="number"] {
   width: 70px;
   height: 28px;
   padding: 0 6px;
@@ -1299,8 +1299,8 @@
   border-radius: var(--radius-sm);
   font-size: 13px;
 }
-.seoauto-task-schedule-form input[type="datetime-local"],
-.seoauto-task-schedule-form input[type="text"] {
+.seoworkerai-task-schedule-form input[type="datetime-local"],
+.seoworkerai-task-schedule-form input[type="text"] {
   height: 28px;
   padding: 0 8px;
   border: 1px solid var(--gray-300);
@@ -1308,52 +1308,52 @@
   font-size: 12px;
   background: var(--white);
 }
-.seoauto-task-schedule-form input[type="datetime-local"] {
+.seoworkerai-task-schedule-form input[type="datetime-local"] {
   width: 200px;
 }
-.seoauto-task-schedule-form input[type="text"] {
+.seoworkerai-task-schedule-form input[type="text"] {
   width: 160px;
 }
 
 /* ============================================================
    Debug Logs — empty state, readable rows
    ============================================================ */
-.seoauto-debug-empty {
+.seoworkerai-debug-empty {
   padding: 48px 24px;
   text-align: center;
   color: var(--gray-600);
   font-size: 14px;
 }
-.seoauto-debug-empty p {
+.seoworkerai-debug-empty p {
   margin: 6px 0 0;
   font-size: 13px;
 }
-.seoauto-severity-error {
+.seoworkerai-severity-error {
   color: var(--red);
   font-weight: 600;
 }
-.seoauto-severity-warning {
+.seoworkerai-severity-warning {
   color: var(--yellow);
   font-weight: 600;
 }
-.seoauto-severity-info {
+.seoworkerai-severity-info {
   color: var(--blue);
 }
-.seoauto-severity-debug {
+.seoworkerai-severity-debug {
   color: var(--gray-600);
 }
 
 /* ============================================================
    Action Items
    ============================================================ */
-.seoauto-items-table {
+.seoworkerai-items-table {
   min-width: 860px;
 }
 
 /* ============================================================
    Notices
    ============================================================ */
-.seoauto-admin-page .notice {
+.seoworkerai-admin-page .notice {
   margin: 14px 0;
   padding: 10px 16px;
   border-left: 4px solid;
@@ -1361,23 +1361,23 @@
   background: var(--white);
   box-shadow: var(--shadow-sm);
 }
-.seoauto-admin-page .notice p {
+.seoworkerai-admin-page .notice p {
   margin: 0.4em 0;
   font-size: 13px;
 }
-.seoauto-admin-page .notice-success {
+.seoworkerai-admin-page .notice-success {
   border-color: var(--green);
   background: var(--green-bg);
 }
-.seoauto-admin-page .notice-warning {
+.seoworkerai-admin-page .notice-warning {
   border-color: #f9ab00;
   background: var(--yellow-bg);
 }
-.seoauto-admin-page .notice-error {
+.seoworkerai-admin-page .notice-error {
   border-color: var(--red);
   background: var(--red-bg);
 }
-.seoauto-admin-page .notice-info {
+.seoworkerai-admin-page .notice-info {
   border-color: var(--blue);
   background: var(--blue-bg);
 }
@@ -1385,28 +1385,28 @@
 /* ============================================================
    Utilities
    ============================================================ */
-.seoauto-mono {
+.seoworkerai-mono {
   font-family: var(--mono);
   font-size: 12px;
   color: var(--gray-700);
 }
-.seoauto-muted {
+.seoworkerai-muted {
   color: var(--gray-600);
   font-size: 13px;
 }
-.seoauto-truncate {
+.seoworkerai-truncate {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.seoauto-nowrap {
+.seoworkerai-nowrap {
   white-space: nowrap;
 }
 
 /* ============================================================
    Pagination
    ============================================================ */
-.seoauto-pagination {
+.seoworkerai-pagination {
   display: flex;
   justify-content: space-between;
   align-items: center;
@@ -1414,7 +1414,7 @@
   font-size: 13px;
   color: var(--gray-600);
 }
-.seoauto-pagination .button.disabled {
+.seoworkerai-pagination .button.disabled {
   opacity: 0.4;
   pointer-events: none;
 }
@@ -1422,7 +1422,7 @@
 /* ============================================================
    Accessibility
    ============================================================ */
-.seoauto-admin-page *:focus-visible {
+.seoworkerai-admin-page *:focus-visible {
   outline: 2px solid var(--blue);
   outline-offset: 2px;
 }
@@ -1431,39 +1431,39 @@
    Responsive
    ============================================================ */
 @media (max-width: 1100px) {
-  .seoauto-settings-grid {
+  .seoworkerai-settings-grid {
     grid-template-columns: 1fr;
   }
-  .seoauto-brief-body {
+  .seoworkerai-brief-body {
     grid-template-columns: 1fr 1fr;
   }
 }
 @media (max-width: 780px) {
-  .seoauto-admin-page {
+  .seoworkerai-admin-page {
     padding: 0 10px 40px;
   }
-  .seoauto-shell-header {
+  .seoworkerai-shell-header {
     padding: 18px 14px 0;
   }
-  .seoauto-card {
+  .seoworkerai-card {
     padding: 14px;
   }
-  .seoauto-brief-body {
+  .seoworkerai-brief-body {
     grid-template-columns: 1fr;
   }
-  .seoauto-form-grid--two,
-  .seoauto-form-grid--three {
+  .seoworkerai-form-grid--two,
+  .seoworkerai-form-grid--three {
     grid-template-columns: 1fr;
   }
-  .seoauto-kpi-grid {
+  .seoworkerai-kpi-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
 @media (max-width: 480px) {
-  .seoauto-kpi-grid {
+  .seoworkerai-kpi-grid {
     grid-template-columns: 1fr;
   }
-  .seoauto-brief-meta {
+  .seoworkerai-brief-meta {
     flex-direction: column;
     gap: 4px;
   }

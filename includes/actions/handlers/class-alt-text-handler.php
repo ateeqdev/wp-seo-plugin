@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions\Handlers;
+namespace SEOWorkerAI\Connector\Actions\Handlers;
 
 use Exception;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class AltTextHandler extends AbstractActionHandler
 {

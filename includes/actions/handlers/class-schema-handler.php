@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions\Handlers;
+namespace SEOWorkerAI\Connector\Actions\Handlers;
 
 use Exception;
-use SEOAutomation\Connector\SEO\InterfaceSeoAdapter;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\SEO\InterfaceSeoAdapter;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class SchemaHandler extends AbstractActionHandler
 {
@@ -77,15 +77,15 @@ final class SchemaHandler extends AbstractActionHandler
 
         $before = [
             'schema' => $this->adapter->getSchema($postId),
-            'plugin_schema' => json_decode((string) get_post_meta($postId, '_seoauto_schema_json_ld', true), true),
+            'plugin_schema' => json_decode((string) get_post_meta($postId, '_seoworkerai_schema_json_ld', true), true),
         ];
 
         $adapterSuccess = $this->adapter->setSchema($postId, $schema);
-        update_post_meta($postId, '_seoauto_schema_json_ld', $json);
+        update_post_meta($postId, '_seoworkerai_schema_json_ld', $json);
 
         $after = [
             'schema' => $this->adapter->getSchema($postId),
-            'plugin_schema' => json_decode((string) get_post_meta($postId, '_seoauto_schema_json_ld', true), true),
+            'plugin_schema' => json_decode((string) get_post_meta($postId, '_seoworkerai_schema_json_ld', true), true),
             'adapter' => $this->adapter->getName(),
             'adapter_success' => $adapterSuccess,
         ];
@@ -125,13 +125,13 @@ final class SchemaHandler extends AbstractActionHandler
         } else {
             delete_post_meta($postId, '_yoast_wpseo_schema');
             delete_post_meta($postId, '_aioseo_schema');
-            delete_post_meta($postId, '_seoauto_schema_json_ld');
+            delete_post_meta($postId, '_seoworkerai_schema_json_ld');
         }
 
         if (is_array($pluginSchema) && $pluginSchema !== []) {
-            update_post_meta($postId, '_seoauto_schema_json_ld', wp_json_encode($pluginSchema));
+            update_post_meta($postId, '_seoworkerai_schema_json_ld', wp_json_encode($pluginSchema));
         } else {
-            delete_post_meta($postId, '_seoauto_schema_json_ld');
+            delete_post_meta($postId, '_seoworkerai_schema_json_ld');
         }
 
         return ['status' => 'rolled_back'];

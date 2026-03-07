@@ -2,17 +2,17 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Admin;
+namespace SEOWorkerAI\Connector\Admin;
 
-use SEOAutomation\Connector\Actions\ActionExecutor;
-use SEOAutomation\Connector\Actions\ActionRepository;
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\Auth\OAuthHandler;
-use SEOAutomation\Connector\Auth\SiteTokenManager;
-use SEOAutomation\Connector\Sync\BriefSyncer;
-use SEOAutomation\Connector\Sync\HealthChecker;
-use SEOAutomation\Connector\Sync\SiteRegistrar;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Actions\ActionExecutor;
+use SEOWorkerAI\Connector\Actions\ActionRepository;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\Auth\OAuthHandler;
+use SEOWorkerAI\Connector\Auth\SiteTokenManager;
+use SEOWorkerAI\Connector\Sync\BriefSyncer;
+use SEOWorkerAI\Connector\Sync\HealthChecker;
+use SEOWorkerAI\Connector\Sync\SiteRegistrar;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class MenuRegistrar
 {
@@ -53,30 +53,30 @@ final class MenuRegistrar
         add_action('admin_menu', [$this, 'registerMenu']);
         add_action('admin_init', [$this, 'registerSettings']);
         add_action('admin_enqueue_scripts', [$this, 'enqueueAssets']);
-        add_action('admin_post_seoauto_register_site', [$this, 'handleRegisterSite']);
-        add_action('admin_post_seoauto_health_check', [$this, 'handleHealthCheck']);
-        add_action('admin_post_seoauto_start_oauth', [$this, 'handleStartOAuth']);
-        add_action('admin_post_seoauto_revoke_oauth', [$this, 'handleRevokeOAuth']);
-        add_action('admin_post_seoauto_rotate_token', [$this, 'handleRotateToken']);
-        add_action('admin_post_seoauto_update_site_profile', [$this, 'handleUpdateSiteProfile']);
-        add_action('admin_post_seoauto_update_task', [$this, 'handleUpdateTask']);
-        add_action('admin_post_seoauto_schedule_task', [$this, 'handleScheduleTask']);
-        add_action('admin_post_seoauto_link_brief', [$this, 'handleLinkBrief']);
-        add_action('admin_post_seoauto_delete_logs', [$this, 'handleDeleteLogs']);
-        add_action('admin_post_seoauto_delete_local_errors', [$this, 'handleDeleteLocalErrors']);
-        add_action('admin_post_seoauto_apply_action', [$this, 'handleApplyAction']);
-        add_action('admin_post_seoauto_revert_action', [$this, 'handleRevertAction']);
-        add_action('admin_post_seoauto_edit_action_payload', [$this, 'handleEditActionPayload']);
-        add_action('admin_post_seoauto_update_action_item', [$this, 'handleUpdateActionItem']);
+        add_action('admin_post_seoworkerai_register_site', [$this, 'handleRegisterSite']);
+        add_action('admin_post_seoworkerai_health_check', [$this, 'handleHealthCheck']);
+        add_action('admin_post_seoworkerai_start_oauth', [$this, 'handleStartOAuth']);
+        add_action('admin_post_seoworkerai_revoke_oauth', [$this, 'handleRevokeOAuth']);
+        add_action('admin_post_seoworkerai_rotate_token', [$this, 'handleRotateToken']);
+        add_action('admin_post_seoworkerai_update_site_profile', [$this, 'handleUpdateSiteProfile']);
+        add_action('admin_post_seoworkerai_update_task', [$this, 'handleUpdateTask']);
+        add_action('admin_post_seoworkerai_schedule_task', [$this, 'handleScheduleTask']);
+        add_action('admin_post_seoworkerai_link_brief', [$this, 'handleLinkBrief']);
+        add_action('admin_post_seoworkerai_delete_logs', [$this, 'handleDeleteLogs']);
+        add_action('admin_post_seoworkerai_delete_local_errors', [$this, 'handleDeleteLocalErrors']);
+        add_action('admin_post_seoworkerai_apply_action', [$this, 'handleApplyAction']);
+        add_action('admin_post_seoworkerai_revert_action', [$this, 'handleRevertAction']);
+        add_action('admin_post_seoworkerai_edit_action_payload', [$this, 'handleEditActionPayload']);
+        add_action('admin_post_seoworkerai_update_action_item', [$this, 'handleUpdateActionItem']);
     }
 
     public function enqueueAssets(string $hookSuffix): void
     {
-        if (strpos($hookSuffix, 'seoauto') === false) {
+        if (strpos($hookSuffix, 'seoworkerai') === false) {
             return;
         }
-        wp_enqueue_style('seoauto-admin', SEOAUTO_PLUGIN_URL . 'assets/css/admin.css', [], SEOAUTO_VERSION);
-        wp_enqueue_script('seoauto-admin', SEOAUTO_PLUGIN_URL . 'assets/js/admin.js', [], SEOAUTO_VERSION, true);
+        wp_enqueue_style('seoworkerai-admin', SEOWORKERAI_PLUGIN_URL . 'assets/css/admin.css', [], SEOWORKERAI_VERSION);
+        wp_enqueue_script('seoworkerai-admin', SEOWORKERAI_PLUGIN_URL . 'assets/js/admin.js', [], SEOWORKERAI_VERSION, true);
     }
 
     // ─── Form handlers ────────────────────────────────────────────────────────
@@ -84,41 +84,41 @@ final class MenuRegistrar
     public function handleRegisterSite(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_register_site');
-        $baseUrl = trim((string) get_option('seoauto_base_url', ''));
+        check_admin_referer('seoworkerai_register_site');
+        $baseUrl = trim((string) get_option('seoworkerai_base_url', ''));
         if ($baseUrl === '' || !$this->isBaseUrlSyntaxValid($baseUrl)) {
-            wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => 'register_missing_base_url'], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => 'register_missing_base_url'], admin_url('admin.php')));
             exit;
         }
         $result = $this->siteRegistrar->registerOrUpdate(true);
-        $ok = !isset($result['error']) && (!empty($result['site_id']) || ((int) get_option('seoauto_site_id', 0) > 0));
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $ok ? 'register_ok' : 'register_failed'], admin_url('admin.php')));
+        $ok = !isset($result['error']) && (!empty($result['site_id']) || ((int) get_option('seoworkerai_site_id', 0) > 0));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => $ok ? 'register_ok' : 'register_failed'], admin_url('admin.php')));
         exit;
     }
 
     public function handleHealthCheck(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_health_check');
+        check_admin_referer('seoworkerai_health_check');
         $result = $this->healthChecker->check();
         $ok = !empty($result['connected']);
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $ok ? 'health_ok' : 'health_failed'], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => $ok ? 'health_ok' : 'health_failed'], admin_url('admin.php')));
         exit;
     }
 
     public function handleStartOAuth(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_start_oauth');
+        check_admin_referer('seoworkerai_start_oauth');
         try {
             $oauthUrl = $this->oauthHandler->beginGoogleOAuth(['search_console', 'analytics']);
             if ($oauthUrl === '') throw new \RuntimeException('Missing oauth_url');
             wp_redirect($oauthUrl);
             exit;
         } catch (\Throwable $e) {
-            update_option('seoauto_oauth_status', 'failed', false);
-            update_option('seoauto_oauth_last_error', $e->getMessage(), false);
-            wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => 'oauth_init_failed'], admin_url('admin.php')));
+            update_option('seoworkerai_oauth_status', 'failed', false);
+            update_option('seoworkerai_oauth_last_error', $e->getMessage(), false);
+            wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => 'oauth_init_failed'], admin_url('admin.php')));
             exit;
         }
     }
@@ -126,7 +126,7 @@ final class MenuRegistrar
     public function handleRevokeOAuth(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_revoke_oauth');
+        check_admin_referer('seoworkerai_revoke_oauth');
         try {
             $reason = isset($_POST['revocation_reason']) ? sanitize_text_field((string) $_POST['revocation_reason']) : '';
             $this->client->revokeGoogleOAuth($reason !== '' ? ['revocation_reason' => $reason] : []);
@@ -134,27 +134,27 @@ final class MenuRegistrar
         } catch (\Throwable $e) {
             $notice = (int) $e->getCode() === 404 ? 'oauth_revoke_ok' : 'oauth_revoke_failed';
             if ($notice !== 'oauth_revoke_ok') {
-                update_option('seoauto_oauth_last_error', $e->getMessage(), false);
+                update_option('seoworkerai_oauth_last_error', $e->getMessage(), false);
             }
         }
         if (in_array($notice, ['oauth_revoke_ok'], true)) {
-            update_option('seoauto_oauth_status', 'pending', false);
-            update_option('seoauto_oauth_provider', '', false);
-            update_option('seoauto_oauth_scopes', [], false);
-            update_option('seoauto_oauth_connected_at', 0, false);
-            update_option('seoauto_oauth_last_error', '', false);
+            update_option('seoworkerai_oauth_status', 'pending', false);
+            update_option('seoworkerai_oauth_provider', '', false);
+            update_option('seoworkerai_oauth_scopes', [], false);
+            update_option('seoworkerai_oauth_connected_at', 0, false);
+            update_option('seoworkerai_oauth_last_error', '', false);
         }
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $notice], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleRotateToken(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_rotate_token');
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        check_admin_referer('seoworkerai_rotate_token');
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
         if ($siteId <= 0) {
-            wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => 'rotate_failed'], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => 'rotate_failed'], admin_url('admin.php')));
             exit;
         }
         try {
@@ -162,20 +162,20 @@ final class MenuRegistrar
             $newToken = isset($response['api_key']) ? (string) $response['api_key'] : '';
             if ($newToken === '') throw new \RuntimeException('Token rotation response missing api_key.');
             $this->tokenManager->storeToken($newToken);
-            update_option('seoauto_oauth_last_error', '', false);
+            update_option('seoworkerai_oauth_last_error', '', false);
             $notice = 'rotate_ok';
         } catch (\Throwable $e) {
-            update_option('seoauto_oauth_last_error', $e->getMessage(), false);
+            update_option('seoworkerai_oauth_last_error', $e->getMessage(), false);
             $notice = 'rotate_failed';
         }
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $notice], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleUpdateSiteProfile(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_update_site_profile');
+        check_admin_referer('seoworkerai_update_site_profile');
         $description = isset($_POST['site_profile_description']) ? sanitize_textarea_field((string) wp_unslash($_POST['site_profile_description'])) : '';
         $taste = isset($_POST['site_profile_taste']) ? sanitize_textarea_field((string) wp_unslash($_POST['site_profile_taste'])) : '';
         $locations = $this->sanitizePostedLocations($_POST);
@@ -186,14 +186,14 @@ final class MenuRegistrar
             'priority' => 0,
         ];
 
-        update_option('seoauto_site_profile_description', $description, false);
-        update_option('seoauto_site_profile_taste', $taste, false);
-        update_option('seoauto_site_locations', $locations, false);
-        update_option('seoauto_site_location_code', (int) $primaryLocation['location_code'], false);
-        update_option('seoauto_site_location_name', (string) $primaryLocation['location_name'], false);
+        update_option('seoworkerai_site_profile_description', $description, false);
+        update_option('seoworkerai_site_profile_taste', $taste, false);
+        update_option('seoworkerai_site_locations', $locations, false);
+        update_option('seoworkerai_site_location_code', (int) $primaryLocation['location_code'], false);
+        update_option('seoworkerai_site_location_name', (string) $primaryLocation['location_name'], false);
 
         $siteSettings = $this->sanitizePostedSiteSettings($_POST);
-        update_option('seoauto_site_seo_settings', $siteSettings, false);
+        update_option('seoworkerai_site_seo_settings', $siteSettings, false);
 
         $result = $this->siteRegistrar->registerOrUpdate(true);
         $notice = 'profile_ok';
@@ -201,13 +201,13 @@ final class MenuRegistrar
         if (isset($result['error'])) {
             $notice = 'profile_failed';
         } else {
-            $siteId = (int) ($result['site_id'] ?? get_option('seoauto_site_id', 0));
+            $siteId = (int) ($result['site_id'] ?? get_option('seoworkerai_site_id', 0));
             if ($siteId > 0) {
                 try {
                     $settingsResponse = $this->client->updateSiteSettings($siteId, $this->buildRemoteSiteSettingsPayload($siteSettings));
                     if (isset($settingsResponse['settings']) && is_array($settingsResponse['settings'])) {
                         update_option(
-                            'seoauto_site_seo_settings',
+                            'seoworkerai_site_seo_settings',
                             $this->siteRegistrar->sanitizeSiteSettingsPayload($settingsResponse['settings']),
                             false
                         );
@@ -219,17 +219,17 @@ final class MenuRegistrar
             }
         }
 
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-settings', 'seoauto_notice' => $notice], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleUpdateTask(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_update_task');
+        check_admin_referer('seoworkerai_update_task');
         $taskId = isset($_POST['task_id']) ? (int) $_POST['task_id'] : 0;
         if ($taskId <= 0) {
-            wp_safe_redirect(add_query_arg(['page' => 'seoauto-schedules', 'seoauto_notice' => 'task_update_failed'], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-schedules', 'seoworkerai_notice' => 'task_update_failed'], admin_url('admin.php')));
             exit;
         }
         try {
@@ -241,17 +241,17 @@ final class MenuRegistrar
             $this->logger->warning('admin_task_update_failed', ['error' => $e->getMessage()], 'admin');
             $notice = 'task_update_failed';
         }
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-schedules', 'seoauto_notice' => $notice], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-schedules', 'seoworkerai_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleScheduleTask(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_schedule_task');
+        check_admin_referer('seoworkerai_schedule_task');
         $taskId = isset($_POST['task_id']) ? (int) $_POST['task_id'] : 0;
         if ($taskId <= 0) {
-            wp_safe_redirect(add_query_arg(['page' => 'seoauto-schedules', 'seoauto_notice' => 'task_schedule_failed'], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-schedules', 'seoworkerai_notice' => 'task_schedule_failed'], admin_url('admin.php')));
             exit;
         }
         $payload = [];
@@ -272,26 +272,26 @@ final class MenuRegistrar
             $this->logger->warning('admin_task_schedule_failed', ['error' => $e->getMessage()], 'admin');
             $notice = 'task_schedule_failed';
         }
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-schedules', 'seoauto_notice' => $notice], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-schedules', 'seoworkerai_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleLinkBrief(): void
     {
         if (!current_user_can('edit_posts')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_link_brief');
+        check_admin_referer('seoworkerai_link_brief');
         $briefId = isset($_POST['brief_id']) ? (int) $_POST['brief_id'] : 0;
         $postId  = isset($_POST['wp_post_id']) ? (int) $_POST['wp_post_id'] : 0;
         $articleStatus = isset($_POST['article_status']) ? sanitize_text_field((string) $_POST['article_status']) : 'drafted';
         if (!in_array($articleStatus, ['drafted', 'published'], true)) $articleStatus = 'drafted';
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
         if ($briefId <= 0 || $postId <= 0 || $siteId <= 0) {
-            wp_safe_redirect(add_query_arg(['page' => 'seoauto-briefs', 'seoauto_notice' => 'brief_link_failed'], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-briefs', 'seoworkerai_notice' => 'brief_link_failed'], admin_url('admin.php')));
             exit;
         }
         $post = get_post($postId);
         if (!$post instanceof \WP_Post) {
-            wp_safe_redirect(add_query_arg(['page' => 'seoauto-briefs', 'seoauto_notice' => 'brief_link_failed'], admin_url('admin.php')));
+            wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-briefs', 'seoworkerai_notice' => 'brief_link_failed'], admin_url('admin.php')));
             exit;
         }
         try {
@@ -317,32 +317,32 @@ final class MenuRegistrar
             $this->logger->warning('admin_brief_link_failed', ['error' => $e->getMessage()], 'admin');
             $notice = 'brief_link_failed';
         }
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-briefs', 'seoauto_notice' => $notice], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-briefs', 'seoworkerai_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleDeleteLogs(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_delete_logs');
+        check_admin_referer('seoworkerai_delete_logs');
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_changes';
+        $table = $wpdb->prefix . 'seoworkerai_changes';
         $deleted = $wpdb->query("DELETE FROM {$table}"); // phpcs:ignore
         $notice = $deleted === false ? 'logs_delete_failed' : 'logs_delete_ok';
         $deletedCount = $deleted === false ? 0 : (int) $deleted;
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-logs', 'seoauto_notice' => $notice, 'deleted_count' => $deletedCount], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-logs', 'seoworkerai_notice' => $notice, 'deleted_count' => $deletedCount], admin_url('admin.php')));
         exit;
     }
 
     public function handleDeleteLocalErrors(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_delete_local_errors');
+        check_admin_referer('seoworkerai_delete_local_errors');
         $severity = isset($_POST['severity']) ? sanitize_text_field((string) $_POST['severity']) : 'all';
         $allowed = ['all', 'error', 'warning'];
         if (!in_array($severity, $allowed, true)) $severity = 'all';
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_logs';
+        $table = $wpdb->prefix . 'seoworkerai_logs';
         if ($severity === 'error') {
             $deleted = $wpdb->query($wpdb->prepare("DELETE FROM {$table} WHERE severity = %s", 'error')); // phpcs:ignore
         } elseif ($severity === 'warning') {
@@ -352,28 +352,28 @@ final class MenuRegistrar
         }
         $notice = $deleted === false ? 'local_errors_delete_failed' : 'local_errors_delete_ok';
         $deletedCount = $deleted === false ? 0 : (int) $deleted;
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-local-errors', 'seoauto_notice' => $notice, 'deleted_count' => $deletedCount, 'severity' => $severity], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-local-errors', 'seoworkerai_notice' => $notice, 'deleted_count' => $deletedCount, 'severity' => $severity], admin_url('admin.php')));
         exit;
     }
 
     public function handleApplyAction(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_apply_action');
+        check_admin_referer('seoworkerai_apply_action');
         $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
         if ($actionId > 0) {
-            \SEOAutomation\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 50);
+            \SEOWorkerAI\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 50);
             $this->actionRepository->markQueued($actionId);
         }
         $returnPage = $this->resolveActionRedirectPage();
-        wp_safe_redirect(add_query_arg(['page' => $returnPage, 'seoauto_notice' => 'action_apply_requested'], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => $returnPage, 'seoworkerai_notice' => 'action_apply_requested'], admin_url('admin.php')));
         exit;
     }
 
     public function handleRevertAction(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_revert_action');
+        check_admin_referer('seoworkerai_revert_action');
         $actionId = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
         $notice = 'action_revert_failed';
         if ($actionId > 0) {
@@ -400,14 +400,14 @@ final class MenuRegistrar
             }
         }
         $returnPage = $this->resolveActionRedirectPage();
-        wp_safe_redirect(add_query_arg(['page' => $returnPage, 'seoauto_notice' => $notice], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => $returnPage, 'seoworkerai_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
     public function handleEditActionPayload(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_edit_action_payload');
+        check_admin_referer('seoworkerai_edit_action_payload');
         $actionId     = isset($_POST['action_id']) ? (int) $_POST['action_id'] : 0;
         $payloadJson  = isset($_POST['payload_json']) ? (string) wp_unslash($_POST['payload_json']) : '';
         $payloadFields = isset($_POST['payload_fields']) && is_array($_POST['payload_fields']) ? wp_unslash($_POST['payload_fields']) : [];
@@ -448,7 +448,7 @@ final class MenuRegistrar
                     if ($updated) {
                         $notice = 'action_edit_ok';
                         if (is_array($action) && ($action['status'] ?? '') === 'applied') {
-                            \SEOAutomation\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 10);
+                            \SEOWorkerAI\Connector\Queue\QueueManager::enqueueActionExecution($actionId, 10);
                             $this->actionRepository->markQueued($actionId);
                             $notice = 'action_edit_ok_reapply';
                         }
@@ -465,7 +465,7 @@ final class MenuRegistrar
                 ], 'admin');
             }
         }
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-logs', 'seoauto_notice' => $notice], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-logs', 'seoworkerai_notice' => $notice], admin_url('admin.php')));
         exit;
     }
 
@@ -538,9 +538,9 @@ final class MenuRegistrar
     public function handleUpdateActionItem(): void
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
-        check_admin_referer('seoauto_update_action_item');
+        check_admin_referer('seoworkerai_update_action_item');
         global $wpdb;
-        $table  = $wpdb->prefix . 'seoauto_action_items';
+        $table  = $wpdb->prefix . 'seoworkerai_action_items';
         $itemId = isset($_POST['item_id']) ? (int) $_POST['item_id'] : 0;
         $status = isset($_POST['status']) ? sanitize_text_field((string) $_POST['status']) : 'open';
         $valid  = ['open', 'in_progress', 'resolved'];
@@ -553,7 +553,7 @@ final class MenuRegistrar
                 ['%d']
             );
         }
-        wp_safe_redirect(add_query_arg(['page' => 'seoauto-action-items', 'seoauto_notice' => 'action_item_updated'], admin_url('admin.php')));
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-action-items', 'seoworkerai_notice' => 'action_item_updated'], admin_url('admin.php')));
         exit;
     }
 
@@ -561,27 +561,27 @@ final class MenuRegistrar
 
     public function registerMenu(): void
     {
-        add_menu_page('SEOWorkerAI', 'SEOWorkerAI', 'manage_options', 'seoauto', [$this, 'renderSettingsPage'], 'dashicons-performance', 80);
-        add_submenu_page('seoauto', 'Settings', 'Settings', 'manage_options', 'seoauto', [$this, 'renderSettingsPage']);
-        add_submenu_page('seoauto', 'Change Center', 'Change Center', 'manage_options', 'seoauto-logs', [$this, 'renderLogsPage']);
-        add_submenu_page('seoauto', 'Action Items', 'Action Items', 'manage_options', 'seoauto-action-items', [$this, 'renderActionItemsPage']);
-        add_submenu_page('seoauto', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoauto-briefs', [$this, 'renderBriefsPage']);
+        add_menu_page('SEOWorkerAI', 'SEOWorkerAI', 'manage_options', 'seoworkerai', [$this, 'renderSettingsPage'], 'dashicons-performance', 80);
+        add_submenu_page('seoworkerai', 'Settings', 'Settings', 'manage_options', 'seoworkerai', [$this, 'renderSettingsPage']);
+        add_submenu_page('seoworkerai', 'Change Center', 'Change Center', 'manage_options', 'seoworkerai-logs', [$this, 'renderLogsPage']);
+        add_submenu_page('seoworkerai', 'Action Items', 'Action Items', 'manage_options', 'seoworkerai-action-items', [$this, 'renderActionItemsPage']);
+        add_submenu_page('seoworkerai', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoworkerai-briefs', [$this, 'renderBriefsPage']);
         
         // Hidden pages - accessible via URL but not in menu (null parent)
-        add_submenu_page(null, 'Debug Logs', 'Debug Logs', 'manage_options', 'seoauto-local-errors', [$this, 'renderLocalErrorsPage']);
-        add_submenu_page(null, 'Schedules', 'Schedules', 'manage_options', 'seoauto-schedules', [$this, 'renderSchedulesPage']);
-        add_submenu_page(null, 'Settings', 'Settings', 'manage_options', 'seoauto-settings', [$this, 'renderSettingsPage']);
-        add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seoauto-oauth-callback', [$this, 'renderOauthCallbackPage']);
+        add_submenu_page(null, 'Debug Logs', 'Debug Logs', 'manage_options', 'seoworkerai-local-errors', [$this, 'renderLocalErrorsPage']);
+        add_submenu_page(null, 'Schedules', 'Schedules', 'manage_options', 'seoworkerai-schedules', [$this, 'renderSchedulesPage']);
+        add_submenu_page(null, 'Settings', 'Settings', 'manage_options', 'seoworkerai-settings', [$this, 'renderSettingsPage']);
+        add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seoworkerai-oauth-callback', [$this, 'renderOauthCallbackPage']);
         add_submenu_page(null, 'OAuth Callback', 'OAuth Callback', 'manage_options', 'seo-platform-oauth-complete', [$this, 'renderOauthCallbackPage']);
     }
 
     public function registerSettings(): void
     {
-        register_setting('seoauto_settings', 'seoauto_primary_seo_adapter', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field', 'default' => 'auto']);
-        register_setting('seoauto_settings', 'seoauto_change_application_mode', ['type' => 'string', 'sanitize_callback' => [$this, 'sanitizeChangeApplicationMode'], 'default' => 'dangerous_auto_apply']);
-        register_setting('seoauto_settings', 'seoauto_debug_enabled', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
-        register_setting('seoauto_settings', 'seoauto_allow_insecure_ssl', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
-        register_setting('seoauto_settings', 'seoauto_excluded_change_audit_pages', ['type' => 'string', 'sanitize_callback' => [$this, 'sanitizeExcludedChangeAuditPages'], 'default' => '']);
+        register_setting('seoworkerai_settings', 'seoworkerai_primary_seo_adapter', ['type' => 'string', 'sanitize_callback' => 'sanitize_text_field', 'default' => 'auto']);
+        register_setting('seoworkerai_settings', 'seoworkerai_change_application_mode', ['type' => 'string', 'sanitize_callback' => [$this, 'sanitizeChangeApplicationMode'], 'default' => 'dangerous_auto_apply']);
+        register_setting('seoworkerai_settings', 'seoworkerai_debug_enabled', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
+        register_setting('seoworkerai_settings', 'seoworkerai_allow_insecure_ssl', ['type' => 'boolean', 'sanitize_callback' => 'rest_sanitize_boolean', 'default' => false]);
+        register_setting('seoworkerai_settings', 'seoworkerai_excluded_change_audit_pages', ['type' => 'string', 'sanitize_callback' => [$this, 'sanitizeExcludedChangeAuditPages'], 'default' => '']);
     }
 
     // ─── Render: Settings ─────────────────────────────────────────────────────
@@ -590,33 +590,33 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
 
-        $notice         = isset($_GET['seoauto_notice']) ? sanitize_text_field((string) $_GET['seoauto_notice']) : '';
-        $oauthStatus    = (string) get_option('seoauto_oauth_status', 'pending');
-        $oauthProvider  = (string) get_option('seoauto_oauth_provider', '');
-        $oauthScopes    = get_option('seoauto_oauth_scopes', []);
+        $notice         = isset($_GET['seoworkerai_notice']) ? sanitize_text_field((string) $_GET['seoworkerai_notice']) : '';
+        $oauthStatus    = (string) get_option('seoworkerai_oauth_status', 'pending');
+        $oauthProvider  = (string) get_option('seoworkerai_oauth_provider', '');
+        $oauthScopes    = get_option('seoworkerai_oauth_scopes', []);
         if (!is_array($oauthScopes)) $oauthScopes = [];
-        $oauthConnectedAt = (int) get_option('seoauto_oauth_connected_at', 0);
-        $oauthError     = (string) get_option('seoauto_oauth_last_error', '');
-        $adapter        = (string) get_option('seoauto_primary_seo_adapter', 'auto');
-        $mode           = (string) get_option('seoauto_change_application_mode', 'dangerous_auto_apply');
-        $siteId         = (int) get_option('seoauto_site_id', 0);
-        $lastCron       = (int) get_option('seoauto_last_cron_run', 0);
-        $lastUserSync   = (int) get_option('seoauto_last_user_sync', 0);
-        $lastBriefSync  = (int) get_option('seoauto_last_brief_sync', 0);
-        $siteDescription = (string) get_option('seoauto_site_profile_description', '');
-        $siteTaste = (string) get_option('seoauto_site_profile_taste', '');
-        $siteLocations = $this->siteRegistrar->normalizeLocationsOption(get_option('seoauto_site_locations', []));
+        $oauthConnectedAt = (int) get_option('seoworkerai_oauth_connected_at', 0);
+        $oauthError     = (string) get_option('seoworkerai_oauth_last_error', '');
+        $adapter        = (string) get_option('seoworkerai_primary_seo_adapter', 'auto');
+        $mode           = (string) get_option('seoworkerai_change_application_mode', 'dangerous_auto_apply');
+        $siteId         = (int) get_option('seoworkerai_site_id', 0);
+        $lastCron       = (int) get_option('seoworkerai_last_cron_run', 0);
+        $lastUserSync   = (int) get_option('seoworkerai_last_user_sync', 0);
+        $lastBriefSync  = (int) get_option('seoworkerai_last_brief_sync', 0);
+        $siteDescription = (string) get_option('seoworkerai_site_profile_description', '');
+        $siteTaste = (string) get_option('seoworkerai_site_profile_taste', '');
+        $siteLocations = $this->siteRegistrar->normalizeLocationsOption(get_option('seoworkerai_site_locations', []));
         if ($siteLocations === []) {
             $siteLocations = [[
                 'location_type' => 'primary',
-                'location_code' => (int) get_option('seoauto_site_location_code', 2840),
-                'location_name' => (string) get_option('seoauto_site_location_name', 'United States'),
+                'location_code' => (int) get_option('seoworkerai_site_location_code', 2840),
+                'location_name' => (string) get_option('seoworkerai_site_location_name', 'United States'),
                 'priority' => 0,
             ]];
         }
-        $siteSeoSettings = get_option('seoauto_site_seo_settings', []);
+        $siteSeoSettings = get_option('seoworkerai_site_seo_settings', []);
         if (!is_array($siteSeoSettings)) $siteSeoSettings = [];
-        $billing = get_option('seoauto_billing', []);
+        $billing = get_option('seoworkerai_billing', []);
         if (!is_array($billing)) $billing = [];
         $siteSettingTemplates = [];
         $availableLocations = $this->getAvailableLocationOptions();
@@ -624,12 +624,12 @@ final class MenuRegistrar
             ? strtotime((string) $siteSeoSettings['domain_rating_checked_at'])
             : false;
 
-        $excludedRaw    = (string) get_option('seoauto_excluded_change_audit_pages', '');
+        $excludedRaw    = (string) get_option('seoworkerai_excluded_change_audit_pages', '');
         $excludedItems  = array_values(array_filter(array_map('trim', explode("\n", $excludedRaw))));
 
         $isConnected    = $oauthStatus === 'active';
 
-        $providerAlerts = get_option('seoauto_provider_connection_alerts', []);
+        $providerAlerts = get_option('seoworkerai_provider_connection_alerts', []);
         if (!is_array($providerAlerts)) $providerAlerts = [];
 
         if ($siteId > 0 && $this->tokenManager->hasToken()) {
@@ -637,11 +637,11 @@ final class MenuRegistrar
                 $settingsResponse = $this->client->getSiteSettings($siteId);
                 if (isset($settingsResponse['settings']) && is_array($settingsResponse['settings'])) {
                     $siteSeoSettings = $this->siteRegistrar->sanitizeSiteSettingsPayload($settingsResponse['settings']);
-                    update_option('seoauto_site_seo_settings', $siteSeoSettings, false);
+                    update_option('seoworkerai_site_seo_settings', $siteSeoSettings, false);
                 }
                 if (isset($settingsResponse['billing']) && is_array($settingsResponse['billing'])) {
-                    $billing = \SEOAutomation\Connector\Sync\SiteRegistrar::sanitizeBillingPayload($settingsResponse['billing']);
-                    update_option('seoauto_billing', $billing, false);
+                    $billing = \SEOWorkerAI\Connector\Sync\SiteRegistrar::sanitizeBillingPayload($settingsResponse['billing']);
+                    update_option('seoworkerai_billing', $billing, false);
                 }
                 $siteSettingTemplates = isset($settingsResponse['templates']) && is_array($settingsResponse['templates']) ? $settingsResponse['templates'] : [];
                 if (isset($settingsResponse['locations']) && is_array($settingsResponse['locations'])) {
@@ -668,8 +668,8 @@ final class MenuRegistrar
             }
         }
         ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('SEOWorkerAI', 'seoauto', 'Manage your site SEO automation preferences, billing, and integrations.'); ?>
+        <div class="wrap seoworkerai-admin-page">
+            <?php $this->renderAdminShellHeader('SEOWorkerAI', 'seoworkerai', 'Manage your site SEO automation preferences, billing, and integrations.'); ?>
 
             <?php $this->renderNotice($notice); ?>
 
@@ -680,48 +680,48 @@ final class MenuRegistrar
                 </div>
             <?php endforeach; endif; ?>
 
-            <?php if ((bool) get_option('seoauto_api_blocked', false)) : ?>
+            <?php if ((bool) get_option('seoworkerai_api_blocked', false)) : ?>
                 <div class="notice notice-error">
-                    <p><strong>Connection error:</strong> <?php echo esc_html((string)get_option('seoauto_api_last_error', 'Unknown error')); ?></p>
+                    <p><strong>Connection error:</strong> <?php echo esc_html((string)get_option('seoworkerai_api_last_error', 'Unknown error')); ?></p>
                 </div>
             <?php endif; ?>
 
             <!-- Site Status Banner -->
-            <div class="seoauto-card seoauto-card-wide" style="margin-bottom:16px;">
-                <div class="seoauto-card-head">
+            <div class="seoworkerai-card seoworkerai-card-wide" style="margin-bottom:16px;">
+                <div class="seoworkerai-card-head">
                     <h2>Site Status</h2>
-                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-briefs')); ?>">View Content Briefs</a>
+                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-briefs')); ?>">View Content Briefs</a>
                 </div>
-                <div class="seoauto-stat-grid">
-                    <div class="seoauto-stat"><span>Registration</span><strong><?php echo esc_html($siteId > 0 ? 'Active' : 'Not registered'); ?></strong></div>
-                    <div class="seoauto-stat"><span>Queue Heartbeat</span><strong><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i', $lastCron) : 'Never'); ?></strong></div>
-                    <div class="seoauto-stat"><span>User Sync</span><strong><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i', $lastUserSync) : 'Never'); ?></strong></div>
-                    <div class="seoauto-stat"><span>Brief Sync</span><strong><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i', $lastBriefSync) : 'Never'); ?></strong></div>
-                    <div class="seoauto-stat"><span>Google Connection</span><strong><?php echo esc_html($isConnected ? 'Connected' . ($oauthProvider !== '' ? ' (' . $oauthProvider . ')' : '') : 'Not connected'); ?></strong></div>
-                    <div class="seoauto-stat"><span>Billing</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Paid'); ?></strong></div>
+                <div class="seoworkerai-stat-grid">
+                    <div class="seoworkerai-stat"><span>Registration</span><strong><?php echo esc_html($siteId > 0 ? 'Active' : 'Not registered'); ?></strong></div>
+                    <div class="seoworkerai-stat"><span>Queue Heartbeat</span><strong><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i', $lastCron) : 'Never'); ?></strong></div>
+                    <div class="seoworkerai-stat"><span>User Sync</span><strong><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i', $lastUserSync) : 'Never'); ?></strong></div>
+                    <div class="seoworkerai-stat"><span>Brief Sync</span><strong><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i', $lastBriefSync) : 'Never'); ?></strong></div>
+                    <div class="seoworkerai-stat"><span>Google Connection</span><strong><?php echo esc_html($isConnected ? 'Connected' . ($oauthProvider !== '' ? ' (' . $oauthProvider . ')' : '') : 'Not connected'); ?></strong></div>
+                    <div class="seoworkerai-stat"><span>Billing</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Paid'); ?></strong></div>
                 </div>
             </div>
 
-            <div class="seoauto-settings-grid">
+            <div class="seoworkerai-settings-grid">
 
-                <section class="seoauto-card seoauto-card--settings">
+                <section class="seoworkerai-card seoworkerai-card--settings">
                     <h2>Site Profile &amp; Strategy</h2>
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                        <?php wp_nonce_field('seoauto_update_site_profile'); ?>
-                        <input type="hidden" name="action" value="seoauto_update_site_profile">
+                        <?php wp_nonce_field('seoworkerai_update_site_profile'); ?>
+                        <input type="hidden" name="action" value="seoworkerai_update_site_profile">
 
-                        <div class="seoauto-form-field">
-                            <label for="seoauto-site-profile-description">Site Description</label>
-                            <textarea id="seoauto-site-profile-description" name="site_profile_description" rows="4"><?php echo esc_textarea($siteDescription); ?></textarea>
+                        <div class="seoworkerai-form-field">
+                            <label for="seoworkerai-site-profile-description">Site Description</label>
+                            <textarea id="seoworkerai-site-profile-description" name="site_profile_description" rows="4"><?php echo esc_textarea($siteDescription); ?></textarea>
                         </div>
-                        <div class="seoauto-form-field">
-                            <label for="seoauto-site-profile-taste">Brand Taste</label>
-                            <textarea id="seoauto-site-profile-taste" name="site_profile_taste" rows="4"><?php echo esc_textarea($siteTaste); ?></textarea>
+                        <div class="seoworkerai-form-field">
+                            <label for="seoworkerai-site-profile-taste">Brand Taste</label>
+                            <textarea id="seoworkerai-site-profile-taste" name="site_profile_taste" rows="4"><?php echo esc_textarea($siteTaste); ?></textarea>
                         </div>
-                        <div class="seoauto-form-field">
+                        <div class="seoworkerai-form-field">
                             <label>Locations</label>
-                            <div class="seoauto-locations-table-wrap" data-location-options="<?php echo esc_attr(wp_json_encode(array_values($availableLocations))); ?>">
-                                <table class="widefat seoauto-locations-table">
+                            <div class="seoworkerai-locations-table-wrap" data-location-options="<?php echo esc_attr(wp_json_encode(array_values($availableLocations))); ?>">
+                                <table class="widefat seoworkerai-locations-table">
                                     <thead>
                                         <tr>
                                             <th>Location</th>
@@ -730,11 +730,11 @@ final class MenuRegistrar
                                             <th></th>
                                         </tr>
                                     </thead>
-                                    <tbody id="seoauto-locations-body">
+                                    <tbody id="seoworkerai-locations-body">
                                         <?php foreach ($siteLocations as $index => $location) : ?>
-                                            <tr class="seoauto-location-row">
+                                            <tr class="seoworkerai-location-row">
                                                 <td>
-                                                    <select name="site_locations[<?php echo esc_attr((string) $index); ?>][location_code]" class="seoauto-location-select">
+                                                    <select name="site_locations[<?php echo esc_attr((string) $index); ?>][location_code]" class="seoworkerai-location-select">
                                                         <?php foreach ($availableLocations as $option) : ?>
                                                             <option
                                                                 value="<?php echo esc_attr((string) $option['code']); ?>"
@@ -745,32 +745,32 @@ final class MenuRegistrar
                                                             </option>
                                                         <?php endforeach; ?>
                                                     </select>
-                                                    <input type="hidden" name="site_locations[<?php echo esc_attr((string) $index); ?>][location_name]" value="<?php echo esc_attr((string) $location['location_name']); ?>" class="seoauto-location-name">
+                                                    <input type="hidden" name="site_locations[<?php echo esc_attr((string) $index); ?>][location_name]" value="<?php echo esc_attr((string) $location['location_name']); ?>" class="seoworkerai-location-name">
                                                 </td>
-                                                <td class="seoauto-location-code-cell"><?php echo esc_html((string) $location['location_code']); ?></td>
+                                                <td class="seoworkerai-location-code-cell"><?php echo esc_html((string) $location['location_code']); ?></td>
                                                 <td>
-                                                    <select name="site_locations[<?php echo esc_attr((string) $index); ?>][location_type]" class="seoauto-location-type">
+                                                    <select name="site_locations[<?php echo esc_attr((string) $index); ?>][location_type]" class="seoworkerai-location-type">
                                                         <option value="primary" <?php selected((string) $location['location_type'], 'primary'); ?>>Primary</option>
                                                         <option value="secondary" <?php selected((string) $location['location_type'], 'secondary'); ?>>Secondary</option>
                                                     </select>
                                                 </td>
                                                 <td>
-                                                    <button type="button" class="button-link-delete seoauto-remove-location">Remove</button>
+                                                    <button type="button" class="button-link-delete seoworkerai-remove-location">Remove</button>
                                                 </td>
                                             </tr>
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
-                                <div class="seoauto-button-row" style="margin-top:10px;">
-                                    <button type="button" class="button" id="seoauto-add-location-row">Add Location</button>
+                                <div class="seoworkerai-button-row" style="margin-top:10px;">
+                                    <button type="button" class="button" id="seoworkerai-add-location-row">Add Location</button>
                                 </div>
                             </div>
                         </div>
 
-                        <div class="seoauto-card-head" style="margin-top:18px;">
+                        <div class="seoworkerai-card-head" style="margin-top:18px;">
                             <h2 style="font-size:16px;">Content Brief Settings</h2>
                             <?php if (array_key_exists('domain_rating', $siteSeoSettings) && $siteSeoSettings['domain_rating'] !== null) : ?>
-                                <span class="seoauto-muted">
+                                <span class="seoworkerai-muted">
                                     Domain rating: <?php echo esc_html((string) $siteSeoSettings['domain_rating']); ?>
                                     <?php if ($domainRatingCheckedAt) : ?>
                                         · Updated <?php echo esc_html(wp_date('Y-m-d H:i', $domainRatingCheckedAt)); ?>
@@ -779,11 +779,11 @@ final class MenuRegistrar
                             <?php endif; ?>
                         </div>
 
-                        <div class="seoauto-form-grid seoauto-form-grid--two">
-                            <div class="seoauto-form-field">
-                                <label for="seoauto-site-settings-domain-rating">Domain Rating</label>
+                        <div class="seoworkerai-form-grid seoworkerai-form-grid--two">
+                            <div class="seoworkerai-form-field">
+                                <label for="seoworkerai-site-settings-domain-rating">Domain Rating</label>
                                 <input
-                                    id="seoauto-site-settings-domain-rating"
+                                    id="seoworkerai-site-settings-domain-rating"
                                     type="number"
                                     min="0"
                                     max="100"
@@ -791,10 +791,10 @@ final class MenuRegistrar
                                     value="<?php echo esc_attr((string) ($siteSeoSettings['domain_rating'] ?? 0)); ?>"
                                 >
                             </div>
-                            <div class="seoauto-form-field">
-                                <label for="seoauto-site-settings-domain-rating-checked-at">Last Domain Rating Sync</label>
+                            <div class="seoworkerai-form-field">
+                                <label for="seoworkerai-site-settings-domain-rating-checked-at">Last Domain Rating Sync</label>
                                 <input
-                                    id="seoauto-site-settings-domain-rating-checked-at"
+                                    id="seoworkerai-site-settings-domain-rating-checked-at"
                                     type="text"
                                     value="<?php echo esc_attr($domainRatingCheckedAt ? wp_date('Y-m-d H:i', $domainRatingCheckedAt) : 'Not synced yet'); ?>"
                                     readonly
@@ -803,10 +803,10 @@ final class MenuRegistrar
                             </div>
                         </div>
 
-                        <div class="seoauto-form-field">
-                            <label for="seoauto-site-settings-template-id">Seeded Strategy Template</label>
+                        <div class="seoworkerai-form-field">
+                            <label for="seoworkerai-site-settings-template-id">Seeded Strategy Template</label>
                             <select
-                                id="seoauto-site-settings-template-id"
+                                id="seoworkerai-site-settings-template-id"
                                 name="site_settings_template_id"
                                 data-template-configs="<?php echo esc_attr(wp_json_encode(array_map(fn (array $template): array => [
                                     'id' => (int) ($template['id'] ?? 0),
@@ -829,25 +829,25 @@ final class MenuRegistrar
                             </select>
                         </div>
 
-                        <div class="seoauto-form-grid seoauto-form-grid--three">
-                            <div class="seoauto-form-field">
-                                <label for="seoauto-site-settings-min-search-volume">Minimum Search Volume</label>
-                                <input id="seoauto-site-settings-min-search-volume" type="number" min="0" name="site_settings_min_search_volume" value="<?php echo esc_attr((string) ($siteSeoSettings['min_search_volume'] ?? 0)); ?>">
+                        <div class="seoworkerai-form-grid seoworkerai-form-grid--three">
+                            <div class="seoworkerai-form-field">
+                                <label for="seoworkerai-site-settings-min-search-volume">Minimum Search Volume</label>
+                                <input id="seoworkerai-site-settings-min-search-volume" type="number" min="0" name="site_settings_min_search_volume" value="<?php echo esc_attr((string) ($siteSeoSettings['min_search_volume'] ?? 0)); ?>">
                             </div>
-                            <div class="seoauto-form-field">
-                                <label for="seoauto-site-settings-max-search-volume">Maximum Search Volume</label>
-                                <input id="seoauto-site-settings-max-search-volume" type="number" min="0" name="site_settings_max_search_volume" value="<?php echo esc_attr(($siteSeoSettings['max_search_volume'] ?? null) === null ? '' : (string) $siteSeoSettings['max_search_volume']); ?>">
+                            <div class="seoworkerai-form-field">
+                                <label for="seoworkerai-site-settings-max-search-volume">Maximum Search Volume</label>
+                                <input id="seoworkerai-site-settings-max-search-volume" type="number" min="0" name="site_settings_max_search_volume" value="<?php echo esc_attr(($siteSeoSettings['max_search_volume'] ?? null) === null ? '' : (string) $siteSeoSettings['max_search_volume']); ?>">
                             </div>
-                            <div class="seoauto-form-field">
-                                <label for="seoauto-site-settings-max-keyword-difficulty">Maximum Keyword Difficulty</label>
-                                <input id="seoauto-site-settings-max-keyword-difficulty" type="number" min="0" max="100" name="site_settings_max_keyword_difficulty" value="<?php echo esc_attr((string) ($siteSeoSettings['max_keyword_difficulty'] ?? 100)); ?>">
+                            <div class="seoworkerai-form-field">
+                                <label for="seoworkerai-site-settings-max-keyword-difficulty">Maximum Keyword Difficulty</label>
+                                <input id="seoworkerai-site-settings-max-keyword-difficulty" type="number" min="0" max="100" name="site_settings_max_keyword_difficulty" value="<?php echo esc_attr((string) ($siteSeoSettings['max_keyword_difficulty'] ?? 100)); ?>">
                             </div>
                         </div>
 
-                        <div class="seoauto-form-grid seoauto-form-grid--two">
-                            <div class="seoauto-form-field">
-                                <label for="seoauto-site-settings-preferred-keyword-type">Preferred Keyword Type</label>
-                                <select id="seoauto-site-settings-preferred-keyword-type" name="site_settings_preferred_keyword_type">
+                        <div class="seoworkerai-form-grid seoworkerai-form-grid--two">
+                            <div class="seoworkerai-form-field">
+                                <label for="seoworkerai-site-settings-preferred-keyword-type">Preferred Keyword Type</label>
+                                <select id="seoworkerai-site-settings-preferred-keyword-type" name="site_settings_preferred_keyword_type">
                                     <option value="">Auto</option>
                                     <?php foreach (['informational', 'commercial', 'transactional', 'navigational'] as $keywordType) : ?>
                                         <option value="<?php echo esc_attr($keywordType); ?>" <?php selected((string) ($siteSeoSettings['preferred_keyword_type'] ?? ''), $keywordType); ?>>
@@ -856,17 +856,17 @@ final class MenuRegistrar
                                     <?php endforeach; ?>
                                 </select>
                             </div>
-                            <div class="seoauto-form-field">
-                                <label for="seoauto-site-settings-content-briefs-per-run">Content Briefs Per Run</label>
-                                <input id="seoauto-site-settings-content-briefs-per-run" type="number" min="1" max="10" name="site_settings_content_briefs_per_run" value="<?php echo esc_attr((string) ($siteSeoSettings['content_briefs_per_run'] ?? 3)); ?>">
+                            <div class="seoworkerai-form-field">
+                                <label for="seoworkerai-site-settings-content-briefs-per-run">Content Briefs Per Run</label>
+                                <input id="seoworkerai-site-settings-content-briefs-per-run" type="number" min="1" max="10" name="site_settings_content_briefs_per_run" value="<?php echo esc_attr((string) ($siteSeoSettings['content_briefs_per_run'] ?? 3)); ?>">
                             </div>
                         </div>
 
-                        <div class="seoauto-form-field">
-                            <label for="seoauto-site-settings-selection-notes">Selection Notes</label>
-                            <textarea id="seoauto-site-settings-selection-notes" name="site_settings_selection_notes" rows="4"><?php echo esc_textarea((string) ($siteSeoSettings['selection_notes'] ?? '')); ?></textarea>
+                        <div class="seoworkerai-form-field">
+                            <label for="seoworkerai-site-settings-selection-notes">Selection Notes</label>
+                            <textarea id="seoworkerai-site-settings-selection-notes" name="site_settings_selection_notes" rows="4"><?php echo esc_textarea((string) ($siteSeoSettings['selection_notes'] ?? '')); ?></textarea>
                         </div>
-                        <div class="seoauto-form-grid seoauto-form-grid--two">
+                        <div class="seoworkerai-form-grid seoworkerai-form-grid--two">
                             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
                                 <input type="checkbox" name="site_settings_prefer_low_difficulty" value="1" <?php checked(!empty($siteSeoSettings['prefer_low_difficulty'])); ?>>
                                 <span>Prefer easier keywords first</span>
@@ -877,28 +877,28 @@ final class MenuRegistrar
                             </label>
                         </div>
 
-                        <div class="seoauto-button-row" style="margin-top:16px;">
+                        <div class="seoworkerai-button-row" style="margin-top:16px;">
                             <button type="submit" class="button button-primary">Save Site Settings</button>
-                            <span class="seoauto-muted">This syncs description, taste, location, and per-site topic thresholds to Laravel.</span>
+                            <span class="seoworkerai-muted">This syncs description, taste, location, and per-site topic thresholds to Laravel.</span>
                         </div>
                     </form>
                 </section>
 
                 <!-- Google Connection -->
-                <section class="seoauto-card">
-                    <div class="seoauto-card-head">
+                <section class="seoworkerai-card">
+                    <div class="seoworkerai-card-head">
                         <h2>Billing</h2>
                         <?php if (!empty($billing['payment_url'])) : ?>
                             <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Pay Now</a>
                         <?php endif; ?>
                     </div>
-                    <div class="seoauto-kv-list" style="margin-bottom:16px;">
+                    <div class="seoworkerai-kv-list" style="margin-bottom:16px;">
                         <div><span>Status</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Active'); ?></strong></div>
                         <div><span>Plan</span><strong><?php echo esc_html((string) ($billing['plan_name'] ?? 'SEOWorkerAI Starter')); ?></strong></div>
                         <div><span>Price</span><strong><?php echo esc_html('$' . number_format((float) ($billing['plan_price'] ?? 60), 2) . '/month'); ?></strong></div>
                     </div>
                     <?php if (!empty($billing['payment_required'])) : ?>
-                        <p class="seoauto-muted" style="margin:0 0 16px;">Registration, site description, taste, and domain rating remain available. Google OAuth and paid SEO automation stay blocked until payment is completed.</p>
+                        <p class="seoworkerai-muted" style="margin:0 0 16px;">Registration, site description, taste, and domain rating remain available. Google OAuth and paid SEO automation stay blocked until payment is completed.</p>
                     <?php endif; ?>
 
                     <hr style="border:none;border-top:1px solid var(--gray-200);margin:16px 0;">
@@ -906,70 +906,70 @@ final class MenuRegistrar
                     <h2>Google Integration</h2>
 
                     <?php if (!empty($billing['payment_required'])) : ?>
-                        <p class="seoauto-muted" style="margin:0 0 12px;">Payment is required before Google Search Console and Analytics can be connected.</p>
+                        <p class="seoworkerai-muted" style="margin:0 0 12px;">Payment is required before Google Search Console and Analytics can be connected.</p>
                         <?php if (!empty($billing['payment_url'])) : ?>
-                            <a class="seoauto-google-cta" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Pay Now to Unlock Google Integration</a>
+                            <a class="seoworkerai-google-cta" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Pay Now to Unlock Google Integration</a>
                         <?php endif; ?>
                     <?php elseif (!$isConnected) : ?>
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:16px;">
-                            <?php wp_nonce_field('seoauto_start_oauth'); ?>
-                            <input type="hidden" name="action" value="seoauto_start_oauth">
-                            <button type="submit" class="seoauto-google-cta">
+                            <?php wp_nonce_field('seoworkerai_start_oauth'); ?>
+                            <input type="hidden" name="action" value="seoworkerai_start_oauth">
+                            <button type="submit" class="seoworkerai-google-cta">
                                 <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/><path d="M9 18c2.43 0 4.467-.806 5.956-2.18l-2.908-2.259c-.806.54-1.837.86-3.048.86-2.344 0-4.328-1.584-5.036-3.711H.957v2.332C2.438 15.983 5.482 18 9 18z" fill="#34A853"/><path d="M3.964 10.71c-.18-.54-.282-1.117-.282-1.71s.102-1.17.282-1.71V4.958H.957C.347 6.173 0 7.548 0 9s.348 2.827.957 4.042l3.007-2.332z" fill="#FBBC05"/><path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0 5.482 0 2.438 2.017.957 4.958L3.964 7.29C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/></svg>
                                 Connect with Google
                             </button>
                         </form>
-                        <p class="seoauto-muted" style="margin:0 0 12px;">Connect Google Search Console &amp; Analytics to enable automated SEO insights.</p>
+                        <p class="seoworkerai-muted" style="margin:0 0 12px;">Connect Google Search Console &amp; Analytics to enable automated SEO insights.</p>
                     <?php else : ?>
-                        <div class="seoauto-kv-list" style="margin-bottom:14px;">
+                        <div class="seoworkerai-kv-list" style="margin-bottom:14px;">
                             <div><span>Status</span><strong><?php echo wp_kses_post($this->renderStatusBadge('active')); ?></strong></div>
                             <div><span>Scopes</span><strong><?php echo esc_html(!empty($oauthScopes) ? implode(', ', array_map('strval', $oauthScopes)) : 'None'); ?></strong></div>
                             <div><span>Connected</span><strong><?php echo esc_html($oauthConnectedAt > 0 ? wp_date('Y-m-d H:i', $oauthConnectedAt) : '—'); ?></strong></div>
                             <?php if ($oauthError !== '') : ?><div><span>Last Error</span><strong style="color:var(--red);"><?php echo esc_html($oauthError); ?></strong></div><?php endif; ?>
                         </div>
-                        <div class="seoauto-button-row">
+                        <div class="seoworkerai-button-row">
                             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                                <?php wp_nonce_field('seoauto_start_oauth'); ?>
-                                <input type="hidden" name="action" value="seoauto_start_oauth">
+                                <?php wp_nonce_field('seoworkerai_start_oauth'); ?>
+                                <input type="hidden" name="action" value="seoworkerai_start_oauth">
                                 <button type="submit" class="button button-secondary">Reconnect Google</button>
                             </form>
-                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-inline-input-form">
-                                <?php wp_nonce_field('seoauto_revoke_oauth'); ?>
-                                <input type="hidden" name="action" value="seoauto_revoke_oauth">
+                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoworkerai-inline-input-form">
+                                <?php wp_nonce_field('seoworkerai_revoke_oauth'); ?>
+                                <input type="hidden" name="action" value="seoworkerai_revoke_oauth">
                                 <input type="text" name="revocation_reason" placeholder="Reason (optional)" style="height:32px;padding:0 8px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;">
-                                <button type="submit" class="button seoauto-btn-danger">Disconnect</button>
+                                <button type="submit" class="button seoworkerai-btn-danger">Disconnect</button>
                             </form>
                         </div>
                     <?php endif; ?>
 
                     <hr style="border:none;border-top:1px solid var(--gray-200);margin:16px 0;">
-                    <div class="seoauto-button-row">
+                    <div class="seoworkerai-button-row">
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                            <?php wp_nonce_field('seoauto_health_check'); ?>
-                            <input type="hidden" name="action" value="seoauto_health_check">
+                            <?php wp_nonce_field('seoworkerai_health_check'); ?>
+                            <input type="hidden" name="action" value="seoworkerai_health_check">
                             <button type="submit" class="button">Run Health Check</button>
                         </form>
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                            <?php wp_nonce_field('seoauto_rotate_token'); ?>
-                            <input type="hidden" name="action" value="seoauto_rotate_token">
+                            <?php wp_nonce_field('seoworkerai_rotate_token'); ?>
+                            <input type="hidden" name="action" value="seoworkerai_rotate_token">
                             <button type="submit" class="button">Rotate API Token</button>
                         </form>
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                            <?php wp_nonce_field('seoauto_register_site'); ?>
-                            <input type="hidden" name="action" value="seoauto_register_site">
+                            <?php wp_nonce_field('seoworkerai_register_site'); ?>
+                            <input type="hidden" name="action" value="seoworkerai_register_site">
                             <button type="submit" class="button">Sync Registration</button>
                         </form>
                     </div>
                 </section>
 
                 <!-- Automation Preferences -->
-                <section class="seoauto-card seoauto-card--settings">
+                <section class="seoworkerai-card seoworkerai-card--settings">
                     <h2>Automation Preferences</h2>
                     <form method="post" action="options.php">
-                        <?php settings_fields('seoauto_settings'); ?>
-                        <div class="seoauto-form-field">
-                            <label for="seoauto_primary_seo_adapter">Primary SEO Plugin</label>
-                            <select name="seoauto_primary_seo_adapter" id="seoauto_primary_seo_adapter">
+                        <?php settings_fields('seoworkerai_settings'); ?>
+                        <div class="seoworkerai-form-field">
+                            <label for="seoworkerai_primary_seo_adapter">Primary SEO Plugin</label>
+                            <select name="seoworkerai_primary_seo_adapter" id="seoworkerai_primary_seo_adapter">
                                 <option value="auto" <?php selected($adapter, 'auto'); ?>>Auto Detect</option>
                                 <option value="yoast" <?php selected($adapter, 'yoast'); ?>>Yoast SEO</option>
                                 <option value="rankmath" <?php selected($adapter, 'rankmath'); ?>>Rank Math</option>
@@ -977,47 +977,47 @@ final class MenuRegistrar
                                 <option value="core" <?php selected($adapter, 'core'); ?>>WordPress Core</option>
                             </select>
                         </div>
-                        <div class="seoauto-form-field">
-                            <div class="seoauto-label">Change Application Mode</div>
+                        <div class="seoworkerai-form-field">
+                            <div class="seoworkerai-label">Change Application Mode</div>
                             <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
-                                <input type="radio" name="seoauto_change_application_mode" value="dangerous_auto_apply" <?php checked($mode, 'dangerous_auto_apply'); ?>>
+                                <input type="radio" name="seoworkerai_change_application_mode" value="dangerous_auto_apply" <?php checked($mode, 'dangerous_auto_apply'); ?>>
                                 <span>Apply changes automatically</span>
                             </label>
                             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input type="radio" name="seoauto_change_application_mode" value="review_before_apply" <?php checked($mode, 'review_before_apply'); ?>>
+                                <input type="radio" name="seoworkerai_change_application_mode" value="review_before_apply" <?php checked($mode, 'review_before_apply'); ?>>
                                 <span>Review every change before applying</span>
                             </label>
                         </div>
-                        <div class="seoauto-form-field">
+                        <div class="seoworkerai-form-field">
                             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input type="checkbox" name="seoauto_debug_enabled" value="1" <?php checked((bool)get_option('seoauto_debug_enabled', false)); ?>>
+                                <input type="checkbox" name="seoworkerai_debug_enabled" value="1" <?php checked((bool)get_option('seoworkerai_debug_enabled', false)); ?>>
                                 <span>Enable debug logging</span>
                             </label>
                         </div>
-                        <div class="seoauto-form-field">
+                        <div class="seoworkerai-form-field">
                             <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input type="checkbox" name="seoauto_allow_insecure_ssl" value="1" <?php checked((bool)get_option('seoauto_allow_insecure_ssl', false)); ?>>
+                                <input type="checkbox" name="seoworkerai_allow_insecure_ssl" value="1" <?php checked((bool)get_option('seoworkerai_allow_insecure_ssl', false)); ?>>
                                 <span>Allow insecure SSL <em>(dev only)</em></span>
                             </label>
                         </div>
 
                         <!-- FIX 4: Excluded pages — tag-chip UI -->
-                        <div class="seoauto-form-field">
+                        <div class="seoworkerai-form-field">
                             <label>Exclude Pages from Audits</label>
-                            <div id="seoauto-exclusion-tag-ui" class="seoauto-excl-tag-ui">
+                            <div id="seoworkerai-exclusion-tag-ui" class="seoworkerai-excl-tag-ui">
                                 <!-- Selected chips rendered by JS -->
-                                <div class="seoauto-excl-chips"></div>
+                                <div class="seoworkerai-excl-chips"></div>
                                 <!-- Search input -->
-                                <div class="seoauto-excl-search-wrap">
+                                <div class="seoworkerai-excl-search-wrap">
                                     <input
                                         type="text"
-                                        class="seoauto-excl-search"
+                                        class="seoworkerai-excl-search"
                                         placeholder="Search and add pages…"
                                         autocomplete="off"
                                     >
                                 </div>
                                 <!-- Dropdown options -->
-                                <div class="seoauto-excl-dropdown">
+                                <div class="seoworkerai-excl-dropdown">
                                     <?php foreach ($allPosts as $postId) :
                                         $postTitle = get_the_title($postId);
                                         $postType  = get_post_type($postId);
@@ -1025,18 +1025,18 @@ final class MenuRegistrar
                                         $isSelected = in_array($postId, $excludedIds, true);
                                     ?>
                                         <div
-                                            class="seoauto-excl-option<?php echo $isSelected ? ' is-selected' : ''; ?>"
+                                            class="seoworkerai-excl-option<?php echo $isSelected ? ' is-selected' : ''; ?>"
                                             data-id="<?php echo esc_attr((string)$postId); ?>"
                                             data-label="<?php echo esc_attr(strtolower($postTitle)); ?>"
                                         >
-                                            <span class="seoauto-excl-checkmark"><?php echo $isSelected ? '✓' : ''; ?></span>
-                                            <span class="seoauto-excl-type-tag"><?php echo esc_html($typeLabel); ?></span>
+                                            <span class="seoworkerai-excl-checkmark"><?php echo $isSelected ? '✓' : ''; ?></span>
+                                            <span class="seoworkerai-excl-type-tag"><?php echo esc_html($typeLabel); ?></span>
                                             <?php echo esc_html($postTitle); ?>
                                         </div>
                                     <?php endforeach; ?>
                                 </div>
                             </div>
-                            <input type="hidden" name="seoauto_excluded_change_audit_pages" id="seoauto-exclusion-hidden" value="<?php echo esc_attr($excludedRaw); ?>">
+                            <input type="hidden" name="seoworkerai_excluded_change_audit_pages" id="seoworkerai-exclusion-hidden" value="<?php echo esc_attr($excludedRaw); ?>">
                             <div class="description" style="margin-top:6px;">Click pages to add/remove. Selected pages will not trigger audits on save or publish.</div>
                         </div>
 
@@ -1054,7 +1054,7 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
 
-        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string)$_GET['seoauto_notice']) : '';
+        $notice = isset($_GET['seoworkerai_notice']) ? sanitize_text_field((string)$_GET['seoworkerai_notice']) : '';
 
         $statusArr     = isset($_GET['status'])      ? array_filter(array_map('sanitize_text_field', (array)$_GET['status']))      : [];
         $actionTypeArr = isset($_GET['action_type']) ? array_filter(array_map('sanitize_text_field', (array)$_GET['action_type'])) : [];
@@ -1081,9 +1081,9 @@ final class MenuRegistrar
         $actionTypeOptions = $this->actionRepository->listDistinctActionTypes();
         $targetTypeOptions = $this->actionRepository->listDistinctTargetTypes();
 
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
         global $wpdb;
-        $itemsTable = $wpdb->prefix . 'seoauto_action_items';
+        $itemsTable = $wpdb->prefix . 'seoworkerai_action_items';
         $humanItems = $siteId > 0
             ? $wpdb->get_results($wpdb->prepare("SELECT * FROM {$itemsTable} WHERE site_id = %d ORDER BY updated_at DESC LIMIT 200", $siteId), ARRAY_A) // phpcs:ignore
             : [];
@@ -1120,28 +1120,28 @@ final class MenuRegistrar
             ),
         ]);
         ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Change Center', 'seoauto-logs', 'Review automated SEO changes and their execution history.'); ?>
+        <div class="wrap seoworkerai-admin-page">
+            <?php $this->renderAdminShellHeader('Change Center', 'seoworkerai-logs', 'Review automated SEO changes and their execution history.'); ?>
             <?php $this->renderNotice($notice); ?>
 
-            <div class="seoauto-kpi-grid">
-                <div class="seoauto-kpi-card"><span class="seoauto-kpi-label">Total Actions</span><span class="seoauto-kpi-value"><?php echo esc_html((string)$totalActions); ?></span></div>
-                <div class="seoauto-kpi-card"><span class="seoauto-kpi-label">On This Page</span><span class="seoauto-kpi-value"><?php echo esc_html((string)count($actions)); ?></span></div>
-                <div class="seoauto-kpi-card"><span class="seoauto-kpi-label">Human Items</span><span class="seoauto-kpi-value"><?php echo esc_html((string)count($humanItems)); ?></span></div>
-                <div class="seoauto-kpi-card"><span class="seoauto-kpi-label">Open Items</span><span class="seoauto-kpi-value"><?php echo esc_html((string)$openHumanItems); ?></span></div>
+            <div class="seoworkerai-kpi-grid">
+                <div class="seoworkerai-kpi-card"><span class="seoworkerai-kpi-label">Total Actions</span><span class="seoworkerai-kpi-value"><?php echo esc_html((string)$totalActions); ?></span></div>
+                <div class="seoworkerai-kpi-card"><span class="seoworkerai-kpi-label">On This Page</span><span class="seoworkerai-kpi-value"><?php echo esc_html((string)count($actions)); ?></span></div>
+                <div class="seoworkerai-kpi-card"><span class="seoworkerai-kpi-label">Human Items</span><span class="seoworkerai-kpi-value"><?php echo esc_html((string)count($humanItems)); ?></span></div>
+                <div class="seoworkerai-kpi-card"><span class="seoworkerai-kpi-label">Open Items</span><span class="seoworkerai-kpi-value"><?php echo esc_html((string)$openHumanItems); ?></span></div>
             </div>
 
             <!-- FIX 1: Chip filter bar — data-label-maps added, hidden inputs removed from PHP -->
-            <div class="seoauto-chip-filter-bar" id="seoauto-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
-                <form method="get" class="seoauto-filter-form" id="seoauto-filter-form">
-                    <input type="hidden" name="page" value="seoauto-logs">
+            <div class="seoworkerai-chip-filter-bar" id="seoworkerai-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
+                <form method="get" class="seoworkerai-filter-form" id="seoworkerai-filter-form">
+                    <input type="hidden" name="page" value="seoworkerai-logs">
                     <input type="hidden" name="per_page" value="<?php echo esc_attr((string)$perPage); ?>">
 
                     <!-- Active filter chips row — populated by JS -->
-                    <div class="seoauto-active-chips" id="seoauto-active-chips"></div>
+                    <div class="seoworkerai-active-chips" id="seoworkerai-active-chips"></div>
 
                     <!-- Filter dropdowns row -->
-                    <div class="seoauto-filter-dropdowns">
+                    <div class="seoworkerai-filter-dropdowns">
                         <?php
                         $filterDefs = [
                             ['key'=>'status',      'label'=>'Status',      'options'=> array_combine(
@@ -1159,16 +1159,16 @@ final class MenuRegistrar
                                 default       => [],
                             };
                         ?>
-                        <div class="seoauto-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
-                            <button type="button" class="seoauto-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
+                        <div class="seoworkerai-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
+                            <button type="button" class="seoworkerai-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
                                 <?php echo esc_html($fd['label']); ?>
-                                <?php if (!empty($activeVals)) echo '<span class="seoauto-filter-count">' . count($activeVals) . '</span>'; ?>
-                                <span class="seoauto-filter-chevron">▾</span>
+                                <?php if (!empty($activeVals)) echo '<span class="seoworkerai-filter-count">' . count($activeVals) . '</span>'; ?>
+                                <span class="seoworkerai-filter-chevron">▾</span>
                             </button>
-                            <div class="seoauto-filter-panel" style="display:none;">
-                                <div class="seoauto-filter-panel-inner">
+                            <div class="seoworkerai-filter-panel" style="display:none;">
+                                <div class="seoworkerai-filter-panel-inner">
                                     <?php foreach ($fd['options'] as $val => $label) : ?>
-                                        <label class="seoauto-filter-option">
+                                        <label class="seoworkerai-filter-option">
                                             <input type="checkbox"
                                                 name="<?php echo esc_attr($fd['key']); ?>[]"
                                                 value="<?php echo esc_attr((string)$val); ?>"
@@ -1177,43 +1177,43 @@ final class MenuRegistrar
                                         </label>
                                     <?php endforeach; ?>
                                 </div>
-                                <div class="seoauto-filter-panel-footer">
-                                    <button type="button" class="seoauto-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
-                                    <button type="button" class="button button-small button-primary seoauto-filter-apply">Apply</button>
+                                <div class="seoworkerai-filter-panel-footer">
+                                    <button type="button" class="seoworkerai-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
+                                    <button type="button" class="button button-small button-primary seoworkerai-filter-apply">Apply</button>
                                 </div>
                             </div>
                         </div>
                         <?php endforeach; ?>
 
                         <!-- Page / Post filter -->
-                        <div class="seoauto-filter-dropdown" data-filter-key="post_id">
-                            <button type="button" class="seoauto-filter-btn <?php echo !empty($postIdArr) ? 'has-active' : ''; ?>">
+                        <div class="seoworkerai-filter-dropdown" data-filter-key="post_id">
+                            <button type="button" class="seoworkerai-filter-btn <?php echo !empty($postIdArr) ? 'has-active' : ''; ?>">
                                 Page
-                                <?php if (!empty($postIdArr)) echo '<span class="seoauto-filter-count">' . count($postIdArr) . '</span>'; ?>
-                                <span class="seoauto-filter-chevron">▾</span>
+                                <?php if (!empty($postIdArr)) echo '<span class="seoworkerai-filter-count">' . count($postIdArr) . '</span>'; ?>
+                                <span class="seoworkerai-filter-chevron">▾</span>
                             </button>
-                            <div class="seoauto-filter-panel seoauto-filter-panel--wide" style="display:none;">
-                                <div class="seoauto-filter-panel-search">
-                                    <input type="text" placeholder="Search pages…" class="seoauto-filter-post-search" autocomplete="off">
+                            <div class="seoworkerai-filter-panel seoworkerai-filter-panel--wide" style="display:none;">
+                                <div class="seoworkerai-filter-panel-search">
+                                    <input type="text" placeholder="Search pages…" class="seoworkerai-filter-post-search" autocomplete="off">
                                 </div>
-                                <div class="seoauto-filter-panel-inner" style="max-height:200px;overflow-y:auto;">
+                                <div class="seoworkerai-filter-panel-inner" style="max-height:200px;overflow-y:auto;">
                                     <?php foreach ($allPosts as $pid) :
                                         $pt = get_post_type($pid) === 'page' ? 'Page' : 'Post';
                                         $ptitle = get_the_title($pid);
                                     ?>
-                                        <label class="seoauto-filter-option" data-label="<?php echo esc_attr(strtolower($ptitle)); ?>">
+                                        <label class="seoworkerai-filter-option" data-label="<?php echo esc_attr(strtolower($ptitle)); ?>">
                                             <input type="checkbox"
                                                 name="post_id[]"
                                                 value="<?php echo esc_attr((string)$pid); ?>"
                                                 <?php checked(in_array($pid, $postIdArr, true)); ?>>
-                                            <span class="seoauto-filter-type-tag"><?php echo esc_html($pt); ?></span>
+                                            <span class="seoworkerai-filter-type-tag"><?php echo esc_html($pt); ?></span>
                                             <?php echo esc_html($ptitle); ?>
                                         </label>
                                     <?php endforeach; ?>
                                 </div>
-                                <div class="seoauto-filter-panel-footer">
-                                    <button type="button" class="seoauto-filter-clear-one button-link" data-filter-key="post_id">Clear</button>
-                                    <button type="button" class="button button-small button-primary seoauto-filter-apply">Apply</button>
+                                <div class="seoworkerai-filter-panel-footer">
+                                    <button type="button" class="seoworkerai-filter-clear-one button-link" data-filter-key="post_id">Clear</button>
+                                    <button type="button" class="button button-small button-primary seoworkerai-filter-apply">Apply</button>
                                 </div>
                             </div>
                         </div>
@@ -1223,20 +1223,20 @@ final class MenuRegistrar
                             <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="Search keyword…" style="height:32px;padding:0 10px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;width:180px;">
                             <button class="button button-primary" type="submit">Search</button>
                             <?php if (!empty($statusArr) || !empty($actionTypeArr) || !empty($targetTypeArr) || !empty($postIdArr) || $search !== '') : ?>
-                                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-logs')); ?>">Reset</a>
+                                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-logs')); ?>">Reset</a>
                             <?php endif; ?>
                         </div>
                     </div>
 
                     <!-- FIX 1: Hidden inputs managed entirely by JS — empty on page load -->
-                    <div id="seoauto-filter-hidden-inputs" class="seoauto-filter-hidden-inputs"></div>
+                    <div id="seoworkerai-filter-hidden-inputs" class="seoworkerai-filter-hidden-inputs"></div>
                 </form>
             </div>
 
             <!-- Actions Table -->
-            <div class="seoauto-card" style="padding:0;overflow:hidden;">
-                <div class="seoauto-table-wrap">
-                <table class="wp-list-table widefat seoauto-changes-table">
+            <div class="seoworkerai-card" style="padding:0;overflow:hidden;">
+                <div class="seoworkerai-table-wrap">
+                <table class="wp-list-table widefat seoworkerai-changes-table">
                     <thead>
                         <tr>
                             <th style="min-width:200px;">Title / Target</th>
@@ -1268,17 +1268,17 @@ final class MenuRegistrar
                                 <td>
                                     <strong><?php echo esc_html($actionTitle); ?></strong>
                                     <?php if (!empty($row['target_url'])) : ?>
-                                        <div class="seoauto-muted seoauto-truncate" style="max-width:200px;" title="<?php echo esc_attr((string)$row['target_url']); ?>">
+                                        <div class="seoworkerai-muted seoworkerai-truncate" style="max-width:200px;" title="<?php echo esc_attr((string)$row['target_url']); ?>">
                                             <a href="<?php echo esc_url((string)$row['target_url']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html((string)$row['target_url']); ?></a>
                                         </div>
                                     <?php endif; ?>
                                     <?php if ($hasLogs) : ?>
                                         <!-- FIX 2: progression toggle now uses document-level JS listener -->
                                         <button type="button"
-                                            class="seoauto-progression-toggle"
+                                            class="seoworkerai-progression-toggle"
                                             data-target="progression-<?php echo esc_attr((string)$laravelId); ?>"
                                             title="Show execution steps">
-                                            <span class="seoauto-prog-arrow">▸</span> progression
+                                            <span class="seoworkerai-prog-arrow">▸</span> progression
                                         </button>
                                     <?php endif; ?>
                                 </td>
@@ -1287,40 +1287,40 @@ final class MenuRegistrar
 
                                 <!-- FIX 5: Edit form lives here, in the Proposed Change column -->
                                 <td>
-                                    <div class="seoauto-inline-edit-container">
-                                        <div class="seoauto-inline-display">
+                                    <div class="seoworkerai-inline-edit-container">
+                                        <div class="seoworkerai-inline-display">
                                             <?php if (!empty($proposedFields)) : ?>
                                                 <?php foreach ($proposedFields as $field) : ?>
                                                     <div style="margin-bottom:4px;">
-                                                        <div class="seoauto-field-label"><?php echo esc_html((string)($field['label'] ?? '')); ?></div>
-                                                        <div class="seoauto-field-value"><?php echo esc_html((string)($field['value'] ?? '')); ?></div>
+                                                        <div class="seoworkerai-field-label"><?php echo esc_html((string)($field['label'] ?? '')); ?></div>
+                                                        <div class="seoworkerai-field-value"><?php echo esc_html((string)($field['value'] ?? '')); ?></div>
                                                     </div>
                                                 <?php endforeach; ?>
                                                 <?php if (!empty($currentFields) && $currentFields !== $proposedFields) : ?>
-                                                    <button type="button" class="seoauto-toggle-current">▸ Currently applied</button>
-                                                    <div class="seoauto-current-value" style="display:none;">
-                                                        <div class="seoauto-field-label">Currently applied</div>
+                                                    <button type="button" class="seoworkerai-toggle-current">▸ Currently applied</button>
+                                                    <div class="seoworkerai-current-value" style="display:none;">
+                                                        <div class="seoworkerai-field-label">Currently applied</div>
                                                         <?php foreach ($currentFields as $cf) : ?>
-                                                            <div class="seoauto-field-value" style="color:var(--gray-500);"><?php echo esc_html((string)($cf['value'] ?? '')); ?></div>
+                                                            <div class="seoworkerai-field-value" style="color:var(--gray-500);"><?php echo esc_html((string)($cf['value'] ?? '')); ?></div>
                                                         <?php endforeach; ?>
                                                     </div>
                                                 <?php endif; ?>
                                             <?php else : ?>
-                                                <span class="seoauto-muted">—</span>
+                                                <span class="seoworkerai-muted">—</span>
                                             <?php endif; ?>
                                         </div>
 
                                         <?php if (!empty($editableFields)) : ?>
                                             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                                                <?php wp_nonce_field('seoauto_edit_action_payload'); ?>
-                                                <input type="hidden" name="action" value="seoauto_edit_action_payload">
+                                                <?php wp_nonce_field('seoworkerai_edit_action_payload'); ?>
+                                                <input type="hidden" name="action" value="seoworkerai_edit_action_payload">
                                                 <input type="hidden" name="action_id" value="<?php echo esc_attr((string)$laravelId); ?>">
-                                                <div class="seoauto-inline-edit-actions">
-                                                    <button type="button" class="button button-small" data-seoauto-edit-toggle="1">Edit</button>
-                                                    <button type="submit" class="button button-small button-primary" data-seoauto-save-button="1" style="display:none;">Save</button>
-                                                    <button type="button" class="button button-small" data-seoauto-cancel-button="1" style="display:none;">Cancel</button>
+                                                <div class="seoworkerai-inline-edit-actions">
+                                                    <button type="button" class="button button-small" data-seoworkerai-edit-toggle="1">Edit</button>
+                                                    <button type="submit" class="button button-small button-primary" data-seoworkerai-save-button="1" style="display:none;">Save</button>
+                                                    <button type="button" class="button button-small" data-seoworkerai-cancel-button="1" style="display:none;">Cancel</button>
                                                 </div>
-                                                <div class="seoauto-inline-edit-fields">
+                                                <div class="seoworkerai-inline-edit-fields">
                                                     <?php foreach ($editableFields as $field) : ?>
                                                         <?php
                                                         $fk = (string)($field['key']   ?? '');
@@ -1358,34 +1358,34 @@ final class MenuRegistrar
                                     </div>
                                 </td>
 
-                                <td class="seoauto-nowrap seoauto-muted" style="font-size:12px;"><?php echo esc_html((string)($row['received_at'] ?? '')); ?></td>
+                                <td class="seoworkerai-nowrap seoworkerai-muted" style="font-size:12px;"><?php echo esc_html((string)($row['received_at'] ?? '')); ?></td>
 
                                 <!-- Actions column: only Apply/Revert, no Edit button -->
                                 <td>
-                                    <div class="seoauto-action-btns">
+                                    <div class="seoworkerai-action-btns">
                                         <?php if (!$isApplied) : ?>
                                             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                                                <?php wp_nonce_field('seoauto_apply_action'); ?>
-                                                <input type="hidden" name="action" value="seoauto_apply_action">
+                                                <?php wp_nonce_field('seoworkerai_apply_action'); ?>
+                                                <input type="hidden" name="action" value="seoworkerai_apply_action">
                                                 <input type="hidden" name="action_id" value="<?php echo esc_attr((string)$laravelId); ?>">
                                                 <button class="button button-small button-primary" type="submit">Apply</button>
                                             </form>
                                         <?php endif; ?>
                                         <?php if ($isApplied) : ?>
                                             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                                                <?php wp_nonce_field('seoauto_revert_action'); ?>
-                                                <input type="hidden" name="action" value="seoauto_revert_action">
+                                                <?php wp_nonce_field('seoworkerai_revert_action'); ?>
+                                                <input type="hidden" name="action" value="seoworkerai_revert_action">
                                                 <input type="hidden" name="action_id" value="<?php echo esc_attr((string)$laravelId); ?>">
-                                                <button class="button button-small seoauto-btn-danger" type="submit">Revert</button>
+                                                <button class="button button-small seoworkerai-btn-danger" type="submit">Revert</button>
                                             </form>
                                         <?php endif; ?>
                                     </div>
                                 </td>
                             </tr>
                             <?php if ($hasLogs) : ?>
-                                <tr id="progression-<?php echo esc_attr((string)$laravelId); ?>" class="seoauto-progression-row" style="display:none;">
+                                <tr id="progression-<?php echo esc_attr((string)$laravelId); ?>" class="seoworkerai-progression-row" style="display:none;">
                                     <td colspan="6" style="padding:0 0 0 32px;background:var(--gray-50);border-top:none;">
-                                        <div class="seoauto-prog-timeline">
+                                        <div class="seoworkerai-prog-timeline">
                                             <?php
                                             $events = array_reverse($groupedChangeLogs[$laravelId]['events']);
                                             foreach ($events as $event) :
@@ -1394,12 +1394,12 @@ final class MenuRegistrar
                                                 $evAt     = (string)($event['created_at'] ?? '');
                                                 $showNote = $this->shouldRenderTimelineNote((string)($event['event_type']??''), $evNote);
                                             ?>
-                                                <div class="seoauto-prog-step">
-                                                    <div class="seoauto-prog-dot seoauto-prog-dot--<?php echo esc_attr($evStatus); ?>"></div>
-                                                    <div class="seoauto-prog-info">
+                                                <div class="seoworkerai-prog-step">
+                                                    <div class="seoworkerai-prog-dot seoworkerai-prog-dot--<?php echo esc_attr($evStatus); ?>"></div>
+                                                    <div class="seoworkerai-prog-info">
                                                         <?php echo wp_kses_post($this->renderStatusBadge($evStatus)); ?>
-                                                        <span class="seoauto-prog-ts"><?php echo esc_html($evAt); ?></span>
-                                                        <?php if ($showNote) : ?><div class="seoauto-prog-note"><?php echo esc_html($evNote); ?></div><?php endif; ?>
+                                                        <span class="seoworkerai-prog-ts"><?php echo esc_html($evAt); ?></span>
+                                                        <?php if ($showNote) : ?><div class="seoworkerai-prog-note"><?php echo esc_html($evNote); ?></div><?php endif; ?>
                                                     </div>
                                                 </div>
                                             <?php endforeach; ?>
@@ -1418,15 +1418,15 @@ final class MenuRegistrar
 
             <!-- Pagination -->
             <?php
-            $baseArgs = ['page'=>'seoauto-logs','per_page'=>$perPage,'q'=>$search];
+            $baseArgs = ['page'=>'seoworkerai-logs','per_page'=>$perPage,'q'=>$search];
             foreach ($statusArr as $v)     $baseArgs['status'][]      = $v;
             foreach ($actionTypeArr as $v) $baseArgs['action_type'][] = $v;
             foreach ($targetTypeArr as $v) $baseArgs['target_type'][] = $v;
             foreach ($postIdArr as $v)     $baseArgs['post_id'][]     = $v;
             ?>
-            <div class="seoauto-pagination">
+            <div class="seoworkerai-pagination">
                 <div>Showing <?php echo esc_html((string)count($actions)); ?> of <?php echo esc_html((string)$totalActions); ?> (page <?php echo esc_html((string)$page); ?> / <?php echo esc_html((string)$totalPages); ?>)</div>
-                <div class="seoauto-button-row">
+                <div class="seoworkerai-button-row">
                     <a class="button <?php echo $page <= 1 ? 'disabled' : ''; ?>" href="<?php echo esc_url(add_query_arg(array_merge($baseArgs, ['paged'=>max(1,$page-1)]), admin_url('admin.php'))); ?>">← Previous</a>
                     <a class="button <?php echo $page >= $totalPages ? 'disabled' : ''; ?>" href="<?php echo esc_url(add_query_arg(array_merge($baseArgs, ['paged'=>min($totalPages,$page+1)]), admin_url('admin.php'))); ?>">Next →</a>
                 </div>
@@ -1434,9 +1434,9 @@ final class MenuRegistrar
 
             <!-- Delete logs -->
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:24px;">
-                <?php wp_nonce_field('seoauto_delete_logs'); ?>
-                <input type="hidden" name="action" value="seoauto_delete_logs">
-                <button type="submit" class="button seoauto-btn-danger" onclick="return confirm('Delete all execution logs? This cannot be undone.');">Delete All Logs</button>
+                <?php wp_nonce_field('seoworkerai_delete_logs'); ?>
+                <input type="hidden" name="action" value="seoworkerai_delete_logs">
+                <button type="submit" class="button seoworkerai-btn-danger" onclick="return confirm('Delete all execution logs? This cannot be undone.');">Delete All Logs</button>
             </form>
         </div>
         <?php
@@ -1450,9 +1450,9 @@ final class MenuRegistrar
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
 
         global $wpdb;
-        $table        = $wpdb->prefix . 'seoauto_action_items';
-        $actionsTable = $wpdb->prefix . 'seoauto_actions';
-        $siteId       = (int) get_option('seoauto_site_id', 0);
+        $table        = $wpdb->prefix . 'seoworkerai_action_items';
+        $actionsTable = $wpdb->prefix . 'seoworkerai_actions';
+        $siteId       = (int) get_option('seoworkerai_site_id', 0);
         
         $statusArr      = isset($_GET['status'])      ? array_filter(array_map('sanitize_text_field', (array)$_GET['status']))      : [];
         $categoryArr    = isset($_GET['category'])    ? array_filter(array_map('sanitize_text_field', (array)$_GET['category']))    : [];
@@ -1462,7 +1462,7 @@ final class MenuRegistrar
         $page    = max(1, (int)($_GET['paged'] ?? 1));
         $perPage = min(100, max(10, (int)($_GET['per_page'] ?? 10)));
         $offset  = ($page - 1) * $perPage;
-        $notice  = isset($_GET['seoauto_notice']) ? sanitize_text_field((string)$_GET['seoauto_notice']) : '';
+        $notice  = isset($_GET['seoworkerai_notice']) ? sanitize_text_field((string)$_GET['seoworkerai_notice']) : '';
 
         $where  = ['1=1'];
         $params = [];
@@ -1512,24 +1512,24 @@ final class MenuRegistrar
             'target_type' => array_combine($targetTypeOptions, $targetTypeOptions),
         ]);
         ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Action Items', 'seoauto-action-items', 'Track tasks that need your manual attention.'); ?>
+        <div class="wrap seoworkerai-admin-page">
+            <?php $this->renderAdminShellHeader('Action Items', 'seoworkerai-action-items', 'Track tasks that need your manual attention.'); ?>
             <?php $this->renderNotice($notice); ?>
             <?php if ($siteId <= 0) : ?>
                 <div class="notice notice-warning"><p>Site not yet registered. Action items will appear here once registration is complete.</p></div>
             <?php endif; ?>
 
             <!-- Chip Filter Bar -->
-            <div class="seoauto-chip-filter-bar" id="seoauto-items-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
-                <form method="get" class="seoauto-filter-form" id="seoauto-items-filter-form">
-                    <input type="hidden" name="page" value="seoauto-action-items">
+            <div class="seoworkerai-chip-filter-bar" id="seoworkerai-items-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
+                <form method="get" class="seoworkerai-filter-form" id="seoworkerai-items-filter-form">
+                    <input type="hidden" name="page" value="seoworkerai-action-items">
                     <input type="hidden" name="per_page" value="<?php echo esc_attr((string)$perPage); ?>">
 
                     <!-- Active filter chips row -->
-                    <div class="seoauto-active-chips" id="seoauto-items-active-chips"></div>
+                    <div class="seoworkerai-active-chips" id="seoworkerai-items-active-chips"></div>
 
                     <!-- Filter dropdowns row -->
-                    <div class="seoauto-filter-dropdowns">
+                    <div class="seoworkerai-filter-dropdowns">
                         <?php
                         $filterDefs = [
                             ['key'=>'status',      'label'=>'Status',      'options'=> ['open'=>'Open','in_progress'=>'In Progress','resolved'=>'Resolved']],
@@ -1544,16 +1544,16 @@ final class MenuRegistrar
                                 default       => [],
                             };
                         ?>
-                        <div class="seoauto-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
-                            <button type="button" class="seoauto-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
+                        <div class="seoworkerai-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
+                            <button type="button" class="seoworkerai-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
                                 <?php echo esc_html($fd['label']); ?>
-                                <?php if (!empty($activeVals)) echo '<span class="seoauto-filter-count">' . count($activeVals) . '</span>'; ?>
-                                <span class="seoauto-filter-chevron">▾</span>
+                                <?php if (!empty($activeVals)) echo '<span class="seoworkerai-filter-count">' . count($activeVals) . '</span>'; ?>
+                                <span class="seoworkerai-filter-chevron">▾</span>
                             </button>
-                            <div class="seoauto-filter-panel" style="display:none;">
-                                <div class="seoauto-filter-panel-inner">
+                            <div class="seoworkerai-filter-panel" style="display:none;">
+                                <div class="seoworkerai-filter-panel-inner">
                                     <?php foreach ($fd['options'] as $val => $label) : ?>
-                                        <label class="seoauto-filter-option">
+                                        <label class="seoworkerai-filter-option">
                                             <input type="checkbox"
                                                 name="<?php echo esc_attr($fd['key']); ?>[]"
                                                 value="<?php echo esc_attr((string)$val); ?>"
@@ -1562,9 +1562,9 @@ final class MenuRegistrar
                                         </label>
                                     <?php endforeach; ?>
                                 </div>
-                                <div class="seoauto-filter-panel-footer">
-                                    <button type="button" class="seoauto-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
-                                    <button type="button" class="button button-small button-primary seoauto-filter-apply">Apply</button>
+                                <div class="seoworkerai-filter-panel-footer">
+                                    <button type="button" class="seoworkerai-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
+                                    <button type="button" class="button button-small button-primary seoworkerai-filter-apply">Apply</button>
                                 </div>
                             </div>
                         </div>
@@ -1575,19 +1575,19 @@ final class MenuRegistrar
                             <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="Search keyword…" style="height:32px;padding:0 10px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;width:180px;">
                             <button class="button button-primary" type="submit">Search</button>
                             <?php if (!empty($statusArr) || !empty($categoryArr) || !empty($targetTypeArr) || $search !== '') : ?>
-                                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-action-items')); ?>">Reset</a>
+                                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-action-items')); ?>">Reset</a>
                             <?php endif; ?>
                         </div>
                     </div>
 
                     <!-- Hidden inputs managed by JS -->
-                    <div id="seoauto-items-filter-hidden-inputs" class="seoauto-filter-hidden-inputs"></div>
+                    <div id="seoworkerai-items-filter-hidden-inputs" class="seoworkerai-filter-hidden-inputs"></div>
                 </form>
             </div>
 
-            <div class="seoauto-card" style="padding:0;overflow:hidden;">
-                <div class="seoauto-table-wrap">
-                <table class="wp-list-table widefat seoauto-items-table">
+            <div class="seoworkerai-card" style="padding:0;overflow:hidden;">
+                <div class="seoworkerai-table-wrap">
+                <table class="wp-list-table widefat seoworkerai-items-table">
                     <thead>
                         <tr><th>Title</th><th>Category</th><th>Status</th><th>Target</th><th>Details</th><th>Update</th><th>Actions</th></tr>
                     </thead>
@@ -1615,13 +1615,13 @@ final class MenuRegistrar
                                 <td><?php echo wp_kses_post($this->renderStatusBadge((string)$item->status)); ?></td>
                                 <td>
                                     <?php if ($targetLabel !== '') : ?><div><?php echo esc_html($targetLabel); ?></div><?php endif; ?>
-                                    <?php if ($targetUrl !== '') : ?><a href="<?php echo esc_url($targetUrl); ?>" target="_blank" rel="noopener noreferrer" class="seoauto-muted" style="font-size:12px;">↗ View</a><?php endif; ?>
+                                    <?php if ($targetUrl !== '') : ?><a href="<?php echo esc_url($targetUrl); ?>" target="_blank" rel="noopener noreferrer" class="seoworkerai-muted" style="font-size:12px;">↗ View</a><?php endif; ?>
                                 </td>
-                                <td class="seoauto-muted"><?php echo esc_html((string)$item->details); ?></td>
+                                <td class="seoworkerai-muted"><?php echo esc_html((string)$item->details); ?></td>
                                 <td>
                                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="display:flex;gap:6px;align-items:center;">
-                                        <?php wp_nonce_field('seoauto_update_action_item'); ?>
-                                        <input type="hidden" name="action" value="seoauto_update_action_item">
+                                        <?php wp_nonce_field('seoworkerai_update_action_item'); ?>
+                                        <input type="hidden" name="action" value="seoworkerai_update_action_item">
                                         <input type="hidden" name="item_id" value="<?php echo esc_attr((string)$item->id); ?>">
                                         <select name="status" style="height:28px;font-size:12px;border:1px solid var(--gray-300);border-radius:4px;padding:0 6px;">
                                             <option value="open" <?php selected((string)$item->status,'open'); ?>>Open</option>
@@ -1632,27 +1632,27 @@ final class MenuRegistrar
                                     </form>
                                 </td>
                                 <td>
-                                    <div class="seoauto-action-btns">
+                                    <div class="seoworkerai-action-btns">
                                         <?php if ($targetType === 'post' && ctype_digit($targetId)) : ?>
                                             <a class="button button-small" href="<?php echo esc_url(admin_url('post.php?post='.(int)$targetId.'&action=edit')); ?>">Edit Post</a>
                                         <?php endif; ?>
                                         <?php if ($laravelId > 0 && $linkedActionType !== '' && $linkedActionType !== 'human-action-required') : ?>
                                             <?php if ($linkedActionStatus !== 'applied') : ?>
                                                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                                                    <?php wp_nonce_field('seoauto_apply_action'); ?>
-                                                    <input type="hidden" name="action" value="seoauto_apply_action">
+                                                    <?php wp_nonce_field('seoworkerai_apply_action'); ?>
+                                                    <input type="hidden" name="action" value="seoworkerai_apply_action">
                                                     <input type="hidden" name="action_id" value="<?php echo esc_attr((string)$laravelId); ?>">
-                                                    <input type="hidden" name="return_page" value="seoauto-action-items">
+                                                    <input type="hidden" name="return_page" value="seoworkerai-action-items">
                                                     <button class="button button-small button-primary" type="submit">Apply</button>
                                                 </form>
                                             <?php endif; ?>
                                             <?php if ($linkedActionStatus === 'applied') : ?>
                                                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                                                    <?php wp_nonce_field('seoauto_revert_action'); ?>
-                                                    <input type="hidden" name="action" value="seoauto_revert_action">
+                                                    <?php wp_nonce_field('seoworkerai_revert_action'); ?>
+                                                    <input type="hidden" name="action" value="seoworkerai_revert_action">
                                                     <input type="hidden" name="action_id" value="<?php echo esc_attr((string)$laravelId); ?>">
-                                                    <input type="hidden" name="return_page" value="seoauto-action-items">
-                                                    <button class="button button-small seoauto-btn-danger" type="submit">Revert</button>
+                                                    <input type="hidden" name="return_page" value="seoworkerai-action-items">
+                                                    <button class="button button-small seoworkerai-btn-danger" type="submit">Revert</button>
                                                 </form>
                                             <?php endif; ?>
                                         <?php endif; ?>
@@ -1662,7 +1662,7 @@ final class MenuRegistrar
                         <?php endforeach; ?>
                     <?php else : ?>
                         <tr><td colspan="7">
-                            <div class="seoauto-debug-empty">
+                            <div class="seoworkerai-debug-empty">
                                 <strong>No action items found</strong>
                                 <p>Action items will appear here when your site needs manual attention.</p>
                             </div>
@@ -1672,7 +1672,7 @@ final class MenuRegistrar
                 </table>
                 </div>
             </div>
-            <div class="seoauto-pagination">
+            <div class="seoworkerai-pagination">
                 <div><?php echo esc_html((string)$total); ?> total items</div>
                 <div>
                     <?php echo wp_kses_post(paginate_links(['base' => add_query_arg('paged','%#%'), 'format' => '', 'current' => $page, 'total' => $totalPages])); ?>
@@ -1688,11 +1688,11 @@ final class MenuRegistrar
     {
         if (!current_user_can('edit_posts')) wp_die('Unauthorized');
 
-        $notice = isset($_GET['seoauto_notice']) ? sanitize_text_field((string)$_GET['seoauto_notice']) : '';
+        $notice = isset($_GET['seoworkerai_notice']) ? sanitize_text_field((string)$_GET['seoworkerai_notice']) : '';
         $this->briefSyncer->sync();
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_briefs';
+        $table = $wpdb->prefix . 'seoworkerai_briefs';
         $articleStatusArr = isset($_GET['article_status']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['article_status'])) : [];
         $assignmentStatusArr = isset($_GET['assignment_status']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['assignment_status'])) : [];
         $keywordTypeArr = isset($_GET['keyword_type']) ? array_filter(array_map('sanitize_text_field', (array) $_GET['keyword_type'])) : [];
@@ -1774,23 +1774,23 @@ final class MenuRegistrar
             'search_intent' => array_combine($searchIntentOptions, array_map(static fn (string $value): string => ucwords(str_replace(['_', '-'], ' ', $value)), $searchIntentOptions)),
         ]);
         ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Content Briefs', 'seoauto-briefs', 'Review synced content briefs and link them to published posts.'); ?>
+        <div class="wrap seoworkerai-admin-page">
+            <?php $this->renderAdminShellHeader('Content Briefs', 'seoworkerai-briefs', 'Review synced content briefs and link them to published posts.'); ?>
             <?php $this->renderNotice($notice); ?>
 
             <?php if (empty($rows)) : ?>
-                <div class="seoauto-card">
-                    <div class="seoauto-debug-empty">
+                <div class="seoworkerai-card">
+                    <div class="seoworkerai-debug-empty">
                         <strong>No content briefs yet</strong>
                         <p>Briefs will appear here once your SEO platform sends them through.</p>
                     </div>
                 </div>
             <?php else : ?>
-                <div class="seoauto-chip-filter-bar" id="seoauto-briefs-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
-                    <form method="get" class="seoauto-filter-form" id="seoauto-briefs-filter-form">
-                        <input type="hidden" name="page" value="seoauto-briefs">
-                        <div class="seoauto-active-chips" id="seoauto-briefs-active-chips"></div>
-                        <div class="seoauto-filter-dropdowns">
+                <div class="seoworkerai-chip-filter-bar" id="seoworkerai-briefs-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
+                    <form method="get" class="seoworkerai-filter-form" id="seoworkerai-briefs-filter-form">
+                        <input type="hidden" name="page" value="seoworkerai-briefs">
+                        <div class="seoworkerai-active-chips" id="seoworkerai-briefs-active-chips"></div>
+                        <div class="seoworkerai-filter-dropdowns">
                             <?php
                             $filterDefs = [
                                 ['key' => 'article_status', 'label' => 'Article Status', 'options' => array_combine($articleStatusOptions, array_map('ucfirst', $articleStatusOptions))],
@@ -1807,46 +1807,46 @@ final class MenuRegistrar
                                     default => [],
                                 };
                             ?>
-                            <div class="seoauto-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
-                                <button type="button" class="seoauto-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
+                            <div class="seoworkerai-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
+                                <button type="button" class="seoworkerai-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
                                     <?php echo esc_html($fd['label']); ?>
-                                    <?php if (!empty($activeVals)) echo '<span class="seoauto-filter-count">' . count($activeVals) . '</span>'; ?>
-                                    <span class="seoauto-filter-chevron">▾</span>
+                                    <?php if (!empty($activeVals)) echo '<span class="seoworkerai-filter-count">' . count($activeVals) . '</span>'; ?>
+                                    <span class="seoworkerai-filter-chevron">▾</span>
                                 </button>
-                                <div class="seoauto-filter-panel" style="display:none;">
-                                    <div class="seoauto-filter-panel-inner">
+                                <div class="seoworkerai-filter-panel" style="display:none;">
+                                    <div class="seoworkerai-filter-panel-inner">
                                         <?php foreach ($fd['options'] as $val => $label) : ?>
-                                            <label class="seoauto-filter-option">
+                                            <label class="seoworkerai-filter-option">
                                                 <input type="checkbox" name="<?php echo esc_attr($fd['key']); ?>[]" value="<?php echo esc_attr((string) $val); ?>" <?php checked(in_array((string) $val, $activeVals, true)); ?>>
                                                 <?php echo esc_html((string) $label); ?>
                                             </label>
                                         <?php endforeach; ?>
                                     </div>
-                                    <div class="seoauto-filter-panel-footer">
-                                        <button type="button" class="seoauto-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
-                                        <button type="button" class="button button-small button-primary seoauto-filter-apply">Apply</button>
+                                    <div class="seoworkerai-filter-panel-footer">
+                                        <button type="button" class="seoworkerai-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
+                                        <button type="button" class="button button-small button-primary seoworkerai-filter-apply">Apply</button>
                                     </div>
                                 </div>
                             </div>
                             <?php endforeach; ?>
 
                             <div style="display:flex;gap:6px;align-items:center;margin-left:auto;">
-                                <input type="number" min="0" name="search_volume_min" value="<?php echo esc_attr($minSearchVolume === null ? '' : (string) $minSearchVolume); ?>" placeholder="Min SV" class="seoauto-filter-range-input">
-                                <input type="number" min="0" name="search_volume_max" value="<?php echo esc_attr($maxSearchVolume === null ? '' : (string) $maxSearchVolume); ?>" placeholder="Max SV" class="seoauto-filter-range-input">
-                                <input type="number" min="0" max="100" name="keyword_difficulty_min" value="<?php echo esc_attr($minKeywordDifficulty === null ? '' : (string) $minKeywordDifficulty); ?>" placeholder="Min KD" class="seoauto-filter-range-input">
-                                <input type="number" min="0" max="100" name="keyword_difficulty_max" value="<?php echo esc_attr($maxKeywordDifficulty === null ? '' : (string) $maxKeywordDifficulty); ?>" placeholder="Max KD" class="seoauto-filter-range-input">
+                                <input type="number" min="0" name="search_volume_min" value="<?php echo esc_attr($minSearchVolume === null ? '' : (string) $minSearchVolume); ?>" placeholder="Min SV" class="seoworkerai-filter-range-input">
+                                <input type="number" min="0" name="search_volume_max" value="<?php echo esc_attr($maxSearchVolume === null ? '' : (string) $maxSearchVolume); ?>" placeholder="Max SV" class="seoworkerai-filter-range-input">
+                                <input type="number" min="0" max="100" name="keyword_difficulty_min" value="<?php echo esc_attr($minKeywordDifficulty === null ? '' : (string) $minKeywordDifficulty); ?>" placeholder="Min KD" class="seoworkerai-filter-range-input">
+                                <input type="number" min="0" max="100" name="keyword_difficulty_max" value="<?php echo esc_attr($maxKeywordDifficulty === null ? '' : (string) $maxKeywordDifficulty); ?>" placeholder="Max KD" class="seoworkerai-filter-range-input">
                                 <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="Search brief…" style="height:32px;padding:0 10px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;width:180px;">
                                 <button class="button button-primary" type="submit">Search</button>
                                 <?php if (!empty($articleStatusArr) || !empty($assignmentStatusArr) || !empty($keywordTypeArr) || !empty($searchIntentArr) || $minSearchVolume !== null || $maxSearchVolume !== null || $minKeywordDifficulty !== null || $maxKeywordDifficulty !== null || $search !== '') : ?>
-                                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-briefs')); ?>">Reset</a>
+                                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-briefs')); ?>">Reset</a>
                                 <?php endif; ?>
                             </div>
                         </div>
-                        <div id="seoauto-briefs-filter-hidden-inputs" class="seoauto-filter-hidden-inputs"></div>
+                        <div id="seoworkerai-briefs-filter-hidden-inputs" class="seoworkerai-filter-hidden-inputs"></div>
                     </form>
                 </div>
 
-                <div class="seoauto-briefs-list">
+                <div class="seoworkerai-briefs-list">
                     <?php foreach ($rows as $row) : ?>
                         <?php
                         $payload = json_decode((string)$row->payload, true);
@@ -1874,11 +1874,11 @@ final class MenuRegistrar
                             if (count($threads) >= 5) break;
                         }
                         ?>
-                        <div class="seoauto-brief-card">
-                            <div class="seoauto-brief-header">
+                        <div class="seoworkerai-brief-card">
+                            <div class="seoworkerai-brief-header">
                                 <div>
-                                    <h3 class="seoauto-brief-title"><?php echo esc_html($briefTitle); ?></h3>
-                                    <div class="seoauto-brief-meta">
+                                    <h3 class="seoworkerai-brief-title"><?php echo esc_html($briefTitle); ?></h3>
+                                    <div class="seoworkerai-brief-meta">
                                         <?php if ($focusKw !== '') : ?><span>🔑 <?php echo esc_html($focusKw); ?></span><?php endif; ?>
                                         <?php if ($searchIntent !== '') : ?><span>🎯 <?php echo esc_html($searchIntent); ?></span><?php endif; ?>
                                         <?php if ($keywordType !== '') : ?><span>Type: <?php echo esc_html(ucfirst($keywordType)); ?></span><?php endif; ?>
@@ -1892,9 +1892,9 @@ final class MenuRegistrar
                                 <?php echo wp_kses_post($this->renderStatusBadge((string)$row->article_status)); ?>
                             </div>
 
-                            <div class="seoauto-brief-body">
+                            <div class="seoworkerai-brief-body">
                                 <?php if ($briefSummary !== '' || $writerNotes !== '') : ?>
-                                <div class="seoauto-brief-col">
+                                <div class="seoworkerai-brief-col">
                                     <?php if ($briefSummary !== '') : ?>
                                         <h4>Brief Summary</h4>
                                         <p><?php echo esc_html($briefSummary); ?></p>
@@ -1907,25 +1907,25 @@ final class MenuRegistrar
                                 <?php endif; ?>
 
                                 <?php if (!empty($outlineItems)) : ?>
-                                <div class="seoauto-brief-col">
+                                <div class="seoworkerai-brief-col">
                                     <h4>Recommended Outline</h4>
-                                    <ul class="seoauto-brief-ul">
+                                    <ul class="seoworkerai-brief-ul">
                                         <?php foreach ($outlineItems as $item) : ?><li><?php echo esc_html($item); ?></li><?php endforeach; ?>
                                     </ul>
                                 </div>
                                 <?php endif; ?>
 
                                 <?php if (!empty($painPoints) || !empty($contentIdeas)) : ?>
-                                <div class="seoauto-brief-col">
+                                <div class="seoworkerai-brief-col">
                                     <?php if (!empty($painPoints)) : ?>
                                         <h4>Reader Pain Points</h4>
-                                        <ul class="seoauto-brief-ul">
+                                        <ul class="seoworkerai-brief-ul">
                                             <?php foreach ($painPoints as $item) : ?><li><?php echo esc_html($item); ?></li><?php endforeach; ?>
                                         </ul>
                                     <?php endif; ?>
                                     <?php if (!empty($contentIdeas)) : ?>
                                         <h4 style="margin-top:14px;">Content Angles</h4>
-                                        <ul class="seoauto-brief-ul">
+                                        <ul class="seoworkerai-brief-ul">
                                             <?php foreach ($contentIdeas as $item) : ?><li><?php echo esc_html($item); ?></li><?php endforeach; ?>
                                         </ul>
                                     <?php endif; ?>
@@ -1933,33 +1933,33 @@ final class MenuRegistrar
                                 <?php endif; ?>
 
                                 <?php if (!empty($threads)) : ?>
-                                <div class="seoauto-brief-col-full">
+                                <div class="seoworkerai-brief-col-full">
                                     <h4>Source Threads</h4>
-                                    <ul class="seoauto-brief-ul" style="columns:2;gap:16px;">
+                                    <ul class="seoworkerai-brief-ul" style="columns:2;gap:16px;">
                                         <?php foreach ($threads as $t) : ?><li><?php echo esc_html($t); ?></li><?php endforeach; ?>
                                     </ul>
                                 </div>
                                 <?php endif; ?>
                             </div>
 
-                            <div class="seoauto-brief-footer">
-                                <div class="seoauto-brief-linked">
+                            <div class="seoworkerai-brief-footer">
+                                <div class="seoworkerai-brief-linked">
                                     <?php if (!empty($row->linked_wp_post_id)) : ?>
                                         Linked to: <a href="<?php echo esc_url((string)get_edit_post_link((int)$row->linked_wp_post_id)); ?>"><?php echo esc_html((string) ($row->linked_wp_post_title ?: get_the_title((int)$row->linked_wp_post_id))); ?></a>
                                     <?php else : ?>
-                                        <span class="seoauto-muted">Not linked to a post yet</span>
+                                        <span class="seoworkerai-muted">Not linked to a post yet</span>
                                     <?php endif; ?>
                                 </div>
-                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-brief-link-form">
-                                    <?php wp_nonce_field('seoauto_link_brief'); ?>
-                                    <input type="hidden" name="action" value="seoauto_link_brief">
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoworkerai-brief-link-form">
+                                    <?php wp_nonce_field('seoworkerai_link_brief'); ?>
+                                    <input type="hidden" name="action" value="seoworkerai_link_brief">
                                     <input type="hidden" name="brief_id" value="<?php echo esc_attr((string)$row->laravel_content_brief_id); ?>">
-                                    <div class="seoauto-post-picker" data-hidden-input-name="wp_post_id">
+                                    <div class="seoworkerai-post-picker" data-hidden-input-name="wp_post_id">
                                         <input type="hidden" name="wp_post_id" value="<?php echo esc_attr((string) ($row->linked_wp_post_id ?? '')); ?>">
-                                        <div class="seoauto-post-picker-display"><?php echo !empty($row->linked_wp_post_id) ? esc_html((string) ($row->linked_wp_post_title ?: get_the_title((int) $row->linked_wp_post_id))) : 'Select a post or page'; ?></div>
-                                        <div class="seoauto-post-picker-dropdown">
-                                            <input type="text" class="seoauto-post-picker-search" placeholder="Search posts or pages…">
-                                            <div class="seoauto-post-picker-options">
+                                        <div class="seoworkerai-post-picker-display"><?php echo !empty($row->linked_wp_post_id) ? esc_html((string) ($row->linked_wp_post_title ?: get_the_title((int) $row->linked_wp_post_id))) : 'Select a post or page'; ?></div>
+                                        <div class="seoworkerai-post-picker-dropdown">
+                                            <input type="text" class="seoworkerai-post-picker-search" placeholder="Search posts or pages…">
+                                            <div class="seoworkerai-post-picker-options">
                                                 <?php foreach ($allPosts as $postId) :
                                                     $postTitle = (string) get_the_title($postId);
                                                     $postType = (string) get_post_type($postId);
@@ -1967,12 +1967,12 @@ final class MenuRegistrar
                                                 ?>
                                                     <button
                                                         type="button"
-                                                        class="seoauto-post-picker-option"
+                                                        class="seoworkerai-post-picker-option"
                                                         data-post-id="<?php echo esc_attr((string) $postId); ?>"
                                                         data-post-title="<?php echo esc_attr($postTitle); ?>"
                                                         data-post-type="<?php echo esc_attr($postType); ?>"
                                                     >
-                                                        <span class="seoauto-excl-type-tag"><?php echo esc_html(ucfirst($postType)); ?></span>
+                                                        <span class="seoworkerai-excl-type-tag"><?php echo esc_html(ucfirst($postType)); ?></span>
                                                         <?php echo esc_html($postTitle); ?>
                                                     </button>
                                                 <?php endforeach; ?>
@@ -2000,7 +2000,7 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
 
-        $notice  = isset($_GET['seoauto_notice']) ? sanitize_text_field((string)$_GET['seoauto_notice']) : '';
+        $notice  = isset($_GET['seoworkerai_notice']) ? sanitize_text_field((string)$_GET['seoworkerai_notice']) : '';
         $tasks   = [];
         $scheduled = [];
         $remoteErrors = [];
@@ -2021,8 +2021,8 @@ final class MenuRegistrar
             $this->logger->warning('admin_scheduled_runs_fetch_failed', ['error' => $e->getMessage()], 'admin');
         }
         ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Schedules', 'seoauto-schedules', 'Manage background task configuration and timing.'); ?>
+        <div class="wrap seoworkerai-admin-page">
+            <?php $this->renderAdminShellHeader('Schedules', 'seoworkerai-schedules', 'Manage background task configuration and timing.'); ?>
             <?php $this->renderNotice($notice); ?>
             <?php if (!empty($remoteErrors)) : ?>
                 <div class="notice notice-warning"><p>Could not load some schedule data: <?php echo esc_html(implode(' | ', $remoteErrors)); ?></p></div>
@@ -2036,9 +2036,9 @@ final class MenuRegistrar
             }
             ?>
 
-            <div class="seoauto-card" style="padding:0;overflow:hidden;">
-                <div class="seoauto-table-wrap">
-                <table class="wp-list-table widefat seoauto-schedules-table">
+            <div class="seoworkerai-card" style="padding:0;overflow:hidden;">
+                <div class="seoworkerai-table-wrap">
+                <table class="wp-list-table widefat seoworkerai-schedules-table">
                     <thead>
                         <tr>
                             <th>Task</th>
@@ -2063,8 +2063,8 @@ final class MenuRegistrar
                                 <td><strong><?php echo esc_html((string)($task['name'] ?? '')); ?></strong></td>
                                 <td><?php echo esc_html((string)($task['category'] ?? '')); ?></td>
                                 <td><?php echo esc_html((string)($task['frequency'] ?? '—')); ?></td>
-                                <td><?php echo $isEnabled ? '<span class="seoauto-badge seoauto-status-applied">Enabled</span>' : '<span class="seoauto-badge seoauto-status-received">Disabled</span>'; ?></td>
-                                <td class="seoauto-mono seoauto-muted" style="font-size:12px;">
+                                <td><?php echo $isEnabled ? '<span class="seoworkerai-badge seoworkerai-status-applied">Enabled</span>' : '<span class="seoworkerai-badge seoworkerai-status-received">Disabled</span>'; ?></td>
+                                <td class="seoworkerai-mono seoworkerai-muted" style="font-size:12px;">
                                     <?php if ($latestRun) : ?>
                                         <?php echo wp_kses_post($this->renderStatusBadge((string)($latestRun['status'] ?? ''))); ?>
                                         <div style="margin-top:3px;"><?php echo esc_html((string)($latestRun['scheduled_for'] ?? '')); ?></div>
@@ -2074,18 +2074,18 @@ final class MenuRegistrar
                                 </td>
                                 <td>
                                     <?php if ($taskId > 0) : ?>
-                                        <div class="seoauto-task-forms">
-                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-task-update-form">
-                                                <?php wp_nonce_field('seoauto_update_task'); ?>
-                                                <input type="hidden" name="action" value="seoauto_update_task">
+                                        <div class="seoworkerai-task-forms">
+                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoworkerai-task-update-form">
+                                                <?php wp_nonce_field('seoworkerai_update_task'); ?>
+                                                <input type="hidden" name="action" value="seoworkerai_update_task">
                                                 <input type="hidden" name="task_id" value="<?php echo esc_attr((string)$taskId); ?>">
                                                 <label><input type="checkbox" name="is_enabled" value="1" <?php checked($isEnabled); ?>> Enabled</label>
                                                 <label>Delay: <input type="number" min="0" name="delay_minutes" value="<?php echo esc_attr((string)$delay); ?>" style="width:60px;"> min</label>
                                                 <button type="submit" class="button button-small">Save</button>
                                             </form>
-                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoauto-task-schedule-form">
-                                                <?php wp_nonce_field('seoauto_schedule_task'); ?>
-                                                <input type="hidden" name="action" value="seoauto_schedule_task">
+                                            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="seoworkerai-task-schedule-form">
+                                                <?php wp_nonce_field('seoworkerai_schedule_task'); ?>
+                                                <input type="hidden" name="action" value="seoworkerai_schedule_task">
                                                 <input type="hidden" name="task_id" value="<?php echo esc_attr((string)$taskId); ?>">
                                                 <input type="datetime-local" name="scheduled_for">
                                                 <button type="submit" class="button button-small button-primary">Schedule Run</button>
@@ -2096,7 +2096,7 @@ final class MenuRegistrar
                             </tr>
                         <?php endforeach; ?>
                     <?php else : ?>
-                        <tr><td colspan="6"><div class="seoauto-debug-empty"><strong>No tasks found</strong><p>Tasks will appear here once your site is registered and connected.</p></div></td></tr>
+                        <tr><td colspan="6"><div class="seoworkerai-debug-empty"><strong>No tasks found</strong><p>Tasks will appear here once your site is registered and connected.</p></div></td></tr>
                     <?php endif; ?>
                     </tbody>
                 </table>
@@ -2113,9 +2113,9 @@ final class MenuRegistrar
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_logs';
+        $table = $wpdb->prefix . 'seoworkerai_logs';
 
-        $notice       = isset($_GET['seoauto_notice'])  ? sanitize_text_field((string)$_GET['seoauto_notice'])  : '';
+        $notice       = isset($_GET['seoworkerai_notice'])  ? sanitize_text_field((string)$_GET['seoworkerai_notice'])  : '';
         $deletedCount = isset($_GET['deleted_count'])   ? max(0,(int)$_GET['deleted_count'])                    : 0;
         
         $severityArr  = isset($_GET['severity'])        ? array_filter(array_map('sanitize_text_field', (array)$_GET['severity'])) : [];
@@ -2166,30 +2166,30 @@ final class MenuRegistrar
             'source'   => ['inbound'=>'Inbound','outbound'=>'Outbound','executor'=>'Executor','admin'=>'Admin'],
         ]);
         ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Debug Logs', 'seoauto-local-errors', 'Inspect plugin warnings and errors.'); ?>
+        <div class="wrap seoworkerai-admin-page">
+            <?php $this->renderAdminShellHeader('Debug Logs', 'seoworkerai-local-errors', 'Inspect plugin warnings and errors.'); ?>
             <?php $this->renderNotice($notice); ?>
 
             <!-- Toolbar -->
-            <div class="seoauto-button-row" style="margin-bottom:14px;">
+            <div class="seoworkerai-button-row" style="margin-bottom:14px;">
                 <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                    <?php wp_nonce_field('seoauto_delete_local_errors'); ?>
-                    <input type="hidden" name="action" value="seoauto_delete_local_errors">
+                    <?php wp_nonce_field('seoworkerai_delete_local_errors'); ?>
+                    <input type="hidden" name="action" value="seoworkerai_delete_local_errors">
                     <input type="hidden" name="severity" value="all">
-                    <button type="submit" class="button seoauto-btn-danger" onclick="return confirm('Delete matching log entries?');">Clear Logs</button>
+                    <button type="submit" class="button seoworkerai-btn-danger" onclick="return confirm('Delete matching log entries?');">Clear Logs</button>
                 </form>
             </div>
 
             <!-- Chip Filter Bar -->
-            <div class="seoauto-chip-filter-bar" id="seoauto-debug-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
-                <form method="get" class="seoauto-filter-form" id="seoauto-debug-filter-form">
-                    <input type="hidden" name="page" value="seoauto-local-errors">
+            <div class="seoworkerai-chip-filter-bar" id="seoworkerai-debug-filter-bar" data-label-maps="<?php echo esc_attr($labelMapsJson); ?>">
+                <form method="get" class="seoworkerai-filter-form" id="seoworkerai-debug-filter-form">
+                    <input type="hidden" name="page" value="seoworkerai-local-errors">
 
                     <!-- Active filter chips row -->
-                    <div class="seoauto-active-chips" id="seoauto-debug-active-chips"></div>
+                    <div class="seoworkerai-active-chips" id="seoworkerai-debug-active-chips"></div>
 
                     <!-- Filter dropdowns row -->
-                    <div class="seoauto-filter-dropdowns">
+                    <div class="seoworkerai-filter-dropdowns">
                         <?php
                         $filterDefs = [
                             ['key'=>'severity', 'label'=>'Severity', 'options'=> ['error'=>'Error','warning'=>'Warning']],
@@ -2202,16 +2202,16 @@ final class MenuRegistrar
                                 default    => [],
                             };
                         ?>
-                        <div class="seoauto-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
-                            <button type="button" class="seoauto-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
+                        <div class="seoworkerai-filter-dropdown" data-filter-key="<?php echo esc_attr($fd['key']); ?>">
+                            <button type="button" class="seoworkerai-filter-btn <?php echo !empty($activeVals) ? 'has-active' : ''; ?>">
                                 <?php echo esc_html($fd['label']); ?>
-                                <?php if (!empty($activeVals)) echo '<span class="seoauto-filter-count">' . count($activeVals) . '</span>'; ?>
-                                <span class="seoauto-filter-chevron">▾</span>
+                                <?php if (!empty($activeVals)) echo '<span class="seoworkerai-filter-count">' . count($activeVals) . '</span>'; ?>
+                                <span class="seoworkerai-filter-chevron">▾</span>
                             </button>
-                            <div class="seoauto-filter-panel" style="display:none;">
-                                <div class="seoauto-filter-panel-inner">
+                            <div class="seoworkerai-filter-panel" style="display:none;">
+                                <div class="seoworkerai-filter-panel-inner">
                                     <?php foreach ($fd['options'] as $val => $label) : ?>
-                                        <label class="seoauto-filter-option">
+                                        <label class="seoworkerai-filter-option">
                                             <input type="checkbox"
                                                 name="<?php echo esc_attr($fd['key']); ?>[]"
                                                 value="<?php echo esc_attr((string)$val); ?>"
@@ -2220,9 +2220,9 @@ final class MenuRegistrar
                                         </label>
                                     <?php endforeach; ?>
                                 </div>
-                                <div class="seoauto-filter-panel-footer">
-                                    <button type="button" class="seoauto-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
-                                    <button type="button" class="button button-small button-primary seoauto-filter-apply">Apply</button>
+                                <div class="seoworkerai-filter-panel-footer">
+                                    <button type="button" class="seoworkerai-filter-clear-one button-link" data-filter-key="<?php echo esc_attr($fd['key']); ?>">Clear</button>
+                                    <button type="button" class="button button-small button-primary seoworkerai-filter-apply">Apply</button>
                                 </div>
                             </div>
                         </div>
@@ -2243,18 +2243,18 @@ final class MenuRegistrar
                             <input type="text" name="q" value="<?php echo esc_attr($search); ?>" placeholder="Search keyword…" style="height:32px;padding:0 10px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;width:180px;">
                             <button class="button button-primary" type="submit">Search</button>
                             <?php if (!empty($severityArr) || !empty($sourceArr) || $dateFrom !== '' || $dateTo !== '' || $search !== '') : ?>
-                                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoauto-local-errors')); ?>">Reset</a>
+                                <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-local-errors')); ?>">Reset</a>
                             <?php endif; ?>
                         </div>
                     </div>
 
                     <!-- Hidden inputs managed by JS -->
-                    <div id="seoauto-debug-filter-hidden-inputs" class="seoauto-filter-hidden-inputs"></div>
+                    <div id="seoworkerai-debug-filter-hidden-inputs" class="seoworkerai-filter-hidden-inputs"></div>
                 </form>
             </div>
 
-            <div class="seoauto-card" style="padding:0;overflow:hidden;">
-                <div class="seoauto-table-wrap">
+            <div class="seoworkerai-card" style="padding:0;overflow:hidden;">
+                <div class="seoworkerai-table-wrap">
                 <?php if (!empty($rows)) : ?>
                 <table class="wp-list-table widefat" style="min-width:900px;">
                     <thead>
@@ -2263,18 +2263,18 @@ final class MenuRegistrar
                     <tbody>
                         <?php foreach ($rows as $row) : ?>
                             <tr>
-                                <td class="seoauto-mono seoauto-nowrap"><?php echo esc_html(wp_date('Y-m-d H:i:s', strtotime((string)$row->created_at))); ?></td>
-                                <td><span class="seoauto-severity-<?php echo esc_attr((string)$row->severity); ?>"><?php echo esc_html(strtoupper((string)$row->severity)); ?></span></td>
+                                <td class="seoworkerai-mono seoworkerai-nowrap"><?php echo esc_html(wp_date('Y-m-d H:i:s', strtotime((string)$row->created_at))); ?></td>
+                                <td><span class="seoworkerai-severity-<?php echo esc_attr((string)$row->severity); ?>"><?php echo esc_html(strtoupper((string)$row->severity)); ?></span></td>
                                 <td><?php echo esc_html((string)$row->source); ?></td>
                                 <td><code><?php echo esc_html((string)$row->event_name); ?></code></td>
-                                <td class="seoauto-muted"><?php echo esc_html((string)$row->entity_type.':'.(string)$row->entity_id); ?></td>
+                                <td class="seoworkerai-muted"><?php echo esc_html((string)$row->entity_type.':'.(string)$row->entity_id); ?></td>
                                 <td><?php echo esc_html((string)$row->error_message); ?></td>
                             </tr>
                         <?php endforeach; ?>
                     </tbody>
                 </table>
                 <?php else : ?>
-                    <div class="seoauto-debug-empty">
+                    <div class="seoworkerai-debug-empty">
                         <strong>No log entries found</strong>
                         <p>
                             <?php if (!empty($severityArr) || !empty($sourceArr) || $dateFrom !== '' || $dateTo !== '' || $search !== '') : ?>
@@ -2288,7 +2288,7 @@ final class MenuRegistrar
                 </div>
             </div>
 
-            <div class="seoauto-pagination">
+            <div class="seoworkerai-pagination">
                 <div><?php echo esc_html((string)$total); ?> total entries</div>
                 <div><?php echo wp_kses_post(paginate_links(['base' => add_query_arg('paged','%#%'), 'format' => '', 'current' => $page, 'total' => $totalPages])); ?></div>
             </div>
@@ -2308,13 +2308,13 @@ final class MenuRegistrar
             $scopes   = isset($result['scopes']) && is_array($result['scopes']) ? $result['scopes'] : [];
             $error    = sanitize_text_field((string)($result['error'] ?? ''));
         } else {
-            $status   = (string)get_option('seoauto_oauth_status', 'pending');
-            $scopes   = (array)get_option('seoauto_oauth_scopes', []);
-            $error    = (string)get_option('seoauto_oauth_last_error', '');
+            $status   = (string)get_option('seoworkerai_oauth_status', 'pending');
+            $scopes   = (array)get_option('seoworkerai_oauth_scopes', []);
+            $error    = (string)get_option('seoworkerai_oauth_last_error', '');
         }
         ?>
-        <div class="wrap seoauto-admin-page">
-            <?php $this->renderAdminShellHeader('Google Connection', 'seoauto', ''); ?>
+        <div class="wrap seoworkerai-admin-page">
+            <?php $this->renderAdminShellHeader('Google Connection', 'seoworkerai', ''); ?>
             <?php if ($status === 'active') : ?>
                 <div class="notice notice-success"><p>✓ Google connected successfully. You can close this page.</p></div>
             <?php elseif ($status === 'error') : ?>
@@ -2325,7 +2325,7 @@ final class MenuRegistrar
                 <div class="notice notice-error"><p>Connection failed. <?php echo esc_html($error); ?></p></div>
             <?php endif; ?>
             <p style="margin-top:16px;">
-                <a class="button button-primary" href="<?php echo esc_url(admin_url('admin.php?page=seoauto')); ?>">← Back to Settings</a>
+                <a class="button button-primary" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai')); ?>">← Back to Settings</a>
             </p>
         </div>
         <?php
@@ -2377,7 +2377,7 @@ final class MenuRegistrar
     {
         $normalized = sanitize_html_class(str_replace('_', '-', strtolower(trim($status))));
         $label = ucwords(str_replace(['-','_'], ' ', $status));
-        return sprintf('<span class="seoauto-badge seoauto-status-%s">%s</span>', esc_attr($normalized), esc_html($label));
+        return sprintf('<span class="seoworkerai-badge seoworkerai-status-%s">%s</span>', esc_attr($normalized), esc_html($label));
     }
 
     private function shouldRenderTimelineNote(string $eventType, string $note): bool
@@ -2474,7 +2474,7 @@ final class MenuRegistrar
     {
         global $wpdb;
         $wpdb->update( // phpcs:ignore
-            $wpdb->prefix . 'seoauto_briefs',
+            $wpdb->prefix . 'seoworkerai_briefs',
             [
                 'linked_wp_post_id' => $postId,
                 'linked_wp_post_url' => $postUrl,
@@ -2619,19 +2619,19 @@ final class MenuRegistrar
     private function renderAdminShellHeader(string $title, string $activePage, string $description = ''): void
     {
         $tabs = [
-            'seoauto'              => ['label'=>'Settings',       'cap'=>'manage_options'],
-            'seoauto-logs'         => ['label'=>'Change Center',  'cap'=>'manage_options'],
-            'seoauto-action-items' => ['label'=>'Action Items',   'cap'=>'manage_options'],
-            'seoauto-briefs'       => ['label'=>'Content Briefs', 'cap'=>'edit_posts'],
+            'seoworkerai'              => ['label'=>'Settings',       'cap'=>'manage_options'],
+            'seoworkerai-logs'         => ['label'=>'Change Center',  'cap'=>'manage_options'],
+            'seoworkerai-action-items' => ['label'=>'Action Items',   'cap'=>'manage_options'],
+            'seoworkerai-briefs'       => ['label'=>'Content Briefs', 'cap'=>'edit_posts'],
         ];
         ?>
-        <div class="seoauto-shell-header">
+        <div class="seoworkerai-shell-header">
             <h1><?php echo esc_html($title); ?></h1>
             <?php if ($description !== '') : ?><p><?php echo esc_html($description); ?></p><?php endif; ?>
-            <div class="seoauto-shell-tabs">
+            <div class="seoworkerai-shell-tabs">
                 <?php foreach ($tabs as $slug => $tab) : ?>
                     <?php if (!current_user_can((string)$tab['cap'])) continue; ?>
-                    <a class="seoauto-shell-tab <?php echo $slug === $activePage ? 'is-active' : ''; ?>" href="<?php echo esc_url(admin_url('admin.php?page='.$slug)); ?>">
+                    <a class="seoworkerai-shell-tab <?php echo $slug === $activePage ? 'is-active' : ''; ?>" href="<?php echo esc_url(admin_url('admin.php?page='.$slug)); ?>">
                         <?php echo esc_html((string)$tab['label']); ?>
                     </a>
                 <?php endforeach; ?>
@@ -2643,12 +2643,12 @@ final class MenuRegistrar
     private function resolveActionRedirectPage(): string
     {
         $returnPage = isset($_POST['return_page']) ? sanitize_text_field((string)$_POST['return_page']) : ''; // phpcs:ignore
-        return in_array($returnPage, ['seoauto-logs','seoauto-action-items'], true) ? $returnPage : 'seoauto-logs';
+        return in_array($returnPage, ['seoworkerai-logs','seoworkerai-action-items'], true) ? $returnPage : 'seoworkerai-logs';
     }
 
     public function sanitizeBaseUrl($value): string
     {
-        return rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/');
+        return rtrim((string) SEOWORKERAI_LARAVEL_BASE_URL, '/');
     }
 
     public function sanitizeChangeApplicationMode($value): string

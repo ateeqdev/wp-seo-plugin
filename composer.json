@@ -1,6 +1,6 @@
 {
-  "name": "seo-automation/wordpress-connector",
-  "description": "WordPress SEO automation connector plugin",
+  "name": "seoworkerai/wordpress-connector",
+  "description": "WordPress SEOWorkerAI connector plugin",
   "type": "wordpress-plugin",
   "license": "GPL-2.0-or-later",
   "require": {
@@ -8,7 +8,7 @@
   },
   "autoload": {
     "psr-4": {
-      "SEOAutomation\\Connector\\": "includes/"
+      "SEOWorkerAI\\Connector\\": "includes/"
     }
   },
   "require-dev": {

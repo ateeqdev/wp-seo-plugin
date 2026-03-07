@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\REST;
+namespace SEOWorkerAI\Connector\REST;
 
-use SEOAutomation\Connector\Auth\SiteTokenManager;
-use SEOAutomation\Connector\SEO\SeoDetector;
+use SEOWorkerAI\Connector\Auth\SiteTokenManager;
+use SEOWorkerAI\Connector\SEO\SeoDetector;
 
 final class PagesEndpoint
 {
@@ -21,7 +21,7 @@ final class PagesEndpoint
 
     public function registerRoutes(): void
     {
-        foreach (['seoauto/v1', 'seo-platform/v1'] as $namespace) {
+        foreach (['seoworkerai/v1', 'seo-platform/v1'] as $namespace) {
             register_rest_route($namespace, '/pages', [
                 'methods' => 'GET',
                 'callback' => [$this, 'listPages'],
@@ -41,7 +41,7 @@ final class PagesEndpoint
         $token = (string) $request->get_header('X-Site-Token');
 
         if (!$this->tokenManager->verifyInboundToken($token)) {
-            return new \WP_Error('seoauto_unauthorized', 'Invalid site token.', ['status' => 401]);
+            return new \WP_Error('seoworkerai_unauthorized', 'Invalid site token.', ['status' => 401]);
         }
 
         return true;
@@ -111,7 +111,7 @@ final class PagesEndpoint
         $post = get_post($postId);
 
         if (!$post instanceof \WP_Post || $post->post_status !== 'publish') {
-            return new \WP_Error('seoauto_not_found', 'Post not found.', ['status' => 404]);
+            return new \WP_Error('seoworkerai_not_found', 'Post not found.', ['status' => 404]);
         }
 
         return new \WP_REST_Response([

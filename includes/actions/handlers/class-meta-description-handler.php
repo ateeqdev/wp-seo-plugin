@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions\Handlers;
+namespace SEOWorkerAI\Connector\Actions\Handlers;
 
 use Exception;
-use SEOAutomation\Connector\SEO\InterfaceSeoAdapter;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\SEO\InterfaceSeoAdapter;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class MetaDescriptionHandler extends AbstractActionHandler
 {
@@ -112,7 +112,7 @@ final class MetaDescriptionHandler extends AbstractActionHandler
         if ($previous !== '') {
             $this->adapter->setDescription($postId, $previous);
         } else {
-            delete_post_meta($postId, '_seoauto_meta_description');
+            delete_post_meta($postId, '_seoworkerai_meta_description');
             delete_post_meta($postId, '_yoast_wpseo_metadesc');
             delete_post_meta($postId, '_rank_math_description');
             delete_post_meta($postId, 'rank_math_description');

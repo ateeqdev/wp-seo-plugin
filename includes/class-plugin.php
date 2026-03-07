@@ -2,40 +2,40 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector;
+namespace SEOWorkerAI\Connector;
 
-use SEOAutomation\Connector\Actions\ActionExecutor;
-use SEOAutomation\Connector\Actions\ActionPoller;
-use SEOAutomation\Connector\Actions\ActionReceiver;
-use SEOAutomation\Connector\Actions\ActionRepository;
-use SEOAutomation\Connector\Actions\RedirectRuntime;
-use SEOAutomation\Connector\Actions\RobotsRuntime;
-use SEOAutomation\Connector\Actions\StatusReporter;
-use SEOAutomation\Connector\Admin\MenuRegistrar;
-use SEOAutomation\Connector\API\ApiClient;
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\API\RetryPolicy;
-use SEOAutomation\Connector\Auth\OAuthHandler;
-use SEOAutomation\Connector\Auth\SiteTokenManager;
-use SEOAutomation\Connector\Auth\TokenEncryption;
-use SEOAutomation\Connector\Events\EventCollector;
-use SEOAutomation\Connector\Events\EventDispatcher;
-use SEOAutomation\Connector\Events\EventMapper;
-use SEOAutomation\Connector\Events\EventOutbox;
-use SEOAutomation\Connector\Queue\QueueManager;
-use SEOAutomation\Connector\REST\ActionsEndpoint;
-use SEOAutomation\Connector\REST\MediaEndpoint;
-use SEOAutomation\Connector\REST\OwnershipProofEndpoint;
-use SEOAutomation\Connector\REST\PagesEndpoint;
-use SEOAutomation\Connector\REST\RestAccessCompatibility;
-use SEOAutomation\Connector\SEO\SeoDetector;
-use SEOAutomation\Connector\Storage\Schema;
-use SEOAutomation\Connector\Sync\BriefSyncer;
-use SEOAutomation\Connector\Sync\HealthChecker;
-use SEOAutomation\Connector\Sync\SiteRegistrar;
-use SEOAutomation\Connector\Sync\UserSyncer;
-use SEOAutomation\Connector\Utils\LockManager;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Actions\ActionExecutor;
+use SEOWorkerAI\Connector\Actions\ActionPoller;
+use SEOWorkerAI\Connector\Actions\ActionReceiver;
+use SEOWorkerAI\Connector\Actions\ActionRepository;
+use SEOWorkerAI\Connector\Actions\RedirectRuntime;
+use SEOWorkerAI\Connector\Actions\RobotsRuntime;
+use SEOWorkerAI\Connector\Actions\StatusReporter;
+use SEOWorkerAI\Connector\Admin\MenuRegistrar;
+use SEOWorkerAI\Connector\API\ApiClient;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\API\RetryPolicy;
+use SEOWorkerAI\Connector\Auth\OAuthHandler;
+use SEOWorkerAI\Connector\Auth\SiteTokenManager;
+use SEOWorkerAI\Connector\Auth\TokenEncryption;
+use SEOWorkerAI\Connector\Events\EventCollector;
+use SEOWorkerAI\Connector\Events\EventDispatcher;
+use SEOWorkerAI\Connector\Events\EventMapper;
+use SEOWorkerAI\Connector\Events\EventOutbox;
+use SEOWorkerAI\Connector\Queue\QueueManager;
+use SEOWorkerAI\Connector\REST\ActionsEndpoint;
+use SEOWorkerAI\Connector\REST\MediaEndpoint;
+use SEOWorkerAI\Connector\REST\OwnershipProofEndpoint;
+use SEOWorkerAI\Connector\REST\PagesEndpoint;
+use SEOWorkerAI\Connector\REST\RestAccessCompatibility;
+use SEOWorkerAI\Connector\SEO\SeoDetector;
+use SEOWorkerAI\Connector\Storage\Schema;
+use SEOWorkerAI\Connector\Sync\BriefSyncer;
+use SEOWorkerAI\Connector\Sync\HealthChecker;
+use SEOWorkerAI\Connector\Sync\SiteRegistrar;
+use SEOWorkerAI\Connector\Sync\UserSyncer;
+use SEOWorkerAI\Connector\Utils\LockManager;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class Plugin
 {
@@ -65,7 +65,7 @@ final class Plugin
     public function onPluginsLoaded(): void
     {
         Schema::createOrUpgrade();
-        update_option('seoauto_base_url', rtrim((string) SEOAUTO_LARAVEL_BASE_URL, '/'), false);
+        update_option('seoworkerai_base_url', rtrim((string) SEOWORKERAI_LARAVEL_BASE_URL, '/'), false);
         $this->registerServices();
         $this->registerHooks();
     }
@@ -258,7 +258,7 @@ final class Plugin
         $this->container->get('queue_manager')->registerHooks();
         $this->container->get('event_collector')->registerHooks();
         $this->container->get('menu_registrar')->registerHooks();
-        add_action('seoauto_auto_register_site', [$this, 'handleAutoRegisterSite']);
+        add_action('seoworkerai_auto_register_site', [$this, 'handleAutoRegisterSite']);
         add_action('admin_init', [$this, 'maybeScheduleAutoRegister']);
 
         add_action('rest_api_init', function (): void {
@@ -282,36 +282,36 @@ final class Plugin
 
     public function maybeScheduleAutoRegister(): void
     {
-        $siteId = (int) get_option('seoauto_site_id', 0);
-        $pending = (bool) get_option('seoauto_auto_register_pending', false);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
+        $pending = (bool) get_option('seoworkerai_auto_register_pending', false);
 
         if (!$pending && $siteId > 0) {
             return;
         }
 
-        if (!wp_next_scheduled('seoauto_auto_register_site')) {
-            wp_schedule_single_event(time() + 20, 'seoauto_auto_register_site');
+        if (!wp_next_scheduled('seoworkerai_auto_register_site')) {
+            wp_schedule_single_event(time() + 20, 'seoworkerai_auto_register_site');
         }
     }
 
     public function handleAutoRegisterSite(): void
     {
         $result = $this->container->get('site_registrar')->registerOrUpdate(true);
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
         if (!isset($result['error']) && $siteId > 0) {
-            update_option('seoauto_auto_register_pending', false, false);
+            update_option('seoworkerai_auto_register_pending', false, false);
             return;
         }
 
-        update_option('seoauto_auto_register_pending', true, false);
-        if (!wp_next_scheduled('seoauto_auto_register_site')) {
-            wp_schedule_single_event(time() + 5 * MINUTE_IN_SECONDS, 'seoauto_auto_register_site');
+        update_option('seoworkerai_auto_register_pending', true, false);
+        if (!wp_next_scheduled('seoworkerai_auto_register_site')) {
+            wp_schedule_single_event(time() + 5 * MINUTE_IN_SECONDS, 'seoworkerai_auto_register_site');
         }
     }
 
     public function checkCronHealth(): void
     {
-        $lastRun = (int) get_option('seoauto_last_cron_run', 0);
+        $lastRun = (int) get_option('seoworkerai_last_cron_run', 0);
 
         if ($lastRun > 0 && (time() - $lastRun) <= (5 * MINUTE_IN_SECONDS)) {
             return;

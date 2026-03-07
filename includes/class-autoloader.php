@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector;
+namespace SEOWorkerAI\Connector;
 
 final class Autoloader
 {
-    private const PREFIX = 'SEOAutomation\\Connector\\';
+    private const PREFIX = 'SEOWorkerAI\\Connector\\';
 
     public static function register(): void
     {
@@ -38,7 +38,7 @@ final class Autoloader
         // Split only on lower/digit -> upper boundaries so acronyms like OAuth stay intact.
         $normalized = (string) preg_replace('/(?<=[a-z0-9])([A-Z])/', '-$1', $className);
         $fileName = 'class-' . strtolower($normalized) . '.php';
-        $path = SEOAUTO_PLUGIN_DIR . 'includes/' . $directory . $fileName;
+        $path = SEOWORKERAI_PLUGIN_DIR . 'includes/' . $directory . $fileName;
 
         if (is_readable($path)) {
             require_once $path;

@@ -2,31 +2,31 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Storage;
+namespace SEOWorkerAI\Connector\Storage;
 
-use SEOAutomation\Connector\Utils\JsonHelper;
+use SEOWorkerAI\Connector\Utils\JsonHelper;
 
 final class Schema
 {
     public static function createOrUpgrade(): void
     {
-        $current = (string) get_option('seoauto_db_version', '0.0.0');
+        $current = (string) get_option('seoworkerai_db_version', '0.0.0');
 
-        if (version_compare($current, SEOAUTO_DB_VERSION, '>=')) {
+        if (version_compare($current, SEOWORKERAI_DB_VERSION, '>=')) {
             return;
         }
 
         global $wpdb;
         $charset = $wpdb->get_charset_collate();
 
-        $actions = $wpdb->prefix . 'seoauto_actions';
-        $outbox = $wpdb->prefix . 'seoauto_outbox';
-        $activityLogs = $wpdb->prefix . 'seoauto_logs';
-        $changeLogs = $wpdb->prefix . 'seoauto_changes';
-        $actionItems = $wpdb->prefix . 'seoauto_action_items';
-        $briefs = $wpdb->prefix . 'seoauto_briefs';
-        $locks = $wpdb->prefix . 'seoauto_locks';
-        $redirects = $wpdb->prefix . 'seoauto_redirects';
+        $actions = $wpdb->prefix . 'seoworkerai_actions';
+        $outbox = $wpdb->prefix . 'seoworkerai_outbox';
+        $activityLogs = $wpdb->prefix . 'seoworkerai_logs';
+        $changeLogs = $wpdb->prefix . 'seoworkerai_changes';
+        $actionItems = $wpdb->prefix . 'seoworkerai_action_items';
+        $briefs = $wpdb->prefix . 'seoworkerai_briefs';
+        $locks = $wpdb->prefix . 'seoworkerai_locks';
+        $redirects = $wpdb->prefix . 'seoworkerai_redirects';
 
         $sql = [];
 
@@ -203,14 +203,14 @@ final class Schema
 
         self::backfillBriefMetadata();
 
-        update_option('seoauto_db_version', SEOAUTO_DB_VERSION, false);
+        update_option('seoworkerai_db_version', SEOWORKERAI_DB_VERSION, false);
     }
 
     private static function backfillBriefMetadata(): void
     {
         global $wpdb;
 
-        $table = $wpdb->prefix . 'seoauto_briefs';
+        $table = $wpdb->prefix . 'seoworkerai_briefs';
         $rows = $wpdb->get_results("SELECT id, payload FROM {$table} WHERE brief_title IS NULL OR focus_keyword IS NULL OR keyword_type IS NULL LIMIT 500", ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
         if (!is_array($rows) || $rows === []) {
             return;

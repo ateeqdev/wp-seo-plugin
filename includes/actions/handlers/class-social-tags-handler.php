@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions\Handlers;
+namespace SEOWorkerAI\Connector\Actions\Handlers;
 
 use Exception;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class SocialTagsHandler extends AbstractActionHandler
 {
@@ -90,18 +90,18 @@ final class SocialTagsHandler extends AbstractActionHandler
     {
         return [
             'og' => [
-                'title' => (string) get_post_meta($postId, '_seoauto_og_title', true),
-                'type' => (string) get_post_meta($postId, '_seoauto_og_type', true),
-                'image' => (string) get_post_meta($postId, '_seoauto_og_image', true),
-                'url' => (string) get_post_meta($postId, '_seoauto_og_url', true),
-                'description' => (string) get_post_meta($postId, '_seoauto_og_description', true),
+                'title' => (string) get_post_meta($postId, '_seoworkerai_og_title', true),
+                'type' => (string) get_post_meta($postId, '_seoworkerai_og_type', true),
+                'image' => (string) get_post_meta($postId, '_seoworkerai_og_image', true),
+                'url' => (string) get_post_meta($postId, '_seoworkerai_og_url', true),
+                'description' => (string) get_post_meta($postId, '_seoworkerai_og_description', true),
             ],
             'twitter' => [
-                'card' => (string) get_post_meta($postId, '_seoauto_twitter_card', true),
-                'site' => (string) get_post_meta($postId, '_seoauto_twitter_site', true),
-                'title' => (string) get_post_meta($postId, '_seoauto_twitter_title', true),
-                'description' => (string) get_post_meta($postId, '_seoauto_twitter_description', true),
-                'image' => (string) get_post_meta($postId, '_seoauto_twitter_image', true),
+                'card' => (string) get_post_meta($postId, '_seoworkerai_twitter_card', true),
+                'site' => (string) get_post_meta($postId, '_seoworkerai_twitter_site', true),
+                'title' => (string) get_post_meta($postId, '_seoworkerai_twitter_title', true),
+                'description' => (string) get_post_meta($postId, '_seoworkerai_twitter_description', true),
+                'image' => (string) get_post_meta($postId, '_seoworkerai_twitter_image', true),
             ],
         ];
     }
@@ -114,16 +114,16 @@ final class SocialTagsHandler extends AbstractActionHandler
         $og = isset($social['og']) && is_array($social['og']) ? $social['og'] : [];
         $twitter = isset($social['twitter']) && is_array($social['twitter']) ? $social['twitter'] : [];
 
-        update_post_meta($postId, '_seoauto_og_title', sanitize_text_field((string) ($og['title'] ?? '')));
-        update_post_meta($postId, '_seoauto_og_type', sanitize_text_field((string) ($og['type'] ?? '')));
-        update_post_meta($postId, '_seoauto_og_image', esc_url_raw((string) ($og['image'] ?? '')));
-        update_post_meta($postId, '_seoauto_og_url', esc_url_raw((string) ($og['url'] ?? '')));
-        update_post_meta($postId, '_seoauto_og_description', sanitize_text_field((string) ($og['description'] ?? '')));
+        update_post_meta($postId, '_seoworkerai_og_title', sanitize_text_field((string) ($og['title'] ?? '')));
+        update_post_meta($postId, '_seoworkerai_og_type', sanitize_text_field((string) ($og['type'] ?? '')));
+        update_post_meta($postId, '_seoworkerai_og_image', esc_url_raw((string) ($og['image'] ?? '')));
+        update_post_meta($postId, '_seoworkerai_og_url', esc_url_raw((string) ($og['url'] ?? '')));
+        update_post_meta($postId, '_seoworkerai_og_description', sanitize_text_field((string) ($og['description'] ?? '')));
 
-        update_post_meta($postId, '_seoauto_twitter_card', sanitize_text_field((string) ($twitter['card'] ?? '')));
-        update_post_meta($postId, '_seoauto_twitter_site', sanitize_text_field((string) ($twitter['site'] ?? '')));
-        update_post_meta($postId, '_seoauto_twitter_title', sanitize_text_field((string) ($twitter['title'] ?? '')));
-        update_post_meta($postId, '_seoauto_twitter_description', sanitize_text_field((string) ($twitter['description'] ?? '')));
-        update_post_meta($postId, '_seoauto_twitter_image', esc_url_raw((string) ($twitter['image'] ?? '')));
+        update_post_meta($postId, '_seoworkerai_twitter_card', sanitize_text_field((string) ($twitter['card'] ?? '')));
+        update_post_meta($postId, '_seoworkerai_twitter_site', sanitize_text_field((string) ($twitter['site'] ?? '')));
+        update_post_meta($postId, '_seoworkerai_twitter_title', sanitize_text_field((string) ($twitter['title'] ?? '')));
+        update_post_meta($postId, '_seoworkerai_twitter_description', sanitize_text_field((string) ($twitter['description'] ?? '')));
+        update_post_meta($postId, '_seoworkerai_twitter_image', esc_url_raw((string) ($twitter['image'] ?? '')));
     }
 }

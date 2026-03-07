@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Auth;
+namespace SEOWorkerAI\Connector\Auth;
 
 final class SiteTokenManager
 {
@@ -15,12 +15,12 @@ final class SiteTokenManager
 
     public function storeToken(string $token): void
     {
-        update_option('seoauto_site_token', $this->encryption->encrypt($token), false);
+        update_option('seoworkerai_site_token', $this->encryption->encrypt($token), false);
     }
 
     public function getToken(): ?string
     {
-        $encrypted = (string) get_option('seoauto_site_token', '');
+        $encrypted = (string) get_option('seoworkerai_site_token', '');
 
         if ($encrypted === '') {
             return null;
@@ -38,7 +38,7 @@ final class SiteTokenManager
 
     public function clearToken(): void
     {
-        delete_option('seoauto_site_token');
+        delete_option('seoworkerai_site_token');
     }
 
     public function verifyInboundToken(string $provided): bool

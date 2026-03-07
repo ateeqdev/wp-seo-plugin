@@ -2,9 +2,9 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Events;
+namespace SEOWorkerAI\Connector\Events;
 
-use SEOAutomation\Connector\Utils\JsonHelper;
+use SEOWorkerAI\Connector\Utils\JsonHelper;
 
 final class EventOutbox
 {
@@ -13,7 +13,7 @@ final class EventOutbox
     public function __construct()
     {
         global $wpdb;
-        $this->table = $wpdb->prefix . 'seoauto_outbox';
+        $this->table = $wpdb->prefix . 'seoworkerai_outbox';
     }
 
     /**

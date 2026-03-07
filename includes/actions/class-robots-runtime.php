@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions;
+namespace SEOWorkerAI\Connector\Actions;
 
 final class RobotsRuntime
 {
@@ -20,12 +20,12 @@ final class RobotsRuntime
             return $output;
         }
 
-        $directives = get_option('seoauto_robots_directives', []);
+        $directives = get_option('seoworkerai_robots_directives', []);
         if (!is_array($directives) || empty($directives)) {
             return $output;
         }
 
-        $output .= "\n# SEO Automation Custom Directives\n";
+        $output .= "\n# SEOWorkerAI Custom Directives\n";
 
         foreach ($directives as $directive) {
             if (is_string($directive) && $directive !== '') {

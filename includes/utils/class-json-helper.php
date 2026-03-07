@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Utils;
+namespace SEOWorkerAI\Connector\Utils;
 
 final class JsonHelper
 {

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Content;
+namespace SEOWorkerAI\Connector\Content;
 
 final class HtmlMutator
 {
@@ -27,7 +27,7 @@ final class HtmlMutator
         $doc = new \DOMDocument('1.0', 'UTF-8');
         libxml_use_internal_errors(true);
         $loaded = $doc->loadHTML(
-            '<?xml encoding="utf-8" ?><div id="seoauto-root">' . $html . '</div>',
+            '<?xml encoding="utf-8" ?><div id="seoworkerai-root">' . $html . '</div>',
             LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
         );
         libxml_clear_errors();
@@ -72,7 +72,7 @@ final class HtmlMutator
             }
         }
 
-        return self::innerHtmlById($doc, 'seoauto-root');
+        return self::innerHtmlById($doc, 'seoworkerai-root');
     }
 
     /**
@@ -108,7 +108,7 @@ final class HtmlMutator
         $doc = new \DOMDocument('1.0', 'UTF-8');
         libxml_use_internal_errors(true);
         $loaded = $doc->loadHTML(
-            '<?xml encoding="utf-8" ?><div id="seoauto-root">' . $html . '</div>',
+            '<?xml encoding="utf-8" ?><div id="seoworkerai-root">' . $html . '</div>',
             LIBXML_HTML_NOIMPLIED | LIBXML_HTML_NODEFDTD
         );
         libxml_clear_errors();
@@ -157,10 +157,10 @@ final class HtmlMutator
             $parent->removeChild($textNode);
             $insertedByMatch = true;
 
-            return self::innerHtmlById($doc, 'seoauto-root');
+            return self::innerHtmlById($doc, 'seoworkerai-root');
         }
 
-        $root = $doc->getElementById('seoauto-root');
+        $root = $doc->getElementById('seoworkerai-root');
         if ($root instanceof \DOMElement) {
             $space = $doc->createTextNode(' ');
             $root->appendChild($space);
@@ -169,7 +169,7 @@ final class HtmlMutator
             $root->appendChild($anchor);
         }
 
-        return self::innerHtmlById($doc, 'seoauto-root');
+        return self::innerHtmlById($doc, 'seoworkerai-root');
     }
 
     private static function innerHtmlById(\DOMDocument $doc, string $id): string

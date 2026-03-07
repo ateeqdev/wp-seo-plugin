@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions\Handlers;
+namespace SEOWorkerAI\Connector\Actions\Handlers;
 
 use Exception;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class RedirectHandler extends AbstractActionHandler
 {
@@ -34,7 +34,7 @@ final class RedirectHandler extends AbstractActionHandler
         }
 
         global $wpdb;
-        $table = $wpdb->prefix . 'seoauto_redirects';
+        $table = $wpdb->prefix . 'seoworkerai_redirects';
 
         $applied = [];
 

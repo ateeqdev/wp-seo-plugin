@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\REST;
+namespace SEOWorkerAI\Connector\REST;
 
-use SEOAutomation\Connector\Auth\SiteTokenManager;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Auth\SiteTokenManager;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class RestAccessCompatibility
 {
@@ -48,7 +48,7 @@ final class RestAccessCompatibility
             return $result;
         }
 
-        $this->logger->info('rest_auth_bypass_for_seoauto_route', [
+        $this->logger->info('rest_auth_bypass_for_seoworkerai_route', [
             'entity_type' => 'route',
             'entity_id' => $route,
         ], 'inbound');
@@ -86,12 +86,12 @@ final class RestAccessCompatibility
 
     private function isSeoAutoRoute(string $route): bool
     {
-        return strpos($route, '/seoauto/v1/') === 0 || strpos($route, '/seo-platform/v1/') === 0;
+        return strpos($route, '/seoworkerai/v1/') === 0 || strpos($route, '/seo-platform/v1/') === 0;
     }
 
     private function isOwnershipProofRoute(string $route): bool
     {
-        return strpos($route, '/seoauto/v1/ownership-proof') === 0
+        return strpos($route, '/seoworkerai/v1/ownership-proof') === 0
             || strpos($route, '/seo-platform/v1/ownership-proof') === 0;
     }
 

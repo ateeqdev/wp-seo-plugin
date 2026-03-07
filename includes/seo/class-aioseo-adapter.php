@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\SEO;
+namespace SEOWorkerAI\Connector\SEO;
 
 final class AioseoAdapter implements InterfaceSeoAdapter
 {
@@ -136,18 +136,18 @@ final class AioseoAdapter implements InterfaceSeoAdapter
     {
         return [
             'og' => [
-                'title' => $this->readFirstMeta($postId, ['_aioseo_og_title', '_seoauto_og_title']),
-                'type' => $this->readFirstMeta($postId, ['_aioseo_og_type', '_seoauto_og_type']),
-                'image' => $this->readFirstMeta($postId, ['_aioseo_og_image', '_seoauto_og_image']),
-                'url' => $this->readFirstMeta($postId, ['_aioseo_og_url', '_seoauto_og_url']),
-                'description' => $this->readFirstMeta($postId, ['_aioseo_og_description', '_seoauto_og_description']),
+                'title' => $this->readFirstMeta($postId, ['_aioseo_og_title', '_seoworkerai_og_title']),
+                'type' => $this->readFirstMeta($postId, ['_aioseo_og_type', '_seoworkerai_og_type']),
+                'image' => $this->readFirstMeta($postId, ['_aioseo_og_image', '_seoworkerai_og_image']),
+                'url' => $this->readFirstMeta($postId, ['_aioseo_og_url', '_seoworkerai_og_url']),
+                'description' => $this->readFirstMeta($postId, ['_aioseo_og_description', '_seoworkerai_og_description']),
             ],
             'twitter' => [
-                'card' => $this->readFirstMeta($postId, ['_aioseo_twitter_card', '_seoauto_twitter_card']),
-                'site' => $this->readFirstMeta($postId, ['_aioseo_twitter_site', '_seoauto_twitter_site']),
-                'title' => $this->readFirstMeta($postId, ['_aioseo_twitter_title', '_seoauto_twitter_title']),
-                'description' => $this->readFirstMeta($postId, ['_aioseo_twitter_description', '_seoauto_twitter_description']),
-                'image' => $this->readFirstMeta($postId, ['_aioseo_twitter_image', '_seoauto_twitter_image']),
+                'card' => $this->readFirstMeta($postId, ['_aioseo_twitter_card', '_seoworkerai_twitter_card']),
+                'site' => $this->readFirstMeta($postId, ['_aioseo_twitter_site', '_seoworkerai_twitter_site']),
+                'title' => $this->readFirstMeta($postId, ['_aioseo_twitter_title', '_seoworkerai_twitter_title']),
+                'description' => $this->readFirstMeta($postId, ['_aioseo_twitter_description', '_seoworkerai_twitter_description']),
+                'image' => $this->readFirstMeta($postId, ['_aioseo_twitter_image', '_seoworkerai_twitter_image']),
             ],
         ];
     }

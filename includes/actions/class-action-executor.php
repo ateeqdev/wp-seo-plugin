@@ -2,29 +2,29 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions;
+namespace SEOWorkerAI\Connector\Actions;
 
-use SEOAutomation\Connector\Actions\Handlers\AltTextHandler;
-use SEOAutomation\Connector\Actions\Handlers\BrokenLinkHandler;
-use SEOAutomation\Connector\Actions\Handlers\CanonicalHandler;
-use SEOAutomation\Connector\Actions\Handlers\HeadingHandler;
-use SEOAutomation\Connector\Actions\Handlers\HumanActionRequiredHandler;
-use SEOAutomation\Connector\Actions\Handlers\IndexingHandler;
-use SEOAutomation\Connector\Actions\Handlers\InternalLinkHandler;
-use SEOAutomation\Connector\Actions\Handlers\InterfaceActionHandler;
-use SEOAutomation\Connector\Actions\Handlers\MetaDescriptionHandler;
-use SEOAutomation\Connector\Actions\Handlers\MonitorHandler;
-use SEOAutomation\Connector\Actions\Handlers\PostDatesHandler;
-use SEOAutomation\Connector\Actions\Handlers\RedirectHandler;
-use SEOAutomation\Connector\Actions\Handlers\RobotsHandler;
-use SEOAutomation\Connector\Actions\Handlers\SchemaHandler;
-use SEOAutomation\Connector\Actions\Handlers\SitemapHandler;
-use SEOAutomation\Connector\Actions\Handlers\SocialTagsHandler;
-use SEOAutomation\Connector\Actions\Handlers\TechnicalFlagsHandler;
-use SEOAutomation\Connector\Actions\Handlers\TitleHandler;
-use SEOAutomation\Connector\SEO\SeoDetector;
-use SEOAutomation\Connector\Utils\LockManager;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\Actions\Handlers\AltTextHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\BrokenLinkHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\CanonicalHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\HeadingHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\HumanActionRequiredHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\IndexingHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\InternalLinkHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\InterfaceActionHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\MetaDescriptionHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\MonitorHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\PostDatesHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\RedirectHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\RobotsHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\SchemaHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\SitemapHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\SocialTagsHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\TechnicalFlagsHandler;
+use SEOWorkerAI\Connector\Actions\Handlers\TitleHandler;
+use SEOWorkerAI\Connector\SEO\SeoDetector;
+use SEOWorkerAI\Connector\Utils\LockManager;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class ActionExecutor
 {

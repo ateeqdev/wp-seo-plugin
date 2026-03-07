@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace SEOAutomation\Connector\Actions;
+namespace SEOWorkerAI\Connector\Actions;
 
-use SEOAutomation\Connector\API\LaravelClient;
-use SEOAutomation\Connector\Utils\Logger;
+use SEOWorkerAI\Connector\API\LaravelClient;
+use SEOWorkerAI\Connector\Utils\Logger;
 
 final class ActionPoller
 {
@@ -24,7 +24,7 @@ final class ActionPoller
 
     public function poll(): void
     {
-        $siteId = (int) get_option('seoauto_site_id', 0);
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
 
         if ($siteId <= 0) {
             return;

@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 use PHPUnit\Framework\TestCase;
-use SEOAutomation\Connector\Actions\StatusReporter;
+use SEOWorkerAI\Connector\Actions\StatusReporter;
 
 final class StatusReporterTest extends TestCase
 {
