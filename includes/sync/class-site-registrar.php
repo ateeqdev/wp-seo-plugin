@@ -285,6 +285,8 @@ final class SiteRegistrar
         return [
             'status' => sanitize_text_field((string) ($billing['status'] ?? 'payment_required')),
             'payment_required' => !empty($billing['payment_required']),
+            'quota_blocked' => !empty($billing['quota_blocked']),
+            'quota_message' => sanitize_text_field((string) ($billing['quota_message'] ?? '')),
             'plan_name' => sanitize_text_field((string) ($billing['plan_name'] ?? '')),
             'plan_slug' => sanitize_text_field((string) ($billing['plan_slug'] ?? '')),
             'plan_price' => isset($billing['plan_price']) ? (float) $billing['plan_price'] : 0.0,

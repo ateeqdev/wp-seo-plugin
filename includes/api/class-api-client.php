@@ -6,6 +6,7 @@ namespace SEOWorkerAI\Connector\API;
 
 use RuntimeException;
 use SEOWorkerAI\Connector\Auth\SiteTokenManager;
+use SEOWorkerAI\Connector\Sync\SiteRegistrar;
 use SEOWorkerAI\Connector\Utils\Logger;
 
 final class ApiClient
@@ -126,6 +127,10 @@ final class ApiClient
         ];
 
         if ($statusCode >= 400) {
+            if (isset($result['body']['billing']) && is_array($result['body']['billing'])) {
+                update_option('seoworkerai_billing', SiteRegistrar::sanitizeBillingPayload($result['body']['billing']), false);
+            }
+
             $message = $this->buildHttpErrorMessage($statusCode, $path, $result['body']);
             update_option('seoworkerai_api_blocked', $statusCode >= 500, false);
             update_option('seoworkerai_api_last_error', $message, false);

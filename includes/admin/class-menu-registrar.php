@@ -894,7 +894,7 @@ final class MenuRegistrar
                     </div>
                     <div class="seoworkerai-kv-list" style="margin-bottom:16px;">
                         <div><span>Status</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Active'); ?></strong></div>
-                        <div><span>Plan</span><strong><?php echo esc_html((string) ($billing['plan_name'] ?? 'SEOWorkerAI Starter')); ?></strong></div>
+                        <div><span>Plan</span><strong><?php echo esc_html((string) ($billing['plan_name'] ?? 'SEOWorkerAI Basic')); ?></strong></div>
                         <div><span>Price</span><strong><?php echo esc_html('$' . number_format((float) ($billing['plan_price'] ?? 60), 2) . '/month'); ?></strong></div>
                     </div>
                     <?php if (!empty($billing['payment_required'])) : ?>
@@ -2624,10 +2624,28 @@ final class MenuRegistrar
             'seoworkerai-action-items' => ['label'=>'Action Items',   'cap'=>'manage_options'],
             'seoworkerai-briefs'       => ['label'=>'Content Briefs', 'cap'=>'edit_posts'],
         ];
+        $billing = get_option('seoworkerai_billing', []);
+        if (!is_array($billing)) {
+            $billing = [];
+        }
+        $showBillingBanner = !empty($billing['payment_required']) || !empty($billing['quota_blocked']);
+        $billingMessage = !empty($billing['quota_message'])
+            ? (string) $billing['quota_message']
+            : 'Payment is required before Google integrations and paid SEO automation can continue.';
         ?>
         <div class="seoworkerai-shell-header">
             <h1><?php echo esc_html($title); ?></h1>
             <?php if ($description !== '') : ?><p><?php echo esc_html($description); ?></p><?php endif; ?>
+            <?php if ($showBillingBanner) : ?>
+                <div class="notice notice-warning" style="margin:16px 0 0;padding:12px 16px;border-radius:10px;">
+                    <p style="margin:0 0 8px;"><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required.' : 'Automation paused.'); ?></strong> <?php echo esc_html($billingMessage); ?></p>
+                    <?php if (!empty($billing['payment_url'])) : ?>
+                        <p style="margin:0;">
+                            <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Open Payment Center</a>
+                        </p>
+                    <?php endif; ?>
+                </div>
+            <?php endif; ?>
             <div class="seoworkerai-shell-tabs">
                 <?php foreach ($tabs as $slug => $tab) : ?>
                     <?php if (!current_user_can((string)$tab['cap'])) continue; ?>
