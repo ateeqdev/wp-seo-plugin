@@ -618,6 +618,9 @@ final class MenuRegistrar
         if (!is_array($siteSeoSettings)) $siteSeoSettings = [];
         $siteSettingTemplates = [];
         $availableLocations = $this->getAvailableLocationOptions();
+        $domainRatingCheckedAt = !empty($siteSeoSettings['domain_rating_checked_at'])
+            ? strtotime((string) $siteSeoSettings['domain_rating_checked_at'])
+            : false;
 
         $excludedRaw    = (string) get_option('seoauto_excluded_change_audit_pages', '');
         $excludedItems  = array_values(array_filter(array_map('trim', explode("\n", $excludedRaw))));
@@ -759,9 +762,37 @@ final class MenuRegistrar
 
                         <div class="seoauto-card-head" style="margin-top:18px;">
                             <h2 style="font-size:16px;">Content Brief Settings</h2>
-                            <?php if (!empty($siteSeoSettings['domain_rating'])) : ?>
-                                <span class="seoauto-muted">Domain rating: <?php echo esc_html((string) $siteSeoSettings['domain_rating']); ?></span>
+                            <?php if (array_key_exists('domain_rating', $siteSeoSettings) && $siteSeoSettings['domain_rating'] !== null) : ?>
+                                <span class="seoauto-muted">
+                                    Domain rating: <?php echo esc_html((string) $siteSeoSettings['domain_rating']); ?>
+                                    <?php if ($domainRatingCheckedAt) : ?>
+                                        · Updated <?php echo esc_html(wp_date('Y-m-d H:i', $domainRatingCheckedAt)); ?>
+                                    <?php endif; ?>
+                                </span>
                             <?php endif; ?>
+                        </div>
+
+                        <div class="seoauto-form-grid seoauto-form-grid--two">
+                            <div class="seoauto-form-field">
+                                <label for="seoauto-site-settings-domain-rating">Domain Rating</label>
+                                <input
+                                    id="seoauto-site-settings-domain-rating"
+                                    type="text"
+                                    value="<?php echo esc_attr(array_key_exists('domain_rating', $siteSeoSettings) && $siteSeoSettings['domain_rating'] !== null ? (string) $siteSeoSettings['domain_rating'] : 'Not available yet'); ?>"
+                                    readonly
+                                    disabled
+                                >
+                            </div>
+                            <div class="seoauto-form-field">
+                                <label for="seoauto-site-settings-domain-rating-checked-at">Last Domain Rating Sync</label>
+                                <input
+                                    id="seoauto-site-settings-domain-rating-checked-at"
+                                    type="text"
+                                    value="<?php echo esc_attr($domainRatingCheckedAt ? wp_date('Y-m-d H:i', $domainRatingCheckedAt) : 'Not synced yet'); ?>"
+                                    readonly
+                                    disabled
+                                >
+                            </div>
                         </div>
 
                         <div class="seoauto-form-field">

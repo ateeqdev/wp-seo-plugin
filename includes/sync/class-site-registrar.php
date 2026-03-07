@@ -106,7 +106,15 @@ final class SiteRegistrar
         $mapped = [];
 
         foreach ($users as $user) {
-            $roles = is_array($user->roles) ? $user->roles : [];
+            $roles = [];
+            if (isset($user->roles) && is_array($user->roles)) {
+                $roles = $user->roles;
+            } else {
+                $wpUser = get_userdata((int) $user->ID);
+                if ($wpUser instanceof \WP_User) {
+                    $roles = is_array($wpUser->roles) ? $wpUser->roles : [];
+                }
+            }
             $mappedRole = RoleMapper::mapWordPressRoles($roles);
 
             $mapped[] = [
@@ -228,6 +236,16 @@ final class SiteRegistrar
 
         if (isset($response['site_settings']) && is_array($response['site_settings'])) {
             update_option('seoauto_site_seo_settings', $this->sanitizeSiteSettingsPayload($response['site_settings']), false);
+        } elseif (array_key_exists('domain_rating', $response)) {
+            $settings = get_option('seoauto_site_seo_settings', []);
+            if (!is_array($settings)) {
+                $settings = [];
+            }
+
+            $settings['domain_rating'] = $response['domain_rating'] !== null ? (int) $response['domain_rating'] : null;
+            $settings['domain_rating_checked_at'] = isset($response['domain_rating_checked_at']) ? sanitize_text_field((string) $response['domain_rating_checked_at']) : '';
+
+            update_option('seoauto_site_seo_settings', $settings, false);
         }
     }
 
@@ -242,6 +260,7 @@ final class SiteRegistrar
             'template_name' => sanitize_text_field((string) ($settings['template_name'] ?? '')),
             'provider_name' => sanitize_text_field((string) ($settings['provider_name'] ?? 'dataforseo')),
             'domain_rating' => isset($settings['domain_rating']) ? (int) $settings['domain_rating'] : null,
+            'domain_rating_checked_at' => sanitize_text_field((string) ($settings['domain_rating_checked_at'] ?? '')),
             'min_search_volume' => isset($settings['min_search_volume']) ? (int) $settings['min_search_volume'] : 0,
             'max_search_volume' => ($settings['max_search_volume'] ?? null) !== null ? (int) $settings['max_search_volume'] : null,
             'max_keyword_difficulty' => isset($settings['max_keyword_difficulty']) ? (int) $settings['max_keyword_difficulty'] : 100,
