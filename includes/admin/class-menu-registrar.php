@@ -669,7 +669,7 @@ final class MenuRegistrar
         }
         ?>
         <div class="wrap seoworkerai-admin-page">
-            <?php $this->renderAdminShellHeader('SEOWorkerAI', 'seoworkerai', 'Manage your site SEO automation preferences, billing, and integrations.'); ?>
+            <?php $this->renderAdminShellHeader('SEOWorkerAI', 'seoworkerai', 'Manage billing, Google connection, and site setup.'); ?>
 
             <?php $this->renderNotice($notice); ?>
 
@@ -686,17 +686,13 @@ final class MenuRegistrar
                 </div>
             <?php endif; ?>
 
-            <!-- Site Status Banner -->
             <div class="seoworkerai-card seoworkerai-card-wide" style="margin-bottom:16px;">
                 <div class="seoworkerai-card-head">
-                    <h2>Site Status</h2>
+                    <h2>Overview</h2>
                     <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-briefs')); ?>">View Content Briefs</a>
                 </div>
                 <div class="seoworkerai-stat-grid">
                     <div class="seoworkerai-stat"><span>Registration</span><strong><?php echo esc_html($siteId > 0 ? 'Active' : 'Not registered'); ?></strong></div>
-                    <div class="seoworkerai-stat"><span>Queue Heartbeat</span><strong><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i', $lastCron) : 'Never'); ?></strong></div>
-                    <div class="seoworkerai-stat"><span>User Sync</span><strong><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i', $lastUserSync) : 'Never'); ?></strong></div>
-                    <div class="seoworkerai-stat"><span>Brief Sync</span><strong><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i', $lastBriefSync) : 'Never'); ?></strong></div>
                     <div class="seoworkerai-stat"><span>Google Connection</span><strong><?php echo esc_html($isConnected ? 'Connected' . ($oauthProvider !== '' ? ' (' . $oauthProvider . ')' : '') : 'Not connected'); ?></strong></div>
                     <div class="seoworkerai-stat"><span>Company Billing</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Paid'); ?></strong></div>
                 </div>
@@ -705,7 +701,7 @@ final class MenuRegistrar
             <div class="seoworkerai-settings-grid">
 
                 <section class="seoworkerai-card seoworkerai-card--settings">
-                    <h2>Site Profile &amp; Strategy</h2>
+                    <h2>Site Setup</h2>
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                         <?php wp_nonce_field('seoworkerai_update_site_profile'); ?>
                         <input type="hidden" name="action" value="seoworkerai_update_site_profile">
@@ -715,11 +711,7 @@ final class MenuRegistrar
                             <textarea id="seoworkerai-site-profile-description" name="site_profile_description" rows="4"><?php echo esc_textarea($siteDescription); ?></textarea>
                         </div>
                         <div class="seoworkerai-form-field">
-                            <label for="seoworkerai-site-profile-taste">Brand Taste</label>
-                            <textarea id="seoworkerai-site-profile-taste" name="site_profile_taste" rows="4"><?php echo esc_textarea($siteTaste); ?></textarea>
-                        </div>
-                        <div class="seoworkerai-form-field">
-                            <label>Locations</label>
+                            <label>Primary Market</label>
                             <div class="seoworkerai-locations-table-wrap" data-location-options="<?php echo esc_attr(wp_json_encode(array_values($availableLocations))); ?>">
                                 <table class="widefat seoworkerai-locations-table">
                                     <thead>
@@ -761,155 +753,147 @@ final class MenuRegistrar
                                         <?php endforeach; ?>
                                     </tbody>
                                 </table>
-                                <div class="seoworkerai-button-row" style="margin-top:10px;">
+                            </div>
+                        </div>
+                        <details class="seoworkerai-disclosure">
+                            <summary>Advanced SEO Settings</summary>
+                            <div class="seoworkerai-disclosure-body">
+                                <div class="seoworkerai-form-field">
+                                    <label for="seoworkerai-site-profile-taste">Brand Taste</label>
+                                    <textarea id="seoworkerai-site-profile-taste" name="site_profile_taste" rows="4"><?php echo esc_textarea($siteTaste); ?></textarea>
+                                </div>
+                                <div class="seoworkerai-button-row" style="margin-top:0;margin-bottom:16px;">
                                     <button type="button" class="button" id="seoworkerai-add-location-row">Add Location</button>
                                 </div>
-                            </div>
-                        </div>
-
-                        <div class="seoworkerai-card-head" style="margin-top:18px;">
-                            <h2 style="font-size:16px;">Content Brief Settings</h2>
-                            <?php if (array_key_exists('domain_rating', $siteSeoSettings) && $siteSeoSettings['domain_rating'] !== null) : ?>
-                                <span class="seoworkerai-muted">
-                                    Domain rating: <?php echo esc_html((string) $siteSeoSettings['domain_rating']); ?>
-                                    <?php if ($domainRatingCheckedAt) : ?>
-                                        · Updated <?php echo esc_html(wp_date('Y-m-d H:i', $domainRatingCheckedAt)); ?>
+                                <div class="seoworkerai-card-head" style="margin-top:0;">
+                                    <h2 style="font-size:16px;">Content Brief Settings</h2>
+                                    <?php if (array_key_exists('domain_rating', $siteSeoSettings) && $siteSeoSettings['domain_rating'] !== null) : ?>
+                                        <span class="seoworkerai-muted">
+                                            Domain rating: <?php echo esc_html((string) $siteSeoSettings['domain_rating']); ?>
+                                            <?php if ($domainRatingCheckedAt) : ?>
+                                                · Updated <?php echo esc_html(wp_date('Y-m-d H:i', $domainRatingCheckedAt)); ?>
+                                            <?php endif; ?>
+                                        </span>
                                     <?php endif; ?>
-                                </span>
-                            <?php endif; ?>
-                        </div>
-
-                        <div class="seoworkerai-form-grid seoworkerai-form-grid--two">
-                            <div class="seoworkerai-form-field">
-                                <label for="seoworkerai-site-settings-domain-rating">Domain Rating</label>
-                                <input
-                                    id="seoworkerai-site-settings-domain-rating"
-                                    type="number"
-                                    min="0"
-                                    max="100"
-                                    name="site_settings_domain_rating"
-                                    value="<?php echo esc_attr((string) ($siteSeoSettings['domain_rating'] ?? 0)); ?>"
-                                >
+                                </div>
+                                <div class="seoworkerai-form-grid seoworkerai-form-grid--two">
+                                    <div class="seoworkerai-form-field">
+                                        <label for="seoworkerai-site-settings-domain-rating">Domain Rating</label>
+                                        <input
+                                            id="seoworkerai-site-settings-domain-rating"
+                                            type="number"
+                                            min="0"
+                                            max="100"
+                                            name="site_settings_domain_rating"
+                                            value="<?php echo esc_attr((string) ($siteSeoSettings['domain_rating'] ?? 0)); ?>"
+                                        >
+                                    </div>
+                                    <div class="seoworkerai-form-field">
+                                        <label for="seoworkerai-site-settings-domain-rating-checked-at">Last Domain Rating Sync</label>
+                                        <input
+                                            id="seoworkerai-site-settings-domain-rating-checked-at"
+                                            type="text"
+                                            value="<?php echo esc_attr($domainRatingCheckedAt ? wp_date('Y-m-d H:i', $domainRatingCheckedAt) : 'Not synced yet'); ?>"
+                                            readonly
+                                            disabled
+                                        >
+                                    </div>
+                                </div>
+                                <div class="seoworkerai-form-field">
+                                    <label for="seoworkerai-site-settings-template-id">Seeded Strategy Template</label>
+                                    <select
+                                        id="seoworkerai-site-settings-template-id"
+                                        name="site_settings_template_id"
+                                        data-template-configs="<?php echo esc_attr(wp_json_encode(array_map(fn (array $template): array => [
+                                            'id' => (int) ($template['id'] ?? 0),
+                                            'min_search_volume' => (int) ($template['min_search_volume'] ?? 0),
+                                            'max_search_volume' => ($template['max_search_volume'] ?? null) !== null ? (int) $template['max_search_volume'] : null,
+                                            'max_keyword_difficulty' => (int) ($template['max_keyword_difficulty'] ?? 100),
+                                            'preferred_keyword_type' => (string) ($template['preferred_keyword_type'] ?? ''),
+                                            'content_briefs_per_run' => (int) ($template['content_briefs_per_run'] ?? 3),
+                                            'prefer_low_difficulty' => !empty($template['prefer_low_difficulty']),
+                                            'allow_low_volume' => !empty($template['allow_low_volume']),
+                                            'selection_notes' => (string) ($template['selection_notes'] ?? ''),
+                                        ], $siteSettingTemplates))); ?>"
+                                    >
+                                        <option value="0">Keep current custom settings</option>
+                                        <?php foreach ($siteSettingTemplates as $template) : if (!is_array($template)) continue; ?>
+                                            <option value="<?php echo esc_attr((string) ($template['id'] ?? 0)); ?>" <?php selected((int) ($siteSeoSettings['template_id'] ?? 0), (int) ($template['id'] ?? 0)); ?>>
+                                                <?php echo esc_html((string) ($template['name'] ?? 'Template')); ?>
+                                            </option>
+                                        <?php endforeach; ?>
+                                    </select>
+                                </div>
+                                <div class="seoworkerai-form-grid seoworkerai-form-grid--three">
+                                    <div class="seoworkerai-form-field">
+                                        <label for="seoworkerai-site-settings-min-search-volume">Minimum Search Volume</label>
+                                        <input id="seoworkerai-site-settings-min-search-volume" type="number" min="0" name="site_settings_min_search_volume" value="<?php echo esc_attr((string) ($siteSeoSettings['min_search_volume'] ?? 0)); ?>">
+                                    </div>
+                                    <div class="seoworkerai-form-field">
+                                        <label for="seoworkerai-site-settings-max-search-volume">Maximum Search Volume</label>
+                                        <input id="seoworkerai-site-settings-max-search-volume" type="number" min="0" name="site_settings_max_search_volume" value="<?php echo esc_attr(($siteSeoSettings['max_search_volume'] ?? null) === null ? '' : (string) $siteSeoSettings['max_search_volume']); ?>">
+                                    </div>
+                                    <div class="seoworkerai-form-field">
+                                        <label for="seoworkerai-site-settings-max-keyword-difficulty">Maximum Keyword Difficulty</label>
+                                        <input id="seoworkerai-site-settings-max-keyword-difficulty" type="number" min="0" max="100" name="site_settings_max_keyword_difficulty" value="<?php echo esc_attr((string) ($siteSeoSettings['max_keyword_difficulty'] ?? 100)); ?>">
+                                    </div>
+                                </div>
+                                <div class="seoworkerai-form-grid seoworkerai-form-grid--two">
+                                    <div class="seoworkerai-form-field">
+                                        <label for="seoworkerai-site-settings-preferred-keyword-type">Preferred Keyword Type</label>
+                                        <select id="seoworkerai-site-settings-preferred-keyword-type" name="site_settings_preferred_keyword_type">
+                                            <option value="">Auto</option>
+                                            <?php foreach (['informational', 'commercial', 'transactional', 'navigational'] as $keywordType) : ?>
+                                                <option value="<?php echo esc_attr($keywordType); ?>" <?php selected((string) ($siteSeoSettings['preferred_keyword_type'] ?? ''), $keywordType); ?>>
+                                                    <?php echo esc_html(ucwords($keywordType)); ?>
+                                                </option>
+                                            <?php endforeach; ?>
+                                        </select>
+                                    </div>
+                                    <div class="seoworkerai-form-field">
+                                        <label for="seoworkerai-site-settings-content-briefs-per-run">Content Briefs Per Run</label>
+                                        <input id="seoworkerai-site-settings-content-briefs-per-run" type="number" min="1" max="10" name="site_settings_content_briefs_per_run" value="<?php echo esc_attr((string) ($siteSeoSettings['content_briefs_per_run'] ?? 3)); ?>">
+                                    </div>
+                                </div>
+                                <div class="seoworkerai-form-field">
+                                    <label for="seoworkerai-site-settings-selection-notes">Selection Notes</label>
+                                    <textarea id="seoworkerai-site-settings-selection-notes" name="site_settings_selection_notes" rows="4"><?php echo esc_textarea((string) ($siteSeoSettings['selection_notes'] ?? '')); ?></textarea>
+                                </div>
+                                <div class="seoworkerai-form-grid seoworkerai-form-grid--two">
+                                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                        <input type="checkbox" name="site_settings_prefer_low_difficulty" value="1" <?php checked(!empty($siteSeoSettings['prefer_low_difficulty'])); ?>>
+                                        <span>Prefer easier keywords first</span>
+                                    </label>
+                                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                        <input type="checkbox" name="site_settings_allow_low_volume" value="1" <?php checked(!empty($siteSeoSettings['allow_low_volume'])); ?>>
+                                        <span>Allow low-volume opportunities</span>
+                                    </label>
+                                </div>
                             </div>
-                            <div class="seoworkerai-form-field">
-                                <label for="seoworkerai-site-settings-domain-rating-checked-at">Last Domain Rating Sync</label>
-                                <input
-                                    id="seoworkerai-site-settings-domain-rating-checked-at"
-                                    type="text"
-                                    value="<?php echo esc_attr($domainRatingCheckedAt ? wp_date('Y-m-d H:i', $domainRatingCheckedAt) : 'Not synced yet'); ?>"
-                                    readonly
-                                    disabled
-                                >
-                            </div>
-                        </div>
-
-                        <div class="seoworkerai-form-field">
-                            <label for="seoworkerai-site-settings-template-id">Seeded Strategy Template</label>
-                            <select
-                                id="seoworkerai-site-settings-template-id"
-                                name="site_settings_template_id"
-                                data-template-configs="<?php echo esc_attr(wp_json_encode(array_map(fn (array $template): array => [
-                                    'id' => (int) ($template['id'] ?? 0),
-                                    'min_search_volume' => (int) ($template['min_search_volume'] ?? 0),
-                                    'max_search_volume' => ($template['max_search_volume'] ?? null) !== null ? (int) $template['max_search_volume'] : null,
-                                    'max_keyword_difficulty' => (int) ($template['max_keyword_difficulty'] ?? 100),
-                                    'preferred_keyword_type' => (string) ($template['preferred_keyword_type'] ?? ''),
-                                    'content_briefs_per_run' => (int) ($template['content_briefs_per_run'] ?? 3),
-                                    'prefer_low_difficulty' => !empty($template['prefer_low_difficulty']),
-                                    'allow_low_volume' => !empty($template['allow_low_volume']),
-                                    'selection_notes' => (string) ($template['selection_notes'] ?? ''),
-                                ], $siteSettingTemplates))); ?>"
-                            >
-                                <option value="0">Keep current custom settings</option>
-                                <?php foreach ($siteSettingTemplates as $template) : if (!is_array($template)) continue; ?>
-                                    <option value="<?php echo esc_attr((string) ($template['id'] ?? 0)); ?>" <?php selected((int) ($siteSeoSettings['template_id'] ?? 0), (int) ($template['id'] ?? 0)); ?>>
-                                        <?php echo esc_html((string) ($template['name'] ?? 'Template')); ?>
-                                    </option>
-                                <?php endforeach; ?>
-                            </select>
-                        </div>
-
-                        <div class="seoworkerai-form-grid seoworkerai-form-grid--three">
-                            <div class="seoworkerai-form-field">
-                                <label for="seoworkerai-site-settings-min-search-volume">Minimum Search Volume</label>
-                                <input id="seoworkerai-site-settings-min-search-volume" type="number" min="0" name="site_settings_min_search_volume" value="<?php echo esc_attr((string) ($siteSeoSettings['min_search_volume'] ?? 0)); ?>">
-                            </div>
-                            <div class="seoworkerai-form-field">
-                                <label for="seoworkerai-site-settings-max-search-volume">Maximum Search Volume</label>
-                                <input id="seoworkerai-site-settings-max-search-volume" type="number" min="0" name="site_settings_max_search_volume" value="<?php echo esc_attr(($siteSeoSettings['max_search_volume'] ?? null) === null ? '' : (string) $siteSeoSettings['max_search_volume']); ?>">
-                            </div>
-                            <div class="seoworkerai-form-field">
-                                <label for="seoworkerai-site-settings-max-keyword-difficulty">Maximum Keyword Difficulty</label>
-                                <input id="seoworkerai-site-settings-max-keyword-difficulty" type="number" min="0" max="100" name="site_settings_max_keyword_difficulty" value="<?php echo esc_attr((string) ($siteSeoSettings['max_keyword_difficulty'] ?? 100)); ?>">
-                            </div>
-                        </div>
-
-                        <div class="seoworkerai-form-grid seoworkerai-form-grid--two">
-                            <div class="seoworkerai-form-field">
-                                <label for="seoworkerai-site-settings-preferred-keyword-type">Preferred Keyword Type</label>
-                                <select id="seoworkerai-site-settings-preferred-keyword-type" name="site_settings_preferred_keyword_type">
-                                    <option value="">Auto</option>
-                                    <?php foreach (['informational', 'commercial', 'transactional', 'navigational'] as $keywordType) : ?>
-                                        <option value="<?php echo esc_attr($keywordType); ?>" <?php selected((string) ($siteSeoSettings['preferred_keyword_type'] ?? ''), $keywordType); ?>>
-                                            <?php echo esc_html(ucwords($keywordType)); ?>
-                                        </option>
-                                    <?php endforeach; ?>
-                                </select>
-                            </div>
-                            <div class="seoworkerai-form-field">
-                                <label for="seoworkerai-site-settings-content-briefs-per-run">Content Briefs Per Run</label>
-                                <input id="seoworkerai-site-settings-content-briefs-per-run" type="number" min="1" max="10" name="site_settings_content_briefs_per_run" value="<?php echo esc_attr((string) ($siteSeoSettings['content_briefs_per_run'] ?? 3)); ?>">
-                            </div>
-                        </div>
-
-                        <div class="seoworkerai-form-field">
-                            <label for="seoworkerai-site-settings-selection-notes">Selection Notes</label>
-                            <textarea id="seoworkerai-site-settings-selection-notes" name="site_settings_selection_notes" rows="4"><?php echo esc_textarea((string) ($siteSeoSettings['selection_notes'] ?? '')); ?></textarea>
-                        </div>
-                        <div class="seoworkerai-form-grid seoworkerai-form-grid--two">
-                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input type="checkbox" name="site_settings_prefer_low_difficulty" value="1" <?php checked(!empty($siteSeoSettings['prefer_low_difficulty'])); ?>>
-                                <span>Prefer easier keywords first</span>
-                            </label>
-                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input type="checkbox" name="site_settings_allow_low_volume" value="1" <?php checked(!empty($siteSeoSettings['allow_low_volume'])); ?>>
-                                <span>Allow low-volume opportunities</span>
-                            </label>
-                        </div>
+                        </details>
 
                         <div class="seoworkerai-button-row" style="margin-top:16px;">
-                            <button type="submit" class="button button-primary">Save Site Settings</button>
-                            <span class="seoworkerai-muted">This syncs description, taste, location, and per-site topic thresholds to Laravel.</span>
+                            <button type="submit" class="button button-primary">Save Site Setup</button>
                         </div>
                     </form>
                 </section>
 
-                <!-- Google Connection -->
                 <section class="seoworkerai-card">
                     <div class="seoworkerai-card-head">
-                        <h2>Company Billing</h2>
+                        <h2>Billing &amp; Google</h2>
                         <?php if (!empty($billing['payment_url'])) : ?>
                             <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Open Payment Center</a>
                         <?php endif; ?>
                     </div>
                     <div class="seoworkerai-kv-list" style="margin-bottom:16px;">
-                        <div><span>Company</span><strong><?php echo esc_html((string) ($billing['company_name'] ?? 'Your company')); ?></strong></div>
                         <div><span>Status</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Active'); ?></strong></div>
                         <div><span>Plan</span><strong><?php echo esc_html((string) ($billing['plan_name'] ?? 'SEOWorkerAI Starter')); ?></strong></div>
-                        <div><span>Price</span><strong><?php echo esc_html('$' . number_format((float) ($billing['plan_price'] ?? 60), 2) . '/' . (!empty($billing['plan_interval']) && $billing['plan_interval'] === 'yearly' ? 'year' : 'month')); ?></strong></div>
+                        <div><span>Google</span><strong><?php echo esc_html($isConnected ? 'Connected' : 'Not connected'); ?></strong></div>
                     </div>
-                    <?php if (!empty($billing['payment_required'])) : ?>
-                        <p class="seoworkerai-muted" style="margin:0 0 16px;">Registration, company setup, site description, taste, and domain rating remain available. Google OAuth and paid SEO automation stay blocked until company billing is completed.</p>
-                    <?php endif; ?>
-
-                    <hr style="border:none;border-top:1px solid var(--gray-200);margin:16px 0;">
-
-                    <h2>Google Integration</h2>
 
                     <?php if (!empty($billing['payment_required'])) : ?>
-                        <p class="seoworkerai-muted" style="margin:0 0 12px;">Company payment is required before Google Search Console and Analytics can be connected.</p>
                         <?php if (!empty($billing['payment_url'])) : ?>
-                            <a class="seoworkerai-google-cta" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Open Company Billing to Unlock Google Integration</a>
+                            <a class="seoworkerai-google-cta" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Open Billing</a>
                         <?php endif; ?>
                     <?php elseif (!$isConnected) : ?>
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:16px;">
@@ -920,10 +904,8 @@ final class MenuRegistrar
                                 Connect with Google
                             </button>
                         </form>
-                        <p class="seoworkerai-muted" style="margin:0 0 12px;">Connect Google Search Console &amp; Analytics to enable automated SEO insights.</p>
                     <?php else : ?>
                         <div class="seoworkerai-kv-list" style="margin-bottom:14px;">
-                            <div><span>Status</span><strong><?php echo wp_kses_post($this->renderStatusBadge('active')); ?></strong></div>
                             <div><span>Scopes</span><strong><?php echo esc_html(!empty($oauthScopes) ? implode(', ', array_map('strval', $oauthScopes)) : 'None'); ?></strong></div>
                             <div><span>Connected</span><strong><?php echo esc_html($oauthConnectedAt > 0 ? wp_date('Y-m-d H:i', $oauthConnectedAt) : '—'); ?></strong></div>
                             <?php if ($oauthError !== '') : ?><div><span>Last Error</span><strong style="color:var(--red);"><?php echo esc_html($oauthError); ?></strong></div><?php endif; ?>
@@ -943,41 +925,41 @@ final class MenuRegistrar
                         </div>
                     <?php endif; ?>
 
-                    <hr style="border:none;border-top:1px solid var(--gray-200);margin:16px 0;">
-                    <div class="seoworkerai-button-row">
-                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                            <?php wp_nonce_field('seoworkerai_health_check'); ?>
-                            <input type="hidden" name="action" value="seoworkerai_health_check">
-                            <button type="submit" class="button">Run Health Check</button>
-                        </form>
-                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                            <?php wp_nonce_field('seoworkerai_rotate_token'); ?>
-                            <input type="hidden" name="action" value="seoworkerai_rotate_token">
-                            <button type="submit" class="button">Rotate API Token</button>
-                        </form>
-                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                            <?php wp_nonce_field('seoworkerai_register_site'); ?>
-                            <input type="hidden" name="action" value="seoworkerai_register_site">
-                            <button type="submit" class="button">Sync Registration</button>
-                        </form>
-                    </div>
+                    <details class="seoworkerai-disclosure">
+                        <summary>Troubleshooting</summary>
+                        <div class="seoworkerai-disclosure-body">
+                            <div class="seoworkerai-button-row">
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                    <?php wp_nonce_field('seoworkerai_health_check'); ?>
+                                    <input type="hidden" name="action" value="seoworkerai_health_check">
+                                    <button type="submit" class="button">Run Health Check</button>
+                                </form>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                    <?php wp_nonce_field('seoworkerai_rotate_token'); ?>
+                                    <input type="hidden" name="action" value="seoworkerai_rotate_token">
+                                    <button type="submit" class="button">Rotate API Token</button>
+                                </form>
+                                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                                    <?php wp_nonce_field('seoworkerai_register_site'); ?>
+                                    <input type="hidden" name="action" value="seoworkerai_register_site">
+                                    <button type="submit" class="button">Sync Registration</button>
+                                </form>
+                            </div>
+                            <?php if ($lastCron > 0 || $lastUserSync > 0 || $lastBriefSync > 0) : ?>
+                                <div class="seoworkerai-kv-list" style="margin-top:16px;">
+                                    <div><span>Queue Heartbeat</span><strong><?php echo esc_html($lastCron > 0 ? wp_date('Y-m-d H:i', $lastCron) : 'Never'); ?></strong></div>
+                                    <div><span>User Sync</span><strong><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i', $lastUserSync) : 'Never'); ?></strong></div>
+                                    <div><span>Brief Sync</span><strong><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i', $lastBriefSync) : 'Never'); ?></strong></div>
+                                </div>
+                            <?php endif; ?>
+                        </div>
+                    </details>
                 </section>
 
-                <!-- Automation Preferences -->
                 <section class="seoworkerai-card seoworkerai-card--settings">
                     <h2>Automation Preferences</h2>
                     <form method="post" action="options.php">
                         <?php settings_fields('seoworkerai_settings'); ?>
-                        <div class="seoworkerai-form-field">
-                            <label for="seoworkerai_primary_seo_adapter">Primary SEO Plugin</label>
-                            <select name="seoworkerai_primary_seo_adapter" id="seoworkerai_primary_seo_adapter">
-                                <option value="auto" <?php selected($adapter, 'auto'); ?>>Auto Detect</option>
-                                <option value="yoast" <?php selected($adapter, 'yoast'); ?>>Yoast SEO</option>
-                                <option value="rankmath" <?php selected($adapter, 'rankmath'); ?>>Rank Math</option>
-                                <option value="aioseo" <?php selected($adapter, 'aioseo'); ?>>AIOSEO</option>
-                                <option value="core" <?php selected($adapter, 'core'); ?>>WordPress Core</option>
-                            </select>
-                        </div>
                         <div class="seoworkerai-form-field">
                             <div class="seoworkerai-label">Change Application Mode</div>
                             <label style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;">
@@ -989,57 +971,66 @@ final class MenuRegistrar
                                 <span>Review every change before applying</span>
                             </label>
                         </div>
-                        <div class="seoworkerai-form-field">
-                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input type="checkbox" name="seoworkerai_debug_enabled" value="1" <?php checked((bool)get_option('seoworkerai_debug_enabled', false)); ?>>
-                                <span>Enable debug logging</span>
-                            </label>
-                        </div>
-                        <div class="seoworkerai-form-field">
-                            <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
-                                <input type="checkbox" name="seoworkerai_allow_insecure_ssl" value="1" <?php checked((bool)get_option('seoworkerai_allow_insecure_ssl', false)); ?>>
-                                <span>Allow insecure SSL <em>(dev only)</em></span>
-                            </label>
-                        </div>
-
-                        <!-- FIX 4: Excluded pages — tag-chip UI -->
-                        <div class="seoworkerai-form-field">
-                            <label>Exclude Pages from Audits</label>
-                            <div id="seoworkerai-exclusion-tag-ui" class="seoworkerai-excl-tag-ui">
-                                <!-- Selected chips rendered by JS -->
-                                <div class="seoworkerai-excl-chips"></div>
-                                <!-- Search input -->
-                                <div class="seoworkerai-excl-search-wrap">
-                                    <input
-                                        type="text"
-                                        class="seoworkerai-excl-search"
-                                        placeholder="Search and add pages…"
-                                        autocomplete="off"
-                                    >
+                        <details class="seoworkerai-disclosure">
+                            <summary>Advanced Preferences</summary>
+                            <div class="seoworkerai-disclosure-body">
+                                <div class="seoworkerai-form-field">
+                                    <label for="seoworkerai_primary_seo_adapter">Primary SEO Plugin</label>
+                                    <select name="seoworkerai_primary_seo_adapter" id="seoworkerai_primary_seo_adapter">
+                                        <option value="auto" <?php selected($adapter, 'auto'); ?>>Auto Detect</option>
+                                        <option value="yoast" <?php selected($adapter, 'yoast'); ?>>Yoast SEO</option>
+                                        <option value="rankmath" <?php selected($adapter, 'rankmath'); ?>>Rank Math</option>
+                                        <option value="aioseo" <?php selected($adapter, 'aioseo'); ?>>AIOSEO</option>
+                                        <option value="core" <?php selected($adapter, 'core'); ?>>WordPress Core</option>
+                                    </select>
                                 </div>
-                                <!-- Dropdown options -->
-                                <div class="seoworkerai-excl-dropdown">
-                                    <?php foreach ($allPosts as $postId) :
-                                        $postTitle = get_the_title($postId);
-                                        $postType  = get_post_type($postId);
-                                        $typeLabel = $postType === 'page' ? 'Page' : 'Post';
-                                        $isSelected = in_array($postId, $excludedIds, true);
-                                    ?>
-                                        <div
-                                            class="seoworkerai-excl-option<?php echo $isSelected ? ' is-selected' : ''; ?>"
-                                            data-id="<?php echo esc_attr((string)$postId); ?>"
-                                            data-label="<?php echo esc_attr(strtolower($postTitle)); ?>"
-                                        >
-                                            <span class="seoworkerai-excl-checkmark"><?php echo $isSelected ? '✓' : ''; ?></span>
-                                            <span class="seoworkerai-excl-type-tag"><?php echo esc_html($typeLabel); ?></span>
-                                            <?php echo esc_html($postTitle); ?>
+                                <div class="seoworkerai-form-field">
+                                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                        <input type="checkbox" name="seoworkerai_debug_enabled" value="1" <?php checked((bool)get_option('seoworkerai_debug_enabled', false)); ?>>
+                                        <span>Enable debug logging</span>
+                                    </label>
+                                </div>
+                                <div class="seoworkerai-form-field">
+                                    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;">
+                                        <input type="checkbox" name="seoworkerai_allow_insecure_ssl" value="1" <?php checked((bool)get_option('seoworkerai_allow_insecure_ssl', false)); ?>>
+                                        <span>Allow insecure SSL <em>(dev only)</em></span>
+                                    </label>
+                                </div>
+                                <div class="seoworkerai-form-field">
+                                    <label>Exclude Pages from Audits</label>
+                                    <div id="seoworkerai-exclusion-tag-ui" class="seoworkerai-excl-tag-ui">
+                                        <div class="seoworkerai-excl-chips"></div>
+                                        <div class="seoworkerai-excl-search-wrap">
+                                            <input
+                                                type="text"
+                                                class="seoworkerai-excl-search"
+                                                placeholder="Search and add pages…"
+                                                autocomplete="off"
+                                            >
                                         </div>
-                                    <?php endforeach; ?>
+                                        <div class="seoworkerai-excl-dropdown">
+                                            <?php foreach ($allPosts as $postId) :
+                                                $postTitle = get_the_title($postId);
+                                                $postType  = get_post_type($postId);
+                                                $typeLabel = $postType === 'page' ? 'Page' : 'Post';
+                                                $isSelected = in_array($postId, $excludedIds, true);
+                                            ?>
+                                                <div
+                                                    class="seoworkerai-excl-option<?php echo $isSelected ? ' is-selected' : ''; ?>"
+                                                    data-id="<?php echo esc_attr((string)$postId); ?>"
+                                                    data-label="<?php echo esc_attr(strtolower($postTitle)); ?>"
+                                                >
+                                                    <span class="seoworkerai-excl-checkmark"><?php echo $isSelected ? '✓' : ''; ?></span>
+                                                    <span class="seoworkerai-excl-type-tag"><?php echo esc_html($typeLabel); ?></span>
+                                                    <?php echo esc_html($postTitle); ?>
+                                                </div>
+                                            <?php endforeach; ?>
+                                        </div>
+                                    </div>
+                                    <input type="hidden" name="seoworkerai_excluded_change_audit_pages" id="seoworkerai-exclusion-hidden" value="<?php echo esc_attr($excludedRaw); ?>">
                                 </div>
                             </div>
-                            <input type="hidden" name="seoworkerai_excluded_change_audit_pages" id="seoworkerai-exclusion-hidden" value="<?php echo esc_attr($excludedRaw); ?>">
-                            <div class="description" style="margin-top:6px;">Click pages to add/remove. Selected pages will not trigger audits on save or publish.</div>
-                        </div>
+                        </details>
 
                         <?php submit_button('Save Preferences', 'primary', 'submit', false); ?>
                     </form>
