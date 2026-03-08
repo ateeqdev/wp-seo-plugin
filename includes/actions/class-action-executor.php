@@ -100,6 +100,15 @@ final class ActionExecutor
         }
 
         $status = (string) ($action['status'] ?? 'received');
+        if ($this->hasAlreadyAppliedPayload($action)) {
+            $this->repository->markResult($laravelActionId, 'applied', null);
+            $this->statusReporter->report($action, 'applied', [
+                'noop' => true,
+                'reason' => 'payload_already_applied',
+            ]);
+            return;
+        }
+
         if (in_array($status, ['applied', 'rejected', 'running'], true)) {
             return;
         }
@@ -191,6 +200,23 @@ final class ActionExecutor
     private function resolveHandler(string $actionType): ?InterfaceActionHandler
     {
         return $this->handlers[$actionType] ?? null;
+    }
+
+    /**
+     * @param array<string, mixed> $action
+     */
+    private function hasAlreadyAppliedPayload(array $action): bool
+    {
+        $status = (string) ($action['status'] ?? 'received');
+
+        if ($status === 'rolled_back') {
+            return false;
+        }
+
+        $lastAppliedChecksum = (string) ($action['last_applied_checksum'] ?? '');
+        $payloadChecksum = (string) ($action['payload_checksum'] ?? '');
+
+        return $lastAppliedChecksum !== '' && hash_equals($lastAppliedChecksum, $payloadChecksum);
     }
 
     public function revertByLaravelId(int $laravelActionId): array

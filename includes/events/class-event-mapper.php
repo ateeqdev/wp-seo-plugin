@@ -16,6 +16,8 @@ final class EventMapper
     {
         $adapter = SeoDetector::instance()->getAdapter();
         $featuredImageId = (int) get_post_thumbnail_id($post->ID);
+        $authorId = (int) $post->post_author;
+        $author = $authorId > 0 ? get_userdata($authorId) : false;
 
         return [
             'event_type' => $eventType,
@@ -33,6 +35,11 @@ final class EventMapper
                 'modified_at' => get_post_modified_time('c', true, $post->ID),
                 'featured_image' => $featuredImageId > 0 ? (string) wp_get_attachment_url($featuredImageId) : '',
                 'social_tags' => $adapter->getSocialTags($post->ID),
+                'author' => [
+                    'id' => $authorId,
+                    'name' => $author instanceof \WP_User ? (string) $author->display_name : '',
+                    'twitter_handle' => $authorId > 0 ? (string) get_user_meta($authorId, '_seoworkerai_author_twitter_handle', true) : '',
+                ],
             ],
             'event_time' => gmdate('c'),
         ];

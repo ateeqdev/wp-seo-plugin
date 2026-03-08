@@ -98,6 +98,22 @@ final class MenuRegistrarValidationTest extends TestCase
         self::assertSame('twitter_handle', $twitterField[0]['validation']);
     }
 
+    public function testRemoteSiteSettingsPayloadIncludesSocialDefaults(): void
+    {
+        $registrar = $this->newRegistrarWithoutConstructor();
+
+        $method = new ReflectionMethod($registrar, 'buildRemoteSiteSettingsPayload');
+        $method->setAccessible(true);
+
+        $settings = $method->invoke($registrar, [
+            'brand_twitter_handle' => '@brand_handle',
+            'default_social_image_url' => 'https://example.test/social.jpg',
+        ]);
+
+        self::assertSame('@brand_handle', $settings['brand_twitter_handle']);
+        self::assertSame('https://example.test/social.jpg', $settings['default_social_image_url']);
+    }
+
     private function newRegistrarWithoutConstructor(): MenuRegistrar
     {
         $ref = new ReflectionClass(MenuRegistrar::class);
@@ -108,4 +124,3 @@ final class MenuRegistrarValidationTest extends TestCase
         return $instance;
     }
 }
-

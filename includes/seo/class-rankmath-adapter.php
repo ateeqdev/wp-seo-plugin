@@ -4,63 +4,36 @@ declare(strict_types=1);
 
 namespace SEOWorkerAI\Connector\SEO;
 
-final class RankmathAdapter implements InterfaceSeoAdapter
+final class RankmathAdapter extends AbstractMetaBackedAdapter
 {
     public function getTitle(int $postId): ?string
     {
-        $value = get_post_meta($postId, '_rank_math_title', true);
-
-        if ($value === '') {
-            $value = get_post_meta($postId, 'rank_math_title', true);
-        }
-
-        return $value !== '' ? (string) $value : null;
+        return $this->readOptionalMeta($postId, ['_rank_math_title', 'rank_math_title']);
     }
 
     public function setTitle(int $postId, string $title): bool
     {
-        $a = (bool) update_post_meta($postId, 'rank_math_title', $title);
-        $b = (bool) update_post_meta($postId, '_rank_math_title', $title);
-
-        return $a || $b;
+        return $this->writeMeta($postId, ['rank_math_title', '_rank_math_title'], $title);
     }
 
     public function getDescription(int $postId): ?string
     {
-        $value = get_post_meta($postId, '_rank_math_description', true);
-
-        if ($value === '') {
-            $value = get_post_meta($postId, 'rank_math_description', true);
-        }
-
-        return $value !== '' ? (string) $value : null;
+        return $this->readOptionalMeta($postId, ['_rank_math_description', 'rank_math_description']);
     }
 
     public function setDescription(int $postId, string $description): bool
     {
-        $a = (bool) update_post_meta($postId, 'rank_math_description', $description);
-        $b = (bool) update_post_meta($postId, '_rank_math_description', $description);
-
-        return $a || $b;
+        return $this->writeMeta($postId, ['rank_math_description', '_rank_math_description'], $description);
     }
 
     public function getCanonical(int $postId): ?string
     {
-        $value = get_post_meta($postId, '_rank_math_canonical_url', true);
-
-        if ($value === '') {
-            $value = get_post_meta($postId, 'rank_math_canonical_url', true);
-        }
-
-        return $value !== '' ? (string) $value : null;
+        return $this->readOptionalMeta($postId, ['_rank_math_canonical_url', 'rank_math_canonical_url']);
     }
 
     public function setCanonical(int $postId, string $url): bool
     {
-        $a = (bool) update_post_meta($postId, 'rank_math_canonical_url', $url);
-        $b = (bool) update_post_meta($postId, '_rank_math_canonical_url', $url);
-
-        return $a || $b;
+        return $this->writeMeta($postId, ['rank_math_canonical_url', '_rank_math_canonical_url'], $url);
     }
 
     /**
@@ -109,15 +82,7 @@ final class RankmathAdapter implements InterfaceSeoAdapter
      */
     public function getSchema(int $postId): ?array
     {
-        $json = get_post_meta($postId, '_seoworkerai_schema_json_ld', true);
-
-        if (!is_string($json) || $json === '') {
-            return null;
-        }
-
-        $decoded = json_decode($json, true);
-
-        return is_array($decoded) ? $decoded : null;
+        return $this->readJsonMeta($postId, '_seoworkerai_schema_json_ld');
     }
 
     /**
@@ -125,7 +90,7 @@ final class RankmathAdapter implements InterfaceSeoAdapter
      */
     public function setSchema(int $postId, array $schema): bool
     {
-        return (bool) update_post_meta($postId, '_seoworkerai_schema_json_ld', wp_json_encode($schema));
+        return $this->writeJsonMeta($postId, '_seoworkerai_schema_json_ld', $schema);
     }
 
     public function getName(): string
@@ -138,36 +103,21 @@ final class RankmathAdapter implements InterfaceSeoAdapter
      */
     public function getSocialTags(int $postId): array
     {
-        return [
+        return $this->buildSocialTags($postId, [
             'og' => [
-                'title' => $this->readFirstMeta($postId, ['rank_math_facebook_title', '_rank_math_facebook_title', '_seoworkerai_og_title']),
-                'type' => $this->readFirstMeta($postId, ['rank_math_facebook_type', '_rank_math_facebook_type', '_seoworkerai_og_type']),
-                'image' => $this->readFirstMeta($postId, ['rank_math_facebook_image', '_rank_math_facebook_image', '_seoworkerai_og_image']),
-                'url' => $this->readFirstMeta($postId, ['rank_math_facebook_url', '_rank_math_facebook_url', '_seoworkerai_og_url']),
-                'description' => $this->readFirstMeta($postId, ['rank_math_facebook_description', '_rank_math_facebook_description', '_seoworkerai_og_description']),
+                'title' => ['rank_math_facebook_title', '_rank_math_facebook_title', '_seoworkerai_og_title'],
+                'type' => ['rank_math_facebook_type', '_rank_math_facebook_type', '_seoworkerai_og_type'],
+                'image' => ['rank_math_facebook_image', '_rank_math_facebook_image', '_seoworkerai_og_image'],
+                'url' => ['rank_math_facebook_url', '_rank_math_facebook_url', '_seoworkerai_og_url'],
+                'description' => ['rank_math_facebook_description', '_rank_math_facebook_description', '_seoworkerai_og_description'],
             ],
             'twitter' => [
-                'card' => $this->readFirstMeta($postId, ['rank_math_twitter_card_type', '_rank_math_twitter_card_type', '_seoworkerai_twitter_card']),
-                'site' => $this->readFirstMeta($postId, ['rank_math_twitter_site', '_rank_math_twitter_site', '_seoworkerai_twitter_site']),
-                'title' => $this->readFirstMeta($postId, ['rank_math_twitter_title', '_rank_math_twitter_title', '_seoworkerai_twitter_title']),
-                'description' => $this->readFirstMeta($postId, ['rank_math_twitter_description', '_rank_math_twitter_description', '_seoworkerai_twitter_description']),
-                'image' => $this->readFirstMeta($postId, ['rank_math_twitter_image', '_rank_math_twitter_image', '_seoworkerai_twitter_image']),
+                'card' => ['rank_math_twitter_card_type', '_rank_math_twitter_card_type', '_seoworkerai_twitter_card'],
+                'site' => ['rank_math_twitter_site', '_rank_math_twitter_site', '_seoworkerai_twitter_site'],
+                'title' => ['rank_math_twitter_title', '_rank_math_twitter_title', '_seoworkerai_twitter_title'],
+                'description' => ['rank_math_twitter_description', '_rank_math_twitter_description', '_seoworkerai_twitter_description'],
+                'image' => ['rank_math_twitter_image', '_rank_math_twitter_image', '_seoworkerai_twitter_image'],
             ],
-        ];
-    }
-
-    /**
-     * @param array<int, string> $keys
-     */
-    private function readFirstMeta(int $postId, array $keys): string
-    {
-        foreach ($keys as $key) {
-            $value = (string) get_post_meta($postId, $key, true);
-            if ($value !== '') {
-                return $value;
-            }
-        }
-
-        return '';
+        ]);
     }
 }

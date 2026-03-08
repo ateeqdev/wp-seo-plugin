@@ -145,15 +145,11 @@ final class CoreAdapter implements InterfaceSeoAdapter
         $title = $this->getTitle($postId);
         if ($title !== null) {
             echo "<title>" . esc_html($title) . "</title>\n";
-            echo '<meta property="og:title" content="' . esc_attr($title) . '">';
-            echo "\n";
         }
 
         $description = $this->getDescription($postId);
         if ($description !== null) {
             echo '<meta name="description" content="' . esc_attr($description) . '">';
-            echo "\n";
-            echo '<meta property="og:description" content="' . esc_attr($description) . '">';
             echo "\n";
         }
 
@@ -195,6 +191,14 @@ final class CoreAdapter implements InterfaceSeoAdapter
             'twitter:description' => (string) get_post_meta($postId, '_seoworkerai_twitter_description', true),
             'twitter:image' => (string) get_post_meta($postId, '_seoworkerai_twitter_image', true),
         ];
+
+        if ($title !== null && $socialMap['og:title'] === '') {
+            $socialMap['og:title'] = $title;
+        }
+
+        if ($description !== null && $socialMap['og:description'] === '') {
+            $socialMap['og:description'] = $description;
+        }
 
         foreach ($socialMap as $name => $value) {
             if ($value === '') {

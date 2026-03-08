@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace SEOWorkerAI\Connector\SEO;
 
-final class AioseoAdapter implements InterfaceSeoAdapter
+final class AioseoAdapter extends AbstractMetaBackedAdapter
 {
     public function getTitle(int $postId): ?string
     {
@@ -15,9 +15,7 @@ final class AioseoAdapter implements InterfaceSeoAdapter
             }
         }
 
-        $value = get_post_meta($postId, '_aioseo_title', true);
-
-        return $value !== '' ? (string) $value : null;
+        return $this->readOptionalMeta($postId, ['_aioseo_title']);
     }
 
     public function setTitle(int $postId, string $title): bool
@@ -32,7 +30,7 @@ final class AioseoAdapter implements InterfaceSeoAdapter
             }
         }
 
-        return (bool) update_post_meta($postId, '_aioseo_title', $title);
+        return $this->writeMeta($postId, ['_aioseo_title'], $title);
     }
 
     public function getDescription(int $postId): ?string
@@ -44,9 +42,7 @@ final class AioseoAdapter implements InterfaceSeoAdapter
             }
         }
 
-        $value = get_post_meta($postId, '_aioseo_description', true);
-
-        return $value !== '' ? (string) $value : null;
+        return $this->readOptionalMeta($postId, ['_aioseo_description']);
     }
 
     public function setDescription(int $postId, string $description): bool
@@ -61,19 +57,17 @@ final class AioseoAdapter implements InterfaceSeoAdapter
             }
         }
 
-        return (bool) update_post_meta($postId, '_aioseo_description', $description);
+        return $this->writeMeta($postId, ['_aioseo_description'], $description);
     }
 
     public function getCanonical(int $postId): ?string
     {
-        $value = get_post_meta($postId, '_aioseo_canonical_url', true);
-
-        return $value !== '' ? (string) $value : null;
+        return $this->readOptionalMeta($postId, ['_aioseo_canonical_url']);
     }
 
     public function setCanonical(int $postId, string $url): bool
     {
-        return (bool) update_post_meta($postId, '_aioseo_canonical_url', $url);
+        return $this->writeMeta($postId, ['_aioseo_canonical_url'], $url);
     }
 
     /**
@@ -105,15 +99,7 @@ final class AioseoAdapter implements InterfaceSeoAdapter
      */
     public function getSchema(int $postId): ?array
     {
-        $json = get_post_meta($postId, '_aioseo_schema', true);
-
-        if (!is_string($json) || $json === '') {
-            return null;
-        }
-
-        $decoded = json_decode($json, true);
-
-        return is_array($decoded) ? $decoded : null;
+        return $this->readJsonMeta($postId, '_aioseo_schema');
     }
 
     /**
@@ -121,7 +107,7 @@ final class AioseoAdapter implements InterfaceSeoAdapter
      */
     public function setSchema(int $postId, array $schema): bool
     {
-        return (bool) update_post_meta($postId, '_aioseo_schema', wp_json_encode($schema));
+        return $this->writeJsonMeta($postId, '_aioseo_schema', $schema);
     }
 
     public function getName(): string
@@ -134,36 +120,21 @@ final class AioseoAdapter implements InterfaceSeoAdapter
      */
     public function getSocialTags(int $postId): array
     {
-        return [
+        return $this->buildSocialTags($postId, [
             'og' => [
-                'title' => $this->readFirstMeta($postId, ['_aioseo_og_title', '_seoworkerai_og_title']),
-                'type' => $this->readFirstMeta($postId, ['_aioseo_og_type', '_seoworkerai_og_type']),
-                'image' => $this->readFirstMeta($postId, ['_aioseo_og_image', '_seoworkerai_og_image']),
-                'url' => $this->readFirstMeta($postId, ['_aioseo_og_url', '_seoworkerai_og_url']),
-                'description' => $this->readFirstMeta($postId, ['_aioseo_og_description', '_seoworkerai_og_description']),
+                'title' => ['_aioseo_og_title', '_seoworkerai_og_title'],
+                'type' => ['_aioseo_og_type', '_seoworkerai_og_type'],
+                'image' => ['_aioseo_og_image', '_seoworkerai_og_image'],
+                'url' => ['_aioseo_og_url', '_seoworkerai_og_url'],
+                'description' => ['_aioseo_og_description', '_seoworkerai_og_description'],
             ],
             'twitter' => [
-                'card' => $this->readFirstMeta($postId, ['_aioseo_twitter_card', '_seoworkerai_twitter_card']),
-                'site' => $this->readFirstMeta($postId, ['_aioseo_twitter_site', '_seoworkerai_twitter_site']),
-                'title' => $this->readFirstMeta($postId, ['_aioseo_twitter_title', '_seoworkerai_twitter_title']),
-                'description' => $this->readFirstMeta($postId, ['_aioseo_twitter_description', '_seoworkerai_twitter_description']),
-                'image' => $this->readFirstMeta($postId, ['_aioseo_twitter_image', '_seoworkerai_twitter_image']),
+                'card' => ['_aioseo_twitter_card', '_seoworkerai_twitter_card'],
+                'site' => ['_aioseo_twitter_site', '_seoworkerai_twitter_site'],
+                'title' => ['_aioseo_twitter_title', '_seoworkerai_twitter_title'],
+                'description' => ['_aioseo_twitter_description', '_seoworkerai_twitter_description'],
+                'image' => ['_aioseo_twitter_image', '_seoworkerai_twitter_image'],
             ],
-        ];
-    }
-
-    /**
-     * @param array<int, string> $keys
-     */
-    private function readFirstMeta(int $postId, array $keys): string
-    {
-        foreach ($keys as $key) {
-            $value = (string) get_post_meta($postId, $key, true);
-            if ($value !== '') {
-                return $value;
-            }
-        }
-
-        return '';
+        ]);
     }
 }

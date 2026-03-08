@@ -4,42 +4,36 @@ declare(strict_types=1);
 
 namespace SEOWorkerAI\Connector\SEO;
 
-final class YoastAdapter implements InterfaceSeoAdapter
+final class YoastAdapter extends AbstractMetaBackedAdapter
 {
     public function getTitle(int $postId): ?string
     {
-        $value = get_post_meta($postId, '_yoast_wpseo_title', true);
-
-        return $value !== '' ? (string) $value : null;
+        return $this->readOptionalMeta($postId, ['_yoast_wpseo_title']);
     }
 
     public function setTitle(int $postId, string $title): bool
     {
-        return (bool) update_post_meta($postId, '_yoast_wpseo_title', $title);
+        return $this->writeMeta($postId, ['_yoast_wpseo_title'], $title);
     }
 
     public function getDescription(int $postId): ?string
     {
-        $value = get_post_meta($postId, '_yoast_wpseo_metadesc', true);
-
-        return $value !== '' ? (string) $value : null;
+        return $this->readOptionalMeta($postId, ['_yoast_wpseo_metadesc']);
     }
 
     public function setDescription(int $postId, string $description): bool
     {
-        return (bool) update_post_meta($postId, '_yoast_wpseo_metadesc', $description);
+        return $this->writeMeta($postId, ['_yoast_wpseo_metadesc'], $description);
     }
 
     public function getCanonical(int $postId): ?string
     {
-        $value = get_post_meta($postId, '_yoast_wpseo_canonical', true);
-
-        return $value !== '' ? (string) $value : null;
+        return $this->readOptionalMeta($postId, ['_yoast_wpseo_canonical']);
     }
 
     public function setCanonical(int $postId, string $url): bool
     {
-        return (bool) update_post_meta($postId, '_yoast_wpseo_canonical', $url);
+        return $this->writeMeta($postId, ['_yoast_wpseo_canonical'], $url);
     }
 
     /**
@@ -76,14 +70,7 @@ final class YoastAdapter implements InterfaceSeoAdapter
      */
     public function getSchema(int $postId): ?array
     {
-        $json = get_post_meta($postId, '_yoast_wpseo_schema', true);
-        if (!is_string($json) || $json === '') {
-            return null;
-        }
-
-        $decoded = json_decode($json, true);
-
-        return is_array($decoded) ? $decoded : null;
+        return $this->readJsonMeta($postId, '_yoast_wpseo_schema');
     }
 
     /**
@@ -91,7 +78,7 @@ final class YoastAdapter implements InterfaceSeoAdapter
      */
     public function setSchema(int $postId, array $schema): bool
     {
-        return (bool) update_post_meta($postId, '_yoast_wpseo_schema', wp_json_encode($schema));
+        return $this->writeJsonMeta($postId, '_yoast_wpseo_schema', $schema);
     }
 
     public function getName(): string
@@ -104,36 +91,21 @@ final class YoastAdapter implements InterfaceSeoAdapter
      */
     public function getSocialTags(int $postId): array
     {
-        return [
+        return $this->buildSocialTags($postId, [
             'og' => [
-                'title' => $this->readFirstMeta($postId, ['_yoast_wpseo_opengraph-title', '_seoworkerai_og_title']),
-                'type' => $this->readFirstMeta($postId, ['_yoast_wpseo_opengraph-type', '_seoworkerai_og_type']),
-                'image' => $this->readFirstMeta($postId, ['_yoast_wpseo_opengraph-image', '_seoworkerai_og_image']),
-                'url' => $this->readFirstMeta($postId, ['_yoast_wpseo_opengraph-url', '_seoworkerai_og_url']),
-                'description' => $this->readFirstMeta($postId, ['_yoast_wpseo_opengraph-description', '_seoworkerai_og_description']),
+                'title' => ['_yoast_wpseo_opengraph-title', '_seoworkerai_og_title'],
+                'type' => ['_yoast_wpseo_opengraph-type', '_seoworkerai_og_type'],
+                'image' => ['_yoast_wpseo_opengraph-image', '_seoworkerai_og_image'],
+                'url' => ['_yoast_wpseo_opengraph-url', '_seoworkerai_og_url'],
+                'description' => ['_yoast_wpseo_opengraph-description', '_seoworkerai_og_description'],
             ],
             'twitter' => [
-                'card' => $this->readFirstMeta($postId, ['_yoast_wpseo_twitter-card', '_seoworkerai_twitter_card']),
-                'site' => $this->readFirstMeta($postId, ['_yoast_wpseo_twitter-site', '_seoworkerai_twitter_site']),
-                'title' => $this->readFirstMeta($postId, ['_yoast_wpseo_twitter-title', '_seoworkerai_twitter_title']),
-                'description' => $this->readFirstMeta($postId, ['_yoast_wpseo_twitter-description', '_seoworkerai_twitter_description']),
-                'image' => $this->readFirstMeta($postId, ['_yoast_wpseo_twitter-image', '_seoworkerai_twitter_image']),
+                'card' => ['_yoast_wpseo_twitter-card', '_seoworkerai_twitter_card'],
+                'site' => ['_yoast_wpseo_twitter-site', '_seoworkerai_twitter_site'],
+                'title' => ['_yoast_wpseo_twitter-title', '_seoworkerai_twitter_title'],
+                'description' => ['_yoast_wpseo_twitter-description', '_seoworkerai_twitter_description'],
+                'image' => ['_yoast_wpseo_twitter-image', '_seoworkerai_twitter_image'],
             ],
-        ];
-    }
-
-    /**
-     * @param array<int, string> $keys
-     */
-    private function readFirstMeta(int $postId, array $keys): string
-    {
-        foreach ($keys as $key) {
-            $value = (string) get_post_meta($postId, $key, true);
-            if ($value !== '') {
-                return $value;
-            }
-        }
-
-        return '';
+        ]);
     }
 }

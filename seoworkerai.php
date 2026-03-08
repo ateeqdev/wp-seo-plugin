@@ -19,7 +19,7 @@ define('SEOWORKERAI_VERSION', '2.0.0');
 define('SEOWORKERAI_PLUGIN_FILE', __FILE__);
 define('SEOWORKERAI_PLUGIN_DIR', plugin_dir_path(__FILE__));
 define('SEOWORKERAI_PLUGIN_URL', plugin_dir_url(__FILE__));
-define('SEOWORKERAI_DB_VERSION', '1.2.2');
+define('SEOWORKERAI_DB_VERSION', '1.2.3');
 define('SEOWORKERAI_LARAVEL_BASE_URL', 'https://app.seoworkerai.com/');
 
 require_once SEOWORKERAI_PLUGIN_DIR . 'includes/class-autoloader.php';

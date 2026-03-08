@@ -145,6 +145,21 @@ final class ActionRepository
         ];
         $updateFormat = ['%s', '%s', '%s', '%s'];
 
+        if ($status === 'applied') {
+            $current = $this->findByLaravelId($laravelActionId);
+            $updateData['last_applied_checksum'] = (string) ($current['payload_checksum'] ?? '');
+            $updateData['last_applied_at'] = current_time('mysql');
+            $updateFormat[] = '%s';
+            $updateFormat[] = '%s';
+        }
+
+        if ($status === 'rolled_back') {
+            $updateData['last_applied_checksum'] = null;
+            $updateData['last_applied_at'] = null;
+            $updateFormat[] = '%s';
+            $updateFormat[] = '%s';
+        }
+
         // Preserve prior snapshots when none are passed (e.g. failed re-run or manual revert).
         if ($before !== null) {
             $updateData['before_snapshot'] = JsonHelper::encode($before);

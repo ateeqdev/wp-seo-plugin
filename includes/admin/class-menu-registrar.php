@@ -194,6 +194,7 @@ final class MenuRegistrar
 
         $siteSettings = $this->sanitizePostedSiteSettings($_POST);
         update_option('seoworkerai_site_seo_settings', $siteSettings, false);
+        $this->savePostedAuthorProfiles($_POST);
 
         $result = $this->siteRegistrar->registerOrUpdate(true);
         $notice = 'profile_ok';
@@ -563,6 +564,7 @@ final class MenuRegistrar
     {
         add_menu_page('SEOWorkerAI', 'SEOWorkerAI', 'manage_options', 'seoworkerai', [$this, 'renderSettingsPage'], SEOWORKERAI_PLUGIN_URL . 'assets/images/logo.png', 80);
         add_submenu_page('seoworkerai', 'Settings', 'Settings', 'manage_options', 'seoworkerai', [$this, 'renderSettingsPage']);
+        add_submenu_page('seoworkerai', 'Activity', 'Activity', 'manage_options', 'seoworkerai-activity', [$this, 'renderActivityPage']);
         add_submenu_page('seoworkerai', 'Change Center', 'Change Center', 'manage_options', 'seoworkerai-logs', [$this, 'renderLogsPage']);
         add_submenu_page('seoworkerai', 'Action Items', 'Action Items', 'manage_options', 'seoworkerai-action-items', [$this, 'renderActionItemsPage']);
         add_submenu_page('seoworkerai', 'Content Briefs', 'Content Briefs', 'edit_posts', 'seoworkerai-briefs', [$this, 'renderBriefsPage']);
@@ -631,6 +633,7 @@ final class MenuRegistrar
 
         $providerAlerts = get_option('seoworkerai_provider_connection_alerts', []);
         if (!is_array($providerAlerts)) $providerAlerts = [];
+        $authorProfiles = $this->getAuthorProfiles();
 
         if ($siteId > 0 && $this->tokenManager->hasToken()) {
             try {
@@ -855,6 +858,18 @@ final class MenuRegistrar
                                         <input id="seoworkerai-site-settings-content-briefs-per-run" type="number" min="1" max="10" name="site_settings_content_briefs_per_run" value="<?php echo esc_attr((string) ($siteSeoSettings['content_briefs_per_run'] ?? 3)); ?>">
                                     </div>
                                 </div>
+                                <div id="social-defaults" class="seoworkerai-form-grid seoworkerai-form-grid--two">
+                                    <div class="seoworkerai-form-field">
+                                        <label for="seoworkerai-site-settings-brand-twitter-handle">Brand Twitter/X Handle</label>
+                                        <input id="seoworkerai-site-settings-brand-twitter-handle" type="text" name="site_settings_brand_twitter_handle" value="<?php echo esc_attr((string) ($siteSeoSettings['brand_twitter_handle'] ?? '')); ?>" placeholder="@yourbrand">
+                                        <p class="description">Used as the default `twitter:site` value across your site.</p>
+                                    </div>
+                                    <div class="seoworkerai-form-field">
+                                        <label for="seoworkerai-site-settings-default-social-image-url">Default Social Image URL</label>
+                                        <input id="seoworkerai-site-settings-default-social-image-url" type="url" name="site_settings_default_social_image_url" value="<?php echo esc_attr((string) ($siteSeoSettings['default_social_image_url'] ?? '')); ?>" placeholder="https://example.com/social-card.jpg">
+                                        <p class="description">Fallback OG/Twitter image when a page does not have its own featured image.</p>
+                                    </div>
+                                </div>
                                 <div class="seoworkerai-form-field">
                                     <label for="seoworkerai-site-settings-selection-notes">Selection Notes</label>
                                     <textarea id="seoworkerai-site-settings-selection-notes" name="site_settings_selection_notes" rows="4"><?php echo esc_textarea((string) ($siteSeoSettings['selection_notes'] ?? '')); ?></textarea>
@@ -869,6 +884,39 @@ final class MenuRegistrar
                                         <span>Allow low-volume opportunities</span>
                                     </label>
                                 </div>
+                            </div>
+                        </details>
+
+                        <details id="author-social-profiles" class="seoworkerai-accordion">
+                            <summary>Author Social Profiles</summary>
+                            <div class="seoworkerai-accordion-body">
+                                <p class="description" style="margin-top:0;">Add author handles once so article audits stop asking for them page by page.</p>
+                                <?php if ($authorProfiles !== []) : ?>
+                                    <div class="seoworkerai-table-wrap">
+                                        <table class="wp-list-table widefat">
+                                            <thead>
+                                                <tr>
+                                                    <th>Author</th>
+                                                    <th>Email</th>
+                                                    <th>Twitter/X Handle</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                <?php foreach ($authorProfiles as $authorProfile) : ?>
+                                                    <tr>
+                                                        <td><?php echo esc_html((string) $authorProfile['display_name']); ?></td>
+                                                        <td><?php echo esc_html((string) $authorProfile['email']); ?></td>
+                                                        <td>
+                                                            <input type="text" name="author_profiles[<?php echo esc_attr((string) $authorProfile['user_id']); ?>][twitter_handle]" value="<?php echo esc_attr((string) $authorProfile['twitter_handle']); ?>" placeholder="@authorhandle">
+                                                        </td>
+                                                    </tr>
+                                                <?php endforeach; ?>
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                <?php else : ?>
+                                    <p>No local authors were found on this site.</p>
+                                <?php endif; ?>
                             </div>
                         </details>
 
@@ -1035,6 +1083,129 @@ final class MenuRegistrar
                         <?php submit_button('Save Preferences', 'primary', 'submit', false); ?>
                     </form>
                 </section>
+            </div>
+        </div>
+        <?php
+    }
+
+    // ─── Render: Activity ──────────────────────────────────────────────────────
+
+    public function renderActivityPage(): void
+    {
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
+
+        global $wpdb;
+        $actionsTable = $wpdb->prefix . 'seoworkerai_actions';
+        $itemsTable = $wpdb->prefix . 'seoworkerai_action_items';
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
+        $notice = isset($_GET['seoworkerai_notice']) ? sanitize_text_field((string) $_GET['seoworkerai_notice']) : '';
+        $executionLogs = [];
+        $scheduledTasks = [];
+        $remoteErrors = [];
+
+        if ($siteId > 0 && $this->tokenManager->hasToken()) {
+            try {
+                $logsResponse = $this->client->listExecutionLogsFast(['limit' => 8]);
+                $executionLogs = isset($logsResponse['execution_logs']) && is_array($logsResponse['execution_logs'])
+                    ? $logsResponse['execution_logs']
+                    : [];
+            } catch (\Throwable $e) {
+                $remoteErrors[] = $e->getMessage();
+            }
+
+            try {
+                $scheduledResponse = $this->client->listScheduledTasksFast(['limit' => 8]);
+                $scheduledTasks = isset($scheduledResponse['scheduled_tasks']) && is_array($scheduledResponse['scheduled_tasks'])
+                    ? $scheduledResponse['scheduled_tasks']
+                    : [];
+            } catch (\Throwable $e) {
+                $remoteErrors[] = $e->getMessage();
+            }
+        }
+
+        $openItems = $siteId > 0
+            ? (int) $wpdb->get_var($wpdb->prepare("SELECT COUNT(*) FROM {$itemsTable} WHERE site_id = %d AND status != %s", $siteId, 'resolved'))
+            : 0; // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $appliedChanges = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$actionsTable} WHERE status = 'applied'"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $failedChanges = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$actionsTable} WHERE status IN ('failed','ack_failed')"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $queuedChanges = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$actionsTable} WHERE status IN ('received','queued','running','ack_pending')"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+
+        ?>
+        <div class="wrap seoworkerai-admin-page">
+            <?php $this->renderAdminShellHeader('Activity', 'seoworkerai-activity', 'See what was checked, what was fixed automatically, and what still needs your input.'); ?>
+            <?php $this->renderNotice($notice); ?>
+            <?php if (!empty($remoteErrors)) : ?>
+                <div class="notice notice-warning"><p>Some remote activity data could not be loaded: <?php echo esc_html(implode(' | ', $remoteErrors)); ?></p></div>
+            <?php endif; ?>
+
+            <div class="seoworkerai-stat-grid" style="margin-bottom:16px;">
+                <div class="seoworkerai-stat"><span>Needs Your Input</span><strong><?php echo esc_html((string) $openItems); ?></strong></div>
+                <div class="seoworkerai-stat"><span>Fixed Automatically</span><strong><?php echo esc_html((string) $appliedChanges); ?></strong></div>
+                <div class="seoworkerai-stat"><span>Currently Processing</span><strong><?php echo esc_html((string) $queuedChanges); ?></strong></div>
+                <div class="seoworkerai-stat"><span>Needs Review</span><strong><?php echo esc_html((string) $failedChanges); ?></strong></div>
+            </div>
+
+            <div class="seoworkerai-settings-grid">
+                <section class="seoworkerai-card">
+                    <div class="seoworkerai-card-head">
+                        <h2>Needs Your Input</h2>
+                        <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-action-items')); ?>">Open Action Items</a>
+                    </div>
+                    <p>These are blockers where automation is waiting on business or author information.</p>
+                    <ul style="margin:0 0 0 18px;">
+                        <li>Site-wide defaults like brand Twitter/X handle or social image fallback belong in Settings.</li>
+                        <li>Author-specific handles belong in Author Social Profiles.</li>
+                        <li>Page-specific exceptions stay in Action Items.</li>
+                    </ul>
+                </section>
+
+                <section class="seoworkerai-card">
+                    <div class="seoworkerai-card-head">
+                        <h2>Recent Runs</h2>
+                        <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-schedules')); ?>">Open Schedules</a>
+                    </div>
+                    <?php if ($executionLogs !== []) : ?>
+                        <table class="wp-list-table widefat">
+                            <thead><tr><th>Task</th><th>Status</th><th>When</th><th>Source</th></tr></thead>
+                            <tbody>
+                                <?php foreach ($executionLogs as $log) : ?>
+                                    <tr>
+                                        <td><?php echo esc_html((string) ($log['task_name'] ?? $log['type'] ?? 'Task')); ?></td>
+                                        <td><?php echo esc_html((string) ($log['status'] ?? 'unknown')); ?></td>
+                                        <td><?php echo esc_html((string) ($log['completed_at'] ?? $log['created_at'] ?? '')); ?></td>
+                                        <td><?php echo esc_html((string) ($log['trigger_source'] ?? 'run')); ?></td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php else : ?>
+                        <p>No recent execution logs were available.</p>
+                    <?php endif; ?>
+                </section>
+            </div>
+
+            <div class="seoworkerai-card" style="margin-top:16px;">
+                <div class="seoworkerai-card-head">
+                    <h2>Upcoming Scheduled Work</h2>
+                    <a class="button" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-schedules')); ?>">Manage Schedules</a>
+                </div>
+                <?php if ($scheduledTasks !== []) : ?>
+                    <table class="wp-list-table widefat">
+                        <thead><tr><th>Task</th><th>Status</th><th>Scheduled For</th><th>Trigger</th></tr></thead>
+                        <tbody>
+                            <?php foreach ($scheduledTasks as $task) : ?>
+                                <tr>
+                                    <td><?php echo esc_html((string) ($task['task_name'] ?? 'Task')); ?></td>
+                                    <td><?php echo esc_html((string) ($task['status'] ?? 'scheduled')); ?></td>
+                                    <td><?php echo esc_html((string) ($task['scheduled_for'] ?? '')); ?></td>
+                                    <td><?php echo esc_html((string) ($task['trigger_source'] ?? 'scheduled')); ?></td>
+                                </tr>
+                            <?php endforeach; ?>
+                        </tbody>
+                    </table>
+                <?php else : ?>
+                    <p>No upcoming scheduled tasks were available.</p>
+                <?php endif; ?>
             </div>
         </div>
         <?php
@@ -1594,7 +1765,14 @@ final class MenuRegistrar
                             $linkedActionType  = (string)($item->linked_action_type ?? '');
                             $linkedActionStatus= (string)($item->linked_action_status ?? '');
                             $targetLabel = '';
-                            if ($targetType === 'post' && ctype_digit($targetId)) {
+                            if ($targetType === 'site') {
+                                $targetLabel = 'Site-wide setting';
+                            } elseif ($targetType === 'author' && ctype_digit($targetId)) {
+                                $user = get_userdata((int) $targetId);
+                                if ($user instanceof \WP_User) {
+                                    $targetLabel = (string) $user->display_name;
+                                }
+                            } elseif ($targetType === 'post' && ctype_digit($targetId)) {
                                 $pt = get_the_title((int)$targetId);
                                 if (is_string($pt) && trim($pt) !== '') $targetLabel = trim($pt);
                             }
@@ -1627,6 +1805,12 @@ final class MenuRegistrar
                                     <div class="seoworkerai-action-btns">
                                         <?php if ($targetType === 'post' && ctype_digit($targetId)) : ?>
                                             <a class="button button-small" href="<?php echo esc_url(admin_url('post.php?post='.(int)$targetId.'&action=edit')); ?>">Edit Post</a>
+                                        <?php endif; ?>
+                                        <?php if ($targetType === 'site') : ?>
+                                            <a class="button button-small" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-settings#social-defaults')); ?>">Open Settings</a>
+                                        <?php endif; ?>
+                                        <?php if ($targetType === 'author' && ctype_digit($targetId)) : ?>
+                                            <a class="button button-small" href="<?php echo esc_url(admin_url('admin.php?page=seoworkerai-settings#author-social-profiles')); ?>">Open Author Profiles</a>
                                         <?php endif; ?>
                                         <?php if ($laravelId > 0 && $linkedActionType !== '' && $linkedActionType !== 'human-action-required') : ?>
                                             <?php if ($linkedActionStatus !== 'applied') : ?>
@@ -2382,7 +2566,7 @@ final class MenuRegistrar
     private function renderStatusBadge(string $status): string
     {
         $normalized = sanitize_html_class(str_replace('_', '-', strtolower(trim($status))));
-        $label = ucwords(str_replace(['-','_'], ' ', $status));
+        $label = $this->humanizeLabel($status);
         return sprintf('<span class="seoworkerai-badge seoworkerai-status-%s">%s</span>', esc_attr($normalized), esc_html($label));
     }
 
@@ -2418,7 +2602,7 @@ final class MenuRegistrar
         if ($targetLabel === '' && $targetUrl !== '') $targetLabel = parse_url($targetUrl, PHP_URL_PATH) ?: $targetUrl;
         if ($targetLabel === '' && $targetType !== '' && $targetId !== '') $targetLabel = "{$targetType}:{$targetId}";
 
-        $actionLabel = ucwords(str_replace(['-','_'], ' ', (string)($row['action_type'] ?? 'action')));
+        $actionLabel = $this->humanizeLabel((string) ($row['action_type'] ?? 'action'));
         return $targetLabel !== '' ? "{$targetLabel} — {$actionLabel}" : $actionLabel;
     }
 
@@ -2471,9 +2655,14 @@ final class MenuRegistrar
         }
         if ($after !== []) {
             $first = array_key_first($after);
-            if (is_string($first)) { $v = $after[$first] ?? ''; return [['label'=>ucwords(str_replace(['_','-'],' ',$first)),'value'=>is_scalar($v)?(string)$v:'Updated']]; }
+            if (is_string($first)) { $v = $after[$first] ?? ''; return [['label'=>$this->humanizeLabel($first),'value'=>is_scalar($v)?(string)$v:'Updated']]; }
         }
         return [];
+    }
+
+    private function humanizeLabel(string $value): string
+    {
+        return ucwords(str_replace(['-', '_'], ' ', trim($value)));
     }
 
     private function updateLocalBriefLinkState(int $briefId, int $postId, string $postUrl, string $postTitle, string $postType, string $articleStatus): void
@@ -2515,6 +2704,8 @@ final class MenuRegistrar
             'content_briefs_per_run' => isset($source['site_settings_content_briefs_per_run']) ? max(1, min(10, (int) $source['site_settings_content_briefs_per_run'])) : 3,
             'prefer_low_difficulty' => !empty($source['site_settings_prefer_low_difficulty']),
             'allow_low_volume' => !empty($source['site_settings_allow_low_volume']),
+            'brand_twitter_handle' => isset($source['site_settings_brand_twitter_handle']) ? sanitize_text_field((string) wp_unslash($source['site_settings_brand_twitter_handle'])) : '',
+            'default_social_image_url' => isset($source['site_settings_default_social_image_url']) ? esc_url_raw((string) wp_unslash($source['site_settings_default_social_image_url'])) : '',
             'selection_notes' => isset($source['site_settings_selection_notes']) ? sanitize_textarea_field((string) wp_unslash($source['site_settings_selection_notes'])) : '',
         ];
     }
@@ -2535,6 +2726,8 @@ final class MenuRegistrar
             'content_briefs_per_run' => (int) ($settings['content_briefs_per_run'] ?? 3),
             'prefer_low_difficulty' => !empty($settings['prefer_low_difficulty']),
             'allow_low_volume' => !empty($settings['allow_low_volume']),
+            'brand_twitter_handle' => ($settings['brand_twitter_handle'] ?? '') !== '' ? (string) $settings['brand_twitter_handle'] : null,
+            'default_social_image_url' => ($settings['default_social_image_url'] ?? '') !== '' ? (string) $settings['default_social_image_url'] : null,
             'selection_notes' => (string) ($settings['selection_notes'] ?? ''),
         ];
 
@@ -2547,6 +2740,66 @@ final class MenuRegistrar
         }
 
         return $payload;
+    }
+
+    /**
+     * @param array<string, mixed> $source
+     */
+    private function savePostedAuthorProfiles(array $source): void
+    {
+        $profiles = isset($source['author_profiles']) && is_array($source['author_profiles'])
+            ? wp_unslash($source['author_profiles'])
+            : [];
+
+        foreach ($profiles as $userId => $profile) {
+            $resolvedUserId = (int) $userId;
+            if ($resolvedUserId <= 0 || ! is_array($profile)) {
+                continue;
+            }
+
+            $twitterHandle = isset($profile['twitter_handle'])
+                ? sanitize_text_field((string) $profile['twitter_handle'])
+                : '';
+
+            if ($twitterHandle !== '' && ! preg_match('/^@?[A-Za-z0-9_]{1,15}$/', $twitterHandle)) {
+                continue;
+            }
+
+            update_user_meta($resolvedUserId, '_seoworkerai_author_twitter_handle', $twitterHandle);
+        }
+    }
+
+    /**
+     * @return list<array{user_id:int,display_name:string,email:string,twitter_handle:string}>
+     */
+    private function getAuthorProfiles(): array
+    {
+        $users = get_users([
+            'role__in' => ['administrator', 'editor', 'author', 'contributor'],
+            'orderby' => 'display_name',
+            'order' => 'ASC',
+        ]);
+
+        if (! is_array($users)) {
+            return [];
+        }
+
+        $profiles = [];
+
+        foreach ($users as $user) {
+            if (! $user instanceof \WP_User) {
+                continue;
+            }
+
+            $profiles[] = [
+                'user_id' => (int) $user->ID,
+                'display_name' => (string) $user->display_name,
+                'email' => (string) $user->user_email,
+                'twitter_handle' => (string) get_user_meta($user->ID, '_seoworkerai_author_twitter_handle', true),
+            ];
+        }
+
+        return $profiles;
     }
 
     /**

@@ -272,6 +272,8 @@ final class SiteRegistrar
             'content_briefs_per_run' => isset($settings['content_briefs_per_run']) ? (int) $settings['content_briefs_per_run'] : 3,
             'prefer_low_difficulty' => !empty($settings['prefer_low_difficulty']),
             'allow_low_volume' => !empty($settings['allow_low_volume']),
+            'brand_twitter_handle' => sanitize_text_field((string) ($settings['brand_twitter_handle'] ?? '')),
+            'default_social_image_url' => esc_url_raw((string) ($settings['default_social_image_url'] ?? '')),
             'selection_notes' => sanitize_textarea_field((string) ($settings['selection_notes'] ?? '')),
         ];
     }

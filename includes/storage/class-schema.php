@@ -47,6 +47,8 @@ final class Schema
             after_snapshot longtext DEFAULT NULL,
             reviewed_by bigint(20) unsigned DEFAULT NULL,
             reviewed_at datetime DEFAULT NULL,
+            last_applied_checksum char(64) DEFAULT NULL,
+            last_applied_at datetime DEFAULT NULL,
             received_at datetime NOT NULL,
             processed_at datetime DEFAULT NULL,
             acknowledged_at datetime DEFAULT NULL,
@@ -57,7 +59,8 @@ final class Schema
             KEY status_idx (status, received_at),
             KEY auto_apply_idx (auto_apply, status),
             KEY action_type_idx (action_type),
-            KEY target_idx (target_type, target_id)
+            KEY target_idx (target_type, target_id),
+            KEY last_applied_checksum_idx (last_applied_checksum)
         ) {$charset};";
 
         $sql[] = "CREATE TABLE {$outbox} (
