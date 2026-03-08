@@ -67,6 +67,22 @@
   margin: 24px 0 20px;
   box-shadow: var(--shadow-sm);
 }
+.seoworkerai-shell-brand {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.seoworkerai-shell-logo {
+  width: 52px;
+  height: 52px;
+  border-radius: 14px;
+  object-fit: cover;
+  box-shadow: 0 8px 18px rgba(60, 64, 67, 0.15);
+}
+.seoworkerai-shell-copy {
+  min-width: 0;
+}
 .seoworkerai-shell-header h1 {
   margin: 0 0 6px;
   font-size: 26px;
@@ -75,6 +91,11 @@
 }
 .seoworkerai-shell-header > p {
   margin: 0 0 20px;
+  font-size: 13px;
+  color: var(--gray-700);
+}
+.seoworkerai-shell-copy > p {
+  margin: 0;
   font-size: 13px;
   color: var(--gray-700);
 }
@@ -1476,6 +1497,9 @@
   }
   .seoworkerai-shell-header {
     padding: 18px 14px 0;
+  }
+  .seoworkerai-shell-brand {
+    align-items: flex-start;
   }
   .seoworkerai-card {
     padding: 14px;

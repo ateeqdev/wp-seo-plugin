@@ -561,7 +561,7 @@ final class MenuRegistrar
 
     public function registerMenu(): void
     {
-        add_menu_page('SEOWorkerAI', 'SEOWorkerAI', 'manage_options', 'seoworkerai', [$this, 'renderSettingsPage'], 'dashicons-performance', 80);
+        add_menu_page('SEOWorkerAI', 'SEOWorkerAI', 'manage_options', 'seoworkerai', [$this, 'renderSettingsPage'], SEOWORKERAI_PLUGIN_URL . 'assets/images/logo.png', 80);
         add_submenu_page('seoworkerai', 'Settings', 'Settings', 'manage_options', 'seoworkerai', [$this, 'renderSettingsPage']);
         add_submenu_page('seoworkerai', 'Change Center', 'Change Center', 'manage_options', 'seoworkerai-logs', [$this, 'renderLogsPage']);
         add_submenu_page('seoworkerai', 'Action Items', 'Action Items', 'manage_options', 'seoworkerai-action-items', [$this, 'renderActionItemsPage']);
@@ -2640,8 +2640,13 @@ final class MenuRegistrar
             : 'Company payment is required before Google integrations and paid SEO automation can continue.';
         ?>
         <div class="seoworkerai-shell-header">
-            <h1><?php echo esc_html($title); ?></h1>
-            <?php if ($description !== '') : ?><p><?php echo esc_html($description); ?></p><?php endif; ?>
+            <div class="seoworkerai-shell-brand">
+                <img src="<?php echo esc_url(SEOWORKERAI_PLUGIN_URL . 'assets/images/logo.png'); ?>" alt="SEOWorkerAI logo" class="seoworkerai-shell-logo">
+                <div class="seoworkerai-shell-copy">
+                    <h1><?php echo esc_html($title); ?></h1>
+                    <?php if ($description !== '') : ?><p><?php echo esc_html($description); ?></p><?php endif; ?>
+                </div>
+            </div>
             <?php if ($showBillingBanner) : ?>
                 <div class="notice notice-warning" style="margin:16px 0 0;padding:12px 16px;border-radius:10px;">
                     <p style="margin:0 0 8px;"><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required.' : 'Automation paused.'); ?></strong> <?php echo esc_html($billingMessage); ?></p>
