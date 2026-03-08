@@ -698,7 +698,7 @@ final class MenuRegistrar
                     <div class="seoworkerai-stat"><span>User Sync</span><strong><?php echo esc_html($lastUserSync > 0 ? wp_date('Y-m-d H:i', $lastUserSync) : 'Never'); ?></strong></div>
                     <div class="seoworkerai-stat"><span>Brief Sync</span><strong><?php echo esc_html($lastBriefSync > 0 ? wp_date('Y-m-d H:i', $lastBriefSync) : 'Never'); ?></strong></div>
                     <div class="seoworkerai-stat"><span>Google Connection</span><strong><?php echo esc_html($isConnected ? 'Connected' . ($oauthProvider !== '' ? ' (' . $oauthProvider . ')' : '') : 'Not connected'); ?></strong></div>
-                    <div class="seoworkerai-stat"><span>Billing</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Paid'); ?></strong></div>
+                    <div class="seoworkerai-stat"><span>Company Billing</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Paid'); ?></strong></div>
                 </div>
             </div>
 
@@ -887,18 +887,19 @@ final class MenuRegistrar
                 <!-- Google Connection -->
                 <section class="seoworkerai-card">
                     <div class="seoworkerai-card-head">
-                        <h2>Billing</h2>
+                        <h2>Company Billing</h2>
                         <?php if (!empty($billing['payment_url'])) : ?>
-                            <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Pay Now</a>
+                            <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Open Payment Center</a>
                         <?php endif; ?>
                     </div>
                     <div class="seoworkerai-kv-list" style="margin-bottom:16px;">
+                        <div><span>Company</span><strong><?php echo esc_html((string) ($billing['company_name'] ?? 'Your company')); ?></strong></div>
                         <div><span>Status</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Active'); ?></strong></div>
-                        <div><span>Plan</span><strong><?php echo esc_html((string) ($billing['plan_name'] ?? 'SEOWorkerAI Basic')); ?></strong></div>
-                        <div><span>Price</span><strong><?php echo esc_html('$' . number_format((float) ($billing['plan_price'] ?? 60), 2) . '/month'); ?></strong></div>
+                        <div><span>Plan</span><strong><?php echo esc_html((string) ($billing['plan_name'] ?? 'SEOWorkerAI Starter')); ?></strong></div>
+                        <div><span>Price</span><strong><?php echo esc_html('$' . number_format((float) ($billing['plan_price'] ?? 60), 2) . '/' . (!empty($billing['plan_interval']) && $billing['plan_interval'] === 'yearly' ? 'year' : 'month')); ?></strong></div>
                     </div>
                     <?php if (!empty($billing['payment_required'])) : ?>
-                        <p class="seoworkerai-muted" style="margin:0 0 16px;">Registration, site description, taste, and domain rating remain available. Google OAuth and paid SEO automation stay blocked until payment is completed.</p>
+                        <p class="seoworkerai-muted" style="margin:0 0 16px;">Registration, company setup, site description, taste, and domain rating remain available. Google OAuth and paid SEO automation stay blocked until company billing is completed.</p>
                     <?php endif; ?>
 
                     <hr style="border:none;border-top:1px solid var(--gray-200);margin:16px 0;">
@@ -906,9 +907,9 @@ final class MenuRegistrar
                     <h2>Google Integration</h2>
 
                     <?php if (!empty($billing['payment_required'])) : ?>
-                        <p class="seoworkerai-muted" style="margin:0 0 12px;">Payment is required before Google Search Console and Analytics can be connected.</p>
+                        <p class="seoworkerai-muted" style="margin:0 0 12px;">Company payment is required before Google Search Console and Analytics can be connected.</p>
                         <?php if (!empty($billing['payment_url'])) : ?>
-                            <a class="seoworkerai-google-cta" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Pay Now to Unlock Google Integration</a>
+                            <a class="seoworkerai-google-cta" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Open Company Billing to Unlock Google Integration</a>
                         <?php endif; ?>
                     <?php elseif (!$isConnected) : ?>
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:16px;">
@@ -2645,7 +2646,7 @@ final class MenuRegistrar
         $showBillingBanner = !empty($billing['payment_required']) || !empty($billing['quota_blocked']);
         $billingMessage = !empty($billing['quota_message'])
             ? (string) $billing['quota_message']
-            : 'Payment is required before Google integrations and paid SEO automation can continue.';
+            : 'Company payment is required before Google integrations and paid SEO automation can continue.';
         ?>
         <div class="seoworkerai-shell-header">
             <h1><?php echo esc_html($title); ?></h1>
