@@ -7,24 +7,23 @@ Stable tag: 2.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-SEOWorkerAI.com connects a WordPress site to the SEOWorkerAI SaaS for company registration, site registration, content briefs, SEO change execution, and reporting.
+SEOWorkerAI.com runs a one-time site-wide SEO audit on install, applies fixes based on your settings, and unlocks ongoing recommendations once you activate a plan.
 
 == Description ==
 
-SEOWorkerAI.com syncs a WordPress site with the SEOWorkerAI SaaS so site owners can:
+SEOWorkerAI.com helps site owners:
 
-- register or update a company and verify a site
-- sync site profile, locations, and SEO settings
-- receive content briefs generated from SEO data and Reddit-backed research
-- receive approved SEO changes from the SaaS and apply or revert them in WordPress
-- sync action status, health signals, and activity logs back to the SaaS
+- run a free, one-time site-wide audit right after install
+- fix technical SEO gaps automatically (or review each change first)
+- connect Google Search Console and Google Analytics for future insights
+- unlock ongoing recommendations, daily audits, and content briefs after payment
 
 == External services ==
 
 This plugin connects to the SEOWorkerAI SaaS and related third-party integrations configured there.
 
 1. SEOWorkerAI SaaS
-- What it is used for: company registration, site registration, ownership verification, company billing status, Google OAuth initialization, content brief sync, action sync, and SEO orchestration.
+- What it is used for: site registration, ownership verification, billing status, the one-time initial audit, Google OAuth initialization, action sync, and SEO orchestration.
 - Data sent and when:
   - during registration or sync: site URL, WordPress version, timezone, admin email, synced user list, site description, taste, locations, and site SEO settings so the SaaS can create or update the owning company and its memberships
   - during health, action, and event sync: site identifiers, action payloads, execution/revert status, and operational logs
@@ -44,14 +43,15 @@ This plugin connects to the SEOWorkerAI SaaS and related third-party integration
 2. Activate the plugin through the WordPress Plugins screen.
 3. Open the SEOWorkerAI settings page in wp-admin.
 4. Register the site.
-5. Complete company payment if required.
-6. Connect Google services when prompted.
+5. Your initial audit runs automatically after registration.
+6. Connect Google services anytime.
+7. Activate payment to unlock ongoing recommendations and monitoring.
 
 == Frequently Asked Questions ==
 
 = Does the plugin work without the SEOWorkerAI SaaS? =
 
-No. The plugin requires a reachable SEOWorkerAI backend.
+No. The plugin requires a reachable SEOWorkerAI backend to run the initial audit and sync changes.
 
 = Does the plugin send data off-site? =
 

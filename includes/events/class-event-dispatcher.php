@@ -31,6 +31,11 @@ final class EventDispatcher
             return;
         }
 
+        $billing = get_option('seoworkerai_billing', []);
+        if (is_array($billing) && !empty($billing['payment_required'])) {
+            return;
+        }
+
         $rows = $this->outbox->listDispatchable(25);
 
         foreach ($rows as $row) {

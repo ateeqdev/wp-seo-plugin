@@ -44,6 +44,11 @@ final class Activator
         add_option('seoworkerai_site_location_name', 'United States', '', 'no');
         add_option('seoworkerai_site_seo_settings', [], '', 'no');
         add_option('seoworkerai_billing', [], '', 'no');
+        add_option('seoworkerai_initial_audit_status', 'pending', '', 'no');
+        add_option('seoworkerai_initial_audit_started_at', 0, '', 'no');
+        add_option('seoworkerai_initial_audit_completed_at', 0, '', 'no');
+        add_option('seoworkerai_initial_audit_message', '', '', 'no');
+        add_option('seoworkerai_initial_audit_requested', false, '', 'no');
         add_option('seoworkerai_excluded_change_audit_pages', '', '', 'no');
         add_option(
             'seoworkerai_features',

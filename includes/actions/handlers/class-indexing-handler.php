@@ -34,7 +34,7 @@ final class IndexingHandler extends AbstractActionHandler
                 'handler' => 'submit_for_indexing',
                 'url' => esc_url_raw($url),
                 'logged' => true,
-                'note' => 'Submission is handled by Laravel.',
+                'note' => 'Submission is handled by SEOWorkerAI.',
             ],
             'before' => [],
             'after' => ['url' => esc_url_raw($url)],

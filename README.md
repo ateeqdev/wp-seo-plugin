@@ -1,12 +1,12 @@
 # SEOWorkerAI Connector
 
-WordPress plugin that integrates with a Laravel SEO automation backend.
+WordPress plugin that runs a free site-wide SEO audit on install and unlocks ongoing automation after payment.
 
 ## Features
 
 - Site registration and token-based authentication (`X-Site-Token`)
-- OAuth handoff via Laravel (`Connect Google` button + callback state persistence)
-- Event outbox + async dispatch to Laravel
+- Google OAuth handoff (`Connect Google` button + callback state persistence)
+- Event outbox + async dispatch to SEOWorkerAI
 - Push and pull action ingestion
 - Async action execution via Action Scheduler (with WP-Cron fallback)
 - REST endpoints for pages/media/action execution
@@ -23,5 +23,6 @@ WordPress plugin that integrates with a Laravel SEO automation backend.
 
 1. Copy plugin to `wp-content/plugins/seoworkerai`.
 2. Activate in WordPress admin.
-3. Configure Laravel base URL in plugin settings.
-4. Register and connect the site.
+3. Register the site.
+4. Initial audit runs once automatically.
+5. Connect Google services anytime.

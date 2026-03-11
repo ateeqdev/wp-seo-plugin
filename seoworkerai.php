@@ -2,7 +2,7 @@
 /**
  * Plugin Name: SEOWorkerAI.com
  * Plugin URI: https://seoworkerai.com/
- * Description: Connects WordPress to SEOWorkerAI.com for SEO automation, content briefs, change execution, and analytics-backed recommendations.
+ * Description: Runs a free site-wide SEO audit on install and fixes issues based on your settings, then unlocks ongoing recommendations and monitoring after payment.
  * Version: 2.0.0
  * Author: SEOWorkerAI.com
  * License: GPL-2.0-or-later

@@ -120,6 +120,27 @@ final class LaravelClient
      * @param array<string, mixed> $payload
      * @return array<string, mixed>
      */
+    public function triggerInitialAudit(int $siteId, array $payload = []): array
+    {
+        $response = $this->retryPolicy->execute(function () use ($siteId, $payload): array {
+            return $this->apiClient->request(
+                'POST',
+                '/api/sites/' . $siteId . '/initial-audit',
+                [],
+                $payload,
+                [],
+                true,
+                20
+            );
+        });
+
+        return (array) $response['body'];
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
     public function initializeGoogleOAuth(array $payload): array
     {
         $response = $this->retryPolicy->execute(function () use ($payload): array {

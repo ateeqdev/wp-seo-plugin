@@ -52,7 +52,7 @@ final class OAuthHandler
         $oauthUrl = isset($response['oauth_url']) ? esc_url_raw((string) $response['oauth_url']) : '';
 
         if ($oauthUrl === '') {
-            throw new RuntimeException('Laravel did not return an oauth_url.');
+            throw new RuntimeException('SEOWorkerAI did not return an OAuth URL.');
         }
 
         update_option('seoworkerai_oauth_status', 'in_progress', false);

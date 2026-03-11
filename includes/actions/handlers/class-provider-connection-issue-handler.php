@@ -23,7 +23,7 @@ final class ProviderConnectionIssueHandler extends AbstractActionHandler
         $providerName = sanitize_text_field((string) ($payload['provider_name'] ?? 'unknown_provider'));
         $issueType = sanitize_text_field((string) ($payload['issue_type'] ?? 'authorization'));
         $taskName = sanitize_text_field((string) ($payload['task_name'] ?? 'unknown'));
-        $message = sanitize_text_field((string) ($payload['message'] ?? 'Provider access issue detected by Laravel.'));
+        $message = sanitize_text_field((string) ($payload['message'] ?? 'Provider access issue detected by SEOWorkerAI.'));
         $resolutionHint = sanitize_text_field((string) ($payload['resolution_hint'] ?? 'Reconnect provider credentials and verify ownership.'));
         $statusCode = isset($payload['status_code']) && is_numeric($payload['status_code'])
             ? (int) $payload['status_code']
@@ -78,4 +78,3 @@ final class ProviderConnectionIssueHandler extends AbstractActionHandler
         ];
     }
 }
-

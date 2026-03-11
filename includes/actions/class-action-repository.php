@@ -77,7 +77,7 @@ final class ActionRepository
                 laravelActionId: (int) ($data['laravel_action_id'] ?? 0),
                 eventType: 'received',
                 status: 'received',
-                note: 'Action received from Laravel.'
+                note: 'Action received from SEOWorkerAI.'
             );
         }
 

@@ -80,6 +80,7 @@ final class SiteRegistrar
             }
 
             $this->syncLocalSiteProfileFromResponse($response);
+            $this->maybeTriggerInitialAudit();
 
             return $response;
         } catch (\Throwable $exception) {
@@ -251,6 +252,75 @@ final class SiteRegistrar
         if (isset($response['billing']) && is_array($response['billing'])) {
             update_option('seoworkerai_billing', self::sanitizeBillingPayload($response['billing']), false);
         }
+
+        if (isset($response['initial_site_audit']) && is_array($response['initial_site_audit'])) {
+            $this->syncInitialAuditFromResponse($response['initial_site_audit']);
+        }
+    }
+
+    private function maybeTriggerInitialAudit(): void
+    {
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
+        if ($siteId <= 0) {
+            return;
+        }
+
+        $requested = (bool) get_option('seoworkerai_initial_audit_requested', false);
+        $status = (string) get_option('seoworkerai_initial_audit_status', 'pending');
+
+        if ($requested || in_array($status, ['queued', 'in_progress', 'completed', 'already_started', 'already_completed'], true)) {
+            return;
+        }
+
+        try {
+            $response = $this->client->triggerInitialAudit($siteId, [
+                'trigger' => 'plugin_install',
+            ]);
+
+            $this->syncInitialAuditFromResponse($response);
+            update_option('seoworkerai_initial_audit_requested', true, false);
+
+            if (isset($response['billing']) && is_array($response['billing'])) {
+                update_option('seoworkerai_billing', self::sanitizeBillingPayload($response['billing']), false);
+            }
+        } catch (\Throwable $exception) {
+            $this->logger->warning('initial_audit_request_failed', [
+                'error' => $exception->getMessage(),
+                'site_id' => (string) $siteId,
+            ], 'outbound');
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $response
+     */
+    private function syncInitialAuditFromResponse(array $response): void
+    {
+        $payload = self::sanitizeInitialAuditPayload($response);
+
+        update_option('seoworkerai_initial_audit_status', $payload['status'], false);
+        update_option('seoworkerai_initial_audit_message', $payload['message'], false);
+
+        if ($payload['started_at'] > 0) {
+            update_option('seoworkerai_initial_audit_started_at', $payload['started_at'], false);
+        }
+        if ($payload['completed_at'] > 0) {
+            update_option('seoworkerai_initial_audit_completed_at', $payload['completed_at'], false);
+        }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array{status:string,message:string,started_at:int,completed_at:int}
+     */
+    public static function sanitizeInitialAuditPayload(array $payload): array
+    {
+        return [
+            'status' => sanitize_text_field((string) ($payload['status'] ?? 'pending')),
+            'message' => sanitize_text_field((string) ($payload['message'] ?? '')),
+            'started_at' => strtotime((string) ($payload['started_at'] ?? '')) ?: 0,
+            'completed_at' => strtotime((string) ($payload['completed_at'] ?? '')) ?: 0,
+        ];
     }
 
     /**

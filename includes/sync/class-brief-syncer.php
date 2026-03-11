@@ -32,6 +32,11 @@ final class BriefSyncer
             return;
         }
 
+        $billing = get_option('seoworkerai_billing', []);
+        if (is_array($billing) && !empty($billing['payment_required'])) {
+            return;
+        }
+
         try {
             $response = $this->client->listContentBriefs($siteId, ['limit' => 50]);
             $briefs = isset($response['content_briefs']) && is_array($response['content_briefs'])

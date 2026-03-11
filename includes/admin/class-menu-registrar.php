@@ -620,6 +620,10 @@ final class MenuRegistrar
         if (!is_array($siteSeoSettings)) $siteSeoSettings = [];
         $billing = get_option('seoworkerai_billing', []);
         if (!is_array($billing)) $billing = [];
+        $initialAuditStatus = (string) get_option('seoworkerai_initial_audit_status', 'pending');
+        $initialAuditMessage = (string) get_option('seoworkerai_initial_audit_message', '');
+        $initialAuditStartedAt = (int) get_option('seoworkerai_initial_audit_started_at', 0);
+        $initialAuditCompletedAt = (int) get_option('seoworkerai_initial_audit_completed_at', 0);
         $siteSettingTemplates = [];
         $availableLocations = $this->getAvailableLocationOptions();
         $domainRatingCheckedAt = !empty($siteSeoSettings['domain_rating_checked_at'])
@@ -672,7 +676,7 @@ final class MenuRegistrar
         }
         ?>
         <div class="wrap seoworkerai-admin-page">
-            <?php $this->renderAdminShellHeader('SEOWorkerAI', 'seoworkerai', 'Manage billing, Google connection, and site setup.'); ?>
+            <?php $this->renderAdminShellHeader('SEOWorkerAI', 'seoworkerai', 'Run your first site-wide audit, connect Google data, and control auto-fixes.'); ?>
 
             <?php $this->renderNotice($notice); ?>
 
@@ -697,7 +701,23 @@ final class MenuRegistrar
                 <div class="seoworkerai-stat-grid">
                     <div class="seoworkerai-stat"><span>Registration</span><strong><?php echo esc_html($siteId > 0 ? 'Active' : 'Not registered'); ?></strong></div>
                     <div class="seoworkerai-stat"><span>Google Connection</span><strong><?php echo esc_html($isConnected ? 'Connected' . ($oauthProvider !== '' ? ' (' . $oauthProvider . ')' : '') : 'Not connected'); ?></strong></div>
-                    <div class="seoworkerai-stat"><span>Company Billing</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Paid'); ?></strong></div>
+                    <div class="seoworkerai-stat"><span>Automation Access</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Active'); ?></strong></div>
+                    <div class="seoworkerai-stat">
+                        <span>Initial Audit</span>
+                        <strong>
+                            <?php
+                            $initialLabel = 'Ready';
+                            if ($siteId <= 0) {
+                                $initialLabel = 'Not started';
+                            } elseif ($initialAuditCompletedAt > 0 || in_array($initialAuditStatus, ['completed', 'already_completed'], true)) {
+                                $initialLabel = 'Completed';
+                            } elseif ($initialAuditStartedAt > 0 || in_array($initialAuditStatus, ['queued', 'in_progress', 'already_started'], true)) {
+                                $initialLabel = 'Running';
+                            }
+                            echo esc_html($initialLabel);
+                            ?>
+                        </strong>
+                    </div>
                 </div>
             </div>
 
@@ -933,17 +953,19 @@ final class MenuRegistrar
                             <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Open Payment Center</a>
                         <?php endif; ?>
                     </div>
+                    <p class="description" style="margin-top:0;">
+                        Your first site-wide audit is included. We scan every page once and fix issues automatically based on your Change Application Mode setting. Ongoing recommendations, daily audits, and monitoring start after payment.
+                    </p>
+                    <?php if ($initialAuditMessage !== '') : ?>
+                        <p class="description" style="margin-top:-8px;"><?php echo esc_html($initialAuditMessage); ?></p>
+                    <?php endif; ?>
                     <div class="seoworkerai-kv-list" style="margin-bottom:16px;">
                         <div><span>Status</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Active'); ?></strong></div>
                         <div><span>Plan</span><strong><?php echo esc_html((string) ($billing['plan_name'] ?? 'SEOWorkerAI Starter')); ?></strong></div>
                         <div><span>Google</span><strong><?php echo esc_html($isConnected ? 'Connected' : 'Not connected'); ?></strong></div>
                     </div>
 
-                    <?php if (!empty($billing['payment_required'])) : ?>
-                        <?php if (!empty($billing['payment_url'])) : ?>
-                            <a class="seoworkerai-google-cta" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Open Billing</a>
-                        <?php endif; ?>
-                    <?php elseif (!$isConnected) : ?>
+                    <?php if (!$isConnected) : ?>
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:16px;">
                             <?php wp_nonce_field('seoworkerai_start_oauth'); ?>
                             <input type="hidden" name="action" value="seoworkerai_start_oauth">
@@ -952,6 +974,9 @@ final class MenuRegistrar
                                 Connect with Google
                             </button>
                         </form>
+                        <?php if (!empty($billing['payment_required']) && !empty($billing['payment_url'])) : ?>
+                            <a class="seoworkerai-google-cta" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Unlock ongoing automation</a>
+                        <?php endif; ?>
                     <?php else : ?>
                         <div class="seoworkerai-kv-list" style="margin-bottom:14px;">
                             <div><span>Scopes</span><strong><?php echo esc_html(!empty($oauthScopes) ? implode(', ', array_map('strval', $oauthScopes)) : 'None'); ?></strong></div>
@@ -970,6 +995,9 @@ final class MenuRegistrar
                                 <input type="text" name="revocation_reason" placeholder="Reason (optional)" style="height:32px;padding:0 8px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;">
                                 <button type="submit" class="button seoworkerai-btn-danger">Disconnect</button>
                             </form>
+                            <?php if (!empty($billing['payment_required']) && !empty($billing['payment_url'])) : ?>
+                                <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Unlock ongoing automation</a>
+                            <?php endif; ?>
                         </div>
                     <?php endif; ?>
 
@@ -1018,6 +1046,7 @@ final class MenuRegistrar
                                 <input type="radio" name="seoworkerai_change_application_mode" value="review_before_apply" <?php checked($mode, 'review_before_apply'); ?>>
                                 <span>Review every change before applying</span>
                             </label>
+                            <p class="description">This setting controls how the free initial audit applies fixes across your pages.</p>
                         </div>
                         <details class="seoworkerai-disclosure">
                             <summary>Advanced Preferences</summary>
@@ -2890,7 +2919,7 @@ final class MenuRegistrar
         $showBillingBanner = !empty($billing['payment_required']) || !empty($billing['quota_blocked']);
         $billingMessage = !empty($billing['quota_message'])
             ? (string) $billing['quota_message']
-            : 'Company payment is required before Google integrations and paid SEO automation can continue.';
+            : 'Your first site-wide audit is included. Ongoing recommendations, daily audits, and monitoring resume after payment.';
         ?>
         <div class="seoworkerai-shell-header">
             <div class="seoworkerai-shell-brand">
@@ -2905,7 +2934,7 @@ final class MenuRegistrar
                     <p style="margin:0 0 8px;"><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required.' : 'Automation paused.'); ?></strong> <?php echo esc_html($billingMessage); ?></p>
                     <?php if (!empty($billing['payment_url'])) : ?>
                         <p style="margin:0;">
-                            <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Open Payment Center</a>
+                            <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Unlock ongoing automation</a>
                         </p>
                     <?php endif; ?>
                 </div>
