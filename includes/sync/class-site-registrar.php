@@ -166,10 +166,21 @@ final class SiteRegistrar
                 'email' => (string) $user->user_email,
                 'platform_user_id' => (string) $user->ID,
                 'role' => $mappedRole,
+                'avatar' => $this->resolveUserAvatarUrl((int) $user->ID),
             ];
         }
 
         return $mapped;
+    }
+
+    private function resolveUserAvatarUrl(int $userId): string
+    {
+        $avatarUrl = get_avatar_url($userId, ['size' => 256]);
+        if (!is_string($avatarUrl) || trim($avatarUrl) === '') {
+            return '';
+        }
+
+        return esc_url_raw($avatarUrl);
     }
 
     /**
