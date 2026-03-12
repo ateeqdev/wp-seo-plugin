@@ -51,6 +51,10 @@ final class RetryPolicy
 
     private function shouldRetry(RuntimeException $exception, int $attempt): bool
     {
+        if ($this->isInteractiveAdminRequest()) {
+            return false;
+        }
+
         if ($attempt >= $this->maxAttempts) {
             return false;
         }
@@ -62,6 +66,18 @@ final class RetryPolicy
         }
 
         return $code >= 500;
+    }
+
+    private function isInteractiveAdminRequest(): bool
+    {
+        if (!function_exists('is_admin') || !is_admin()) {
+            return false;
+        }
+
+        $is_ajax_request = function_exists('wp_doing_ajax') && wp_doing_ajax();
+        $is_cron_request = function_exists('wp_doing_cron') && wp_doing_cron();
+
+        return !$is_ajax_request && !$is_cron_request;
     }
 
     private function nextDelaySeconds(int $attempt): int

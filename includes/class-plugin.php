@@ -275,7 +275,6 @@ final class Plugin
             }
         }, 1);
 
-        add_action('admin_init', [$this, 'checkCronHealth']);
         RedirectRuntime::registerHooks();
         RobotsRuntime::registerHooks();
     }

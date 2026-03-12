@@ -64,6 +64,10 @@ final class ApiClient
             $requestHeaders['X-Site-Token'] = $token;
         }
 
+        if ($this->isInteractiveAdminRequest()) {
+            $timeout = min($timeout, 5);
+        }
+
         $args = [
             'method' => strtoupper($method),
             'timeout' => $timeout,
@@ -155,6 +159,18 @@ final class ApiClient
     {
         return stripos($error->get_error_message(), 'cURL error 60') !== false
             || stripos($error->get_error_message(), 'SSL certificate') !== false;
+    }
+
+    private function isInteractiveAdminRequest(): bool
+    {
+        if (!function_exists('is_admin') || !is_admin()) {
+            return false;
+        }
+
+        $is_ajax_request = function_exists('wp_doing_ajax') && wp_doing_ajax();
+        $is_cron_request = function_exists('wp_doing_cron') && wp_doing_cron();
+
+        return !$is_ajax_request && !$is_cron_request;
     }
 
     private function shouldAutoDisableSslVerifyForBaseUrl(string $baseUrl): bool
