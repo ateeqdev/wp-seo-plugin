@@ -43,6 +43,7 @@ final class Activator
         add_option('seoworkerai_site_location_code', 2840, '', 'no');
         add_option('seoworkerai_site_location_name', 'United States', '', 'no');
         add_option('seoworkerai_site_seo_settings', [], '', 'no');
+        add_option('seoworkerai_domain_rating_confirmed', false, '', 'no');
         add_option('seoworkerai_billing', [], '', 'no');
         add_option('seoworkerai_initial_audit_status', 'pending', '', 'no');
         add_option('seoworkerai_initial_audit_started_at', 0, '', 'no');
@@ -68,7 +69,9 @@ final class Activator
         add_option('seoworkerai_api_last_error_at', 0, '', 'no');
         add_option('seoworkerai_ownership_challenges', [], '', 'no');
         add_option('seoworkerai_auto_register_pending', true, '', 'no');
+        add_option('seoworkerai_activation_redirect', true, '', 'no');
         update_option('seoworkerai_auto_register_pending', true, false);
+        update_option('seoworkerai_activation_redirect', true, false);
     }
 
     private static function scheduleAutoRegistration(): void

@@ -259,9 +259,11 @@ final class Plugin
         $this->container->get('event_collector')->registerHooks();
         $this->container->get('menu_registrar')->registerHooks();
         add_action('seoworkerai_auto_register_site', [$this, 'handleAutoRegisterSite']);
+        add_action('admin_init', [$this, 'maybeRedirectAfterActivation'], 1);
         add_action('admin_init', [$this, 'maybeRunImmediateAutoRegister'], 1);
         add_action('admin_init', [$this, 'maybeScheduleAutoRegister']);
         add_action('admin_init', [$this, 'checkCronHealth']);
+        add_filter('plugin_action_links_' . plugin_basename(SEOWORKERAI_PLUGIN_FILE), [$this, 'filterPluginActionLinks']);
 
         add_action('rest_api_init', function (): void {
             $this->container->get('pages_endpoint')->registerRoutes();
@@ -316,6 +318,22 @@ final class Plugin
         $this->handleAutoRegisterSite();
     }
 
+    public function maybeRedirectAfterActivation(): void
+    {
+        if (!is_admin() || !current_user_can('manage_options')) {
+            return;
+        }
+        if ((function_exists('wp_doing_ajax') && wp_doing_ajax()) || (function_exists('wp_doing_cron') && wp_doing_cron())) {
+            return;
+        }
+        if (!((bool) get_option('seoworkerai_activation_redirect', false))) {
+            return;
+        }
+        update_option('seoworkerai_activation_redirect', false, false);
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => 'domain_rating_required'], admin_url('admin.php')));
+        exit;
+    }
+
     public function handleAutoRegisterSite(): void
     {
         $result = $this->container->get('site_registrar')->registerOrUpdate(true);
@@ -342,5 +360,25 @@ final class Plugin
         if (function_exists('spawn_cron')) {
             spawn_cron();
         }
+    }
+
+    /**
+     * @param array<int, string> $links
+     * @return array<int, string>
+     */
+    public function filterPluginActionLinks(array $links): array
+    {
+        $settingsLink = sprintf(
+            '<a href="%s">%s</a>',
+            esc_url(admin_url('admin.php?page=seoworkerai')),
+            esc_html__('Settings', 'seoworkerai')
+        );
+        $rateLink = sprintf(
+            '<a href="%s" target="_blank" rel="noopener noreferrer">%s</a>',
+            esc_url('https://wordpress.org/support/plugin/seoworkerai/reviews/#new-post'),
+            esc_html__('Rate this plugin', 'seoworkerai')
+        );
+
+        return array_merge([$settingsLink, $rateLink], $links);
     }
 }

@@ -68,6 +68,7 @@ final class MenuRegistrar
         add_action('admin_post_seoworkerai_revert_action', [$this, 'handleRevertAction']);
         add_action('admin_post_seoworkerai_edit_action_payload', [$this, 'handleEditActionPayload']);
         add_action('admin_post_seoworkerai_update_action_item', [$this, 'handleUpdateActionItem']);
+        add_action('admin_post_seoworkerai_dismiss_audit_notice', [$this, 'handleDismissAuditNotice']);
     }
 
     public function enqueueAssets(string $hookSuffix): void
@@ -110,6 +111,10 @@ final class MenuRegistrar
     {
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoworkerai_start_oauth');
+        if (!$this->isDomainRatingConfirmed()) {
+            wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => 'domain_rating_required'], admin_url('admin.php')));
+            exit;
+        }
         try {
             $siteId = (int) get_option('seoworkerai_site_id', 0);
             if ($siteId <= 0) {
@@ -154,6 +159,24 @@ final class MenuRegistrar
             update_option('seoworkerai_oauth_last_error', '', false);
         }
         wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => $notice], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleDismissAuditNotice(): void
+    {
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
+        check_admin_referer('seoworkerai_dismiss_audit_notice');
+
+        $dismissUntil = time() + (3 * DAY_IN_SECONDS);
+        update_user_meta(get_current_user_id(), 'seoworkerai_audit_notice_dismissed_until', $dismissUntil);
+
+        $returnPage = isset($_POST['return_page']) ? sanitize_text_field((string) wp_unslash($_POST['return_page'])) : 'seoworkerai-settings';
+        $allowedPages = ['seoworkerai', 'seoworkerai-settings', 'seoworkerai-logs', 'seoworkerai-action-items', 'seoworkerai-briefs'];
+        if (!in_array($returnPage, $allowedPages, true)) {
+            $returnPage = 'seoworkerai-settings';
+        }
+
+        wp_safe_redirect(add_query_arg(['page' => $returnPage, 'seoworkerai_notice' => 'audit_notice_dismissed'], admin_url('admin.php')));
         exit;
     }
 
@@ -203,6 +226,8 @@ final class MenuRegistrar
 
         $siteSettings = $this->sanitizePostedSiteSettings($_POST);
         update_option('seoworkerai_site_seo_settings', $siteSettings, false);
+        $domainRatingConfirmed = array_key_exists('domain_rating', $siteSettings) && $siteSettings['domain_rating'] !== null;
+        update_option('seoworkerai_domain_rating_confirmed', $domainRatingConfirmed, false);
         $this->savePostedAuthorProfiles($_POST);
 
         $result = $this->siteRegistrar->registerOrUpdate(true);
@@ -627,6 +652,7 @@ final class MenuRegistrar
         }
         $siteSeoSettings = get_option('seoworkerai_site_seo_settings', []);
         if (!is_array($siteSeoSettings)) $siteSeoSettings = [];
+        $domainRatingConfirmed = (bool) get_option('seoworkerai_domain_rating_confirmed', false);
         $billing = get_option('seoworkerai_billing', []);
         if (!is_array($billing)) $billing = [];
         $initialAuditStatus = (string) get_option('seoworkerai_initial_audit_status', 'pending');
@@ -651,6 +677,9 @@ final class MenuRegistrar
         $domainRatingCheckedAt = !empty($siteSeoSettings['domain_rating_checked_at'])
             ? strtotime((string) $siteSeoSettings['domain_rating_checked_at'])
             : false;
+        $domainRatingInputValue = array_key_exists('domain_rating', $siteSeoSettings) && $siteSeoSettings['domain_rating'] !== null
+            ? (string) $siteSeoSettings['domain_rating']
+            : '';
 
         $excludedRaw    = (string) get_option('seoworkerai_excluded_change_audit_pages', '');
         $excludedItems  = array_values(array_filter(array_map('trim', explode("\n", $excludedRaw))));
@@ -721,6 +750,11 @@ final class MenuRegistrar
             <?php $this->renderAdminShellHeader('SEOWorkerAI', 'seoworkerai', 'Run your first site-wide audit, connect Google data, and control auto-fixes.'); ?>
 
             <?php $this->renderNotice($notice); ?>
+            <?php if (!$domainRatingConfirmed) : ?>
+                <div class="notice notice-warning">
+                    <p><strong>Set your domain authority before connecting Google.</strong> This helps tune your first content brief and strategy to your site's current strength.</p>
+                </div>
+            <?php endif; ?>
 
             <?php if (!empty($providerAlerts)) : foreach ($providerAlerts as $key => $alert) : if (!is_array($alert)) continue; ?>
                 <div class="notice notice-warning">
@@ -853,8 +887,10 @@ final class MenuRegistrar
                                             min="0"
                                             max="100"
                                             name="site_settings_domain_rating"
-                                            value="<?php echo esc_attr((string) ($siteSeoSettings['domain_rating'] ?? 0)); ?>"
+                                            value="<?php echo esc_attr($domainRatingInputValue); ?>"
+                                            required
                                         >
+                                        <p class="description" style="margin-top:6px;">Required once during setup before Google connection.</p>
                                     </div>
                                     <div class="seoworkerai-form-field">
                                         <label for="seoworkerai-site-settings-domain-rating-checked-at">Last Domain Rating Sync</label>
@@ -1022,7 +1058,7 @@ final class MenuRegistrar
                         <div><span>Google</span><strong><?php echo esc_html($isConnected ? 'Connected' : 'Not connected'); ?></strong></div>
                         <div><span>Last Initial Audit</span><strong><?php echo esc_html($initialAuditLastRunLabel); ?></strong></div>
                     </div>
-                    <?php if (($shouldShowPaymentPrompt || $auditMetrics['is_sync_pending']) && $initialAuditCompletedAt > 0) : ?>
+                    <?php if (($shouldShowPaymentPrompt || $auditMetrics['is_sync_pending']) && $initialAuditCompletedAt > 0 && !$this->isAuditNoticeDismissed()) : ?>
                         <p style="margin-top:-8px;margin-bottom:6px;font-weight:600;">
                             Your initial audit is complete and your core SEO baseline is now in place.
                         </p>
@@ -1038,6 +1074,12 @@ final class MenuRegistrar
                         <p class="description" style="margin-top:0;margin-bottom:16px;font-size:12px;opacity:.85;">
                             Upgrade to keep this momentum with audits on every page change, scheduled reports, and continuous automation.
                         </p>
+                        <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-top:-8px;">
+                            <?php wp_nonce_field('seoworkerai_dismiss_audit_notice'); ?>
+                            <input type="hidden" name="action" value="seoworkerai_dismiss_audit_notice">
+                            <input type="hidden" name="return_page" value="seoworkerai">
+                            <button type="submit" class="button-link">Dismiss for 3 days</button>
+                        </form>
                     <?php endif; ?>
 
                     <?php if (!$isConnected) : ?>
@@ -2636,6 +2678,7 @@ final class MenuRegistrar
             'health_ok'              => ['success', 'Health check passed — connection is working.'],
             'health_failed'          => ['warning', 'Health check failed — check your connection settings.'],
             'oauth_init_failed'      => ['error',   'Failed to start Google authorization. Ensure site is registered.'],
+            'domain_rating_required' => ['warning', 'Set Domain Rating in Settings before connecting Google.'],
             'oauth_revoke_ok'        => ['success', 'Google account disconnected.'],
             'oauth_revoke_failed'    => ['error',   'Disconnect failed. Check debug logs.'],
             'rotate_ok'              => ['success', 'API token rotated successfully.'],
@@ -2660,6 +2703,7 @@ final class MenuRegistrar
             'action_edit_validation_failed' => ['error', 'Validation failed. Please fix field values and try again.'],
             'action_edit_failed'     => ['error',   'Failed to update change.'],
             'action_item_updated'    => ['success', 'Action item updated.'],
+            'audit_notice_dismissed' => ['success', 'Initial audit notice dismissed for 3 days.'],
         ];
 
         if (!isset($map[$notice])) return;
@@ -2795,10 +2839,17 @@ final class MenuRegistrar
      */
     private function sanitizePostedSiteSettings(array $source): array
     {
+        $domainRatingRaw = isset($source['site_settings_domain_rating'])
+            ? trim((string) wp_unslash($source['site_settings_domain_rating']))
+            : '';
+        $domainRating = $domainRatingRaw === ''
+            ? null
+            : max(0, min(100, (int) $domainRatingRaw));
+
         return [
             'template_id' => isset($source['site_settings_template_id']) ? max(0, (int) $source['site_settings_template_id']) : 0,
             'provider_name' => 'dataforseo',
-            'domain_rating' => isset($source['site_settings_domain_rating']) ? max(0, min(100, (int) $source['site_settings_domain_rating'])) : 0,
+            'domain_rating' => $domainRating,
             'min_search_volume' => isset($source['site_settings_min_search_volume']) ? max(0, (int) $source['site_settings_min_search_volume']) : 0,
             'max_search_volume' => isset($source['site_settings_max_search_volume']) && $source['site_settings_max_search_volume'] !== ''
                 ? max(0, (int) $source['site_settings_max_search_volume'])
@@ -2822,7 +2873,7 @@ final class MenuRegistrar
     {
         $payload = [
             'provider_name' => 'dataforseo',
-            'domain_rating' => isset($settings['domain_rating']) ? (int) $settings['domain_rating'] : 0,
+            'domain_rating' => ($settings['domain_rating'] ?? null) !== null ? (int) $settings['domain_rating'] : null,
             'min_search_volume' => (int) ($settings['min_search_volume'] ?? 0),
             'max_search_volume' => $settings['max_search_volume'] ?? null,
             'max_keyword_difficulty' => (int) ($settings['max_keyword_difficulty'] ?? 100),
@@ -3030,6 +3081,8 @@ final class MenuRegistrar
             $needsHumanReview = max(0, (int) ($fallbackRow['needs_human_review'] ?? 0));
         }
 
+        $issuesFound = max($issuesFound, $applied + $needsHumanReview);
+
         $syncPending = ((int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
             "SELECT COUNT(*) FROM {$actionsTable}
              WHERE status IN ('received', 'queued', 'running', 'ack_pending', 'ack_failed')"
@@ -3070,6 +3123,18 @@ final class MenuRegistrar
         if ($auditMetrics['is_sync_pending']) {
             $showBillingBanner = false;
         }
+        if ($showBillingBanner && $this->isAuditNoticeDismissed()) {
+            $showBillingBanner = false;
+        }
+        if (
+            $showBillingBanner
+            && $activePage !== 'seoworkerai'
+            && $activePage !== 'seoworkerai-settings'
+            && $initialAuditCompletedAt > 0
+            && time() < ($initialAuditCompletedAt + (3 * DAY_IN_SECONDS))
+        ) {
+            $showBillingBanner = false;
+        }
         ?>
         <div class="seoworkerai-shell-header">
             <div class="seoworkerai-shell-brand">
@@ -3088,6 +3153,12 @@ final class MenuRegistrar
                         <p style="margin:0 0 4px;"><?php echo esc_html('Initial audit results: ' . $auditMetrics['issues_found'] . ' issues found, ' . $auditMetrics['applied'] . ' fixed automatically, ' . $auditMetrics['needs_human_review'] . ' flagged for human review.'); ?></p>
                     <?php endif; ?>
                     <p style="margin:0 0 8px;font-size:12px;opacity:.85;"><?php echo esc_html($billingMessage); ?></p>
+                    <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin:0 0 8px;">
+                        <?php wp_nonce_field('seoworkerai_dismiss_audit_notice'); ?>
+                        <input type="hidden" name="action" value="seoworkerai_dismiss_audit_notice">
+                        <input type="hidden" name="return_page" value="<?php echo esc_attr($activePage); ?>">
+                        <button type="submit" class="button-link">Dismiss for 3 days</button>
+                    </form>
                     <?php if (!empty($billing['payment_url'])) : ?>
                         <p style="margin:0;">
                             <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Unlock ongoing automation</a>
@@ -3111,6 +3182,17 @@ final class MenuRegistrar
     {
         $returnPage = isset($_POST['return_page']) ? sanitize_text_field((string) wp_unslash($_POST['return_page'])) : '';
         return in_array($returnPage, ['seoworkerai-logs','seoworkerai-action-items'], true) ? $returnPage : 'seoworkerai-logs';
+    }
+
+    private function isAuditNoticeDismissed(): bool
+    {
+        $dismissedUntil = (int) get_user_meta(get_current_user_id(), 'seoworkerai_audit_notice_dismissed_until', true);
+        return $dismissedUntil > time();
+    }
+
+    private function isDomainRatingConfirmed(): bool
+    {
+        return (bool) get_option('seoworkerai_domain_rating_confirmed', false);
     }
 
     public function sanitizeBaseUrl($value): string
