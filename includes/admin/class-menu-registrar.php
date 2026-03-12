@@ -562,7 +562,7 @@ final class MenuRegistrar
 
     public function registerMenu(): void
     {
-        add_menu_page('SEOWorkerAI', 'SEOWorkerAI', 'manage_options', 'seoworkerai', [$this, 'renderSettingsPage'], SEOWORKERAI_PLUGIN_URL . 'assets/images/logo.png', 80);
+        add_menu_page('SEOWorkerAI', 'SEOWorkerAI', 'manage_options', 'seoworkerai', [$this, 'renderSettingsPage'], 'dashicons-chart-line', 80);
         add_submenu_page('seoworkerai', 'Settings', 'Settings', 'manage_options', 'seoworkerai', [$this, 'renderSettingsPage']);
         add_submenu_page('seoworkerai', 'Activity', 'Activity', 'manage_options', 'seoworkerai-activity', [$this, 'renderActivityPage']);
         add_submenu_page('seoworkerai', 'Change Center', 'Change Center', 'manage_options', 'seoworkerai-logs', [$this, 'renderLogsPage']);
@@ -624,6 +624,8 @@ final class MenuRegistrar
         $initialAuditMessage = (string) get_option('seoworkerai_initial_audit_message', '');
         $initialAuditStartedAt = (int) get_option('seoworkerai_initial_audit_started_at', 0);
         $initialAuditCompletedAt = (int) get_option('seoworkerai_initial_audit_completed_at', 0);
+        $initialAuditLastRunAt = $initialAuditCompletedAt > 0 ? $initialAuditCompletedAt : $initialAuditStartedAt;
+        $initialAuditLastRunLabel = $initialAuditLastRunAt > 0 ? wp_date('Y-m-d H:i', $initialAuditLastRunAt) : 'Not run yet';
         $siteSettingTemplates = [];
         $availableLocations = $this->getAvailableLocationOptions();
         $domainRatingCheckedAt = !empty($siteSeoSettings['domain_rating_checked_at'])
@@ -649,6 +651,23 @@ final class MenuRegistrar
                 if (isset($settingsResponse['billing']) && is_array($settingsResponse['billing'])) {
                     $billing = \SEOWorkerAI\Connector\Sync\SiteRegistrar::sanitizeBillingPayload($settingsResponse['billing']);
                     update_option('seoworkerai_billing', $billing, false);
+                }
+                if (isset($settingsResponse['initial_site_audit']) && is_array($settingsResponse['initial_site_audit'])) {
+                    $initialAuditPayload = \SEOWorkerAI\Connector\Sync\SiteRegistrar::sanitizeInitialAuditPayload($settingsResponse['initial_site_audit']);
+                    update_option('seoworkerai_initial_audit_status', $initialAuditPayload['status'], false);
+                    update_option('seoworkerai_initial_audit_message', $initialAuditPayload['message'], false);
+                    if ($initialAuditPayload['started_at'] > 0) {
+                        update_option('seoworkerai_initial_audit_started_at', $initialAuditPayload['started_at'], false);
+                        $initialAuditStartedAt = $initialAuditPayload['started_at'];
+                    }
+                    if ($initialAuditPayload['completed_at'] > 0) {
+                        update_option('seoworkerai_initial_audit_completed_at', $initialAuditPayload['completed_at'], false);
+                        $initialAuditCompletedAt = $initialAuditPayload['completed_at'];
+                    }
+                    $initialAuditStatus = $initialAuditPayload['status'];
+                    $initialAuditMessage = $initialAuditPayload['message'];
+                    $initialAuditLastRunAt = $initialAuditCompletedAt > 0 ? $initialAuditCompletedAt : $initialAuditStartedAt;
+                    $initialAuditLastRunLabel = $initialAuditLastRunAt > 0 ? wp_date('Y-m-d H:i', $initialAuditLastRunAt) : 'Not run yet';
                 }
                 $siteSettingTemplates = isset($settingsResponse['templates']) && is_array($settingsResponse['templates']) ? $settingsResponse['templates'] : [];
                 if (isset($settingsResponse['locations']) && is_array($settingsResponse['locations'])) {
@@ -963,7 +982,13 @@ final class MenuRegistrar
                         <div><span>Status</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Active'); ?></strong></div>
                         <div><span>Plan</span><strong><?php echo esc_html((string) ($billing['plan_name'] ?? 'SEOWorkerAI Starter')); ?></strong></div>
                         <div><span>Google</span><strong><?php echo esc_html($isConnected ? 'Connected' : 'Not connected'); ?></strong></div>
+                        <div><span>Last Initial Audit</span><strong><?php echo esc_html($initialAuditLastRunLabel); ?></strong></div>
                     </div>
+                    <?php if (!empty($billing['payment_required']) && $initialAuditCompletedAt > 0) : ?>
+                        <p class="description" style="margin-top:-8px;margin-bottom:16px;">
+                            Your initial audit ran on <?php echo esc_html(wp_date('Y-m-d H:i', $initialAuditCompletedAt)); ?>. Upgrade to continue daily audits, recommendations, and automated fixes.
+                        </p>
+                    <?php endif; ?>
 
                     <?php if (!$isConnected) : ?>
                         <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin-bottom:16px;">
