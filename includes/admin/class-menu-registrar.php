@@ -639,6 +639,10 @@ final class MenuRegistrar
         $isInitialAuditRunning = $initialAuditStartedAt > 0 || in_array($initialAuditStatus, ['queued', 'in_progress', 'already_started'], true);
         $shouldShowPaymentPrompt = !empty($billing['payment_required']) && $isInitialAuditCompleted;
         $auditMetrics = $this->getInitialAuditMetrics();
+        $auditMetricsUnavailable = $isInitialAuditCompleted
+            && $auditMetrics['issues_found'] === 0
+            && $auditMetrics['applied'] === 0
+            && $auditMetrics['needs_human_review'] === 0;
         $siteSettingTemplates = [];
         $availableLocations = $this->getAvailableLocationOptions();
         $domainRatingCheckedAt = !empty($siteSeoSettings['domain_rating_checked_at'])
@@ -1019,9 +1023,15 @@ final class MenuRegistrar
                         <p style="margin-top:-8px;margin-bottom:6px;font-weight:600;">
                             Your initial audit is complete and your core SEO baseline is now in place.
                         </p>
-                        <p class="description" style="margin-top:0;margin-bottom:4px;">
-                            Results from <?php echo esc_html(wp_date('Y-m-d H:i', $initialAuditCompletedAt)); ?>: <?php echo esc_html((string) $auditMetrics['issues_found']); ?> issues found, <?php echo esc_html((string) $auditMetrics['applied']); ?> fixed automatically, <?php echo esc_html((string) $auditMetrics['needs_human_review']); ?> flagged for human review.
-                        </p>
+                        <?php if ($auditMetricsUnavailable) : ?>
+                            <p class="description" style="margin-top:0;margin-bottom:4px;">
+                                Results from <?php echo esc_html(wp_date('Y-m-d H:i', $initialAuditCompletedAt)); ?> are still syncing from the audit engine. Refresh in a minute to see exact counts.
+                            </p>
+                        <?php else : ?>
+                            <p class="description" style="margin-top:0;margin-bottom:4px;">
+                                Results from <?php echo esc_html(wp_date('Y-m-d H:i', $initialAuditCompletedAt)); ?>: <?php echo esc_html((string) $auditMetrics['issues_found']); ?> issues found, <?php echo esc_html((string) $auditMetrics['applied']); ?> fixed automatically, <?php echo esc_html((string) $auditMetrics['needs_human_review']); ?> flagged for human review.
+                            </p>
+                        <?php endif; ?>
                         <p class="description" style="margin-top:0;margin-bottom:16px;font-size:12px;opacity:.85;">
                             Upgrade to keep this momentum with audits on every page change, scheduled reports, and continuous automation.
                         </p>
@@ -3025,6 +3035,10 @@ final class MenuRegistrar
             ? (string) $billing['quota_message']
             : 'Your initial audit is complete. Keep this momentum with continuous SEO automation.';
         $auditMetrics = $this->getInitialAuditMetrics();
+        $auditMetricsUnavailable = $isInitialAuditCompleted
+            && $auditMetrics['issues_found'] === 0
+            && $auditMetrics['applied'] === 0
+            && $auditMetrics['needs_human_review'] === 0;
         ?>
         <div class="seoworkerai-shell-header">
             <div class="seoworkerai-shell-brand">
@@ -3037,7 +3051,11 @@ final class MenuRegistrar
             <?php if ($showBillingBanner) : ?>
                 <div class="notice notice-warning" style="margin:16px 0 0;padding:12px 16px;border-radius:10px;">
                     <p style="margin:0 0 6px;font-weight:600;">Your first audit already improved your SEO baseline across the site.</p>
-                    <p style="margin:0 0 4px;"><?php echo esc_html('Initial audit results: ' . $auditMetrics['issues_found'] . ' issues found, ' . $auditMetrics['applied'] . ' fixed automatically, ' . $auditMetrics['needs_human_review'] . ' flagged for human review.'); ?></p>
+                    <?php if ($auditMetricsUnavailable) : ?>
+                        <p style="margin:0 0 4px;">Initial audit results are still syncing. Refresh in a minute to see exact counts.</p>
+                    <?php else : ?>
+                        <p style="margin:0 0 4px;"><?php echo esc_html('Initial audit results: ' . $auditMetrics['issues_found'] . ' issues found, ' . $auditMetrics['applied'] . ' fixed automatically, ' . $auditMetrics['needs_human_review'] . ' flagged for human review.'); ?></p>
+                    <?php endif; ?>
                     <p style="margin:0 0 8px;font-size:12px;opacity:.85;"><?php echo esc_html($billingMessage); ?></p>
                     <?php if (!empty($billing['payment_url'])) : ?>
                         <p style="margin:0;">
