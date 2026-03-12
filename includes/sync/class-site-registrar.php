@@ -48,35 +48,28 @@ final class SiteRegistrar
 
         try {
             if ($siteId > 0 && $this->tokenManager->hasToken()) {
-                $this->reactivateSiteWithOwnershipProof($siteId, $payload);
-                $response = $fast
-                    ? $this->client->updateSiteRegistrationFast($siteId, $payload)
-                    : $this->client->updateSiteRegistration($siteId, $payload);
-            } else {
-                $challenge = $this->client->createOwnershipChallenge([
-                    'domain' => (string) $payload['domain'],
-                    'intent' => 'register',
-                ]);
-                $challengeId = (string) ($challenge['challenge_id'] ?? '');
-                $challengeToken = (string) ($challenge['challenge_token'] ?? '');
-                $expiresAt = strtotime((string) ($challenge['expires_at'] ?? '')) ?: (time() + 600);
-                if ($challengeId === '' || $challengeToken === '') {
-                    throw new \RuntimeException('Failed to issue ownership challenge.');
-                }
-                OwnershipProofStore::put($challengeId, $challengeToken, $expiresAt);
-                $payload['ownership_challenge_id'] = $challengeId;
-                $payload['ownership_proof_url'] = $this->buildOwnershipProofUrl($challengeId);
+                try {
+                    $this->reactivateSiteWithOwnershipProof($siteId, $payload);
+                    $response = $fast
+                        ? $this->client->updateSiteRegistrationFast($siteId, $payload)
+                        : $this->client->updateSiteRegistration($siteId, $payload);
+                } catch (\Throwable $exception) {
+                    if (! $this->shouldRetryAsFreshRegistration($exception)) {
+                        throw $exception;
+                    }
 
-                $response = $fast
-                    ? $this->client->registerSiteFast($payload)
-                    : $this->client->registerSite($payload);
-                if (!empty($response['site_id'])) {
-                    update_option('seoworkerai_site_id', (int) $response['site_id'], false);
+                    $this->logger->warning('site_registration_stale_identity_detected', [
+                        'site_id' => $siteId,
+                        'http_code' => (int) $exception->getCode(),
+                        'error' => $exception->getMessage(),
+                    ], 'outbound');
+
+                    $this->resetLocalSiteIdentity();
+                    unset($payload['api_key']);
+                    $response = $this->registerFreshSite($payload, $fast);
                 }
-                if (!empty($response['api_key'])) {
-                    $this->tokenManager->storeToken((string) $response['api_key']);
-                }
-                OwnershipProofStore::delete($challengeId);
+            } else {
+                $response = $this->registerFreshSite($payload, $fast);
             }
 
             $this->syncLocalSiteProfileFromResponse($response);
@@ -93,6 +86,56 @@ final class SiteRegistrar
                 'error' => $exception->getMessage(),
             ];
         }
+    }
+
+    /**
+     * @param array<string, mixed> $payload
+     * @return array<string, mixed>
+     */
+    private function registerFreshSite(array $payload, bool $fast): array
+    {
+        $challenge = $this->client->createOwnershipChallenge([
+            'domain' => (string) $payload['domain'],
+            'intent' => 'register',
+        ]);
+        $challengeId = (string) ($challenge['challenge_id'] ?? '');
+        $challengeToken = (string) ($challenge['challenge_token'] ?? '');
+        $expiresAt = strtotime((string) ($challenge['expires_at'] ?? '')) ?: (time() + 600);
+        if ($challengeId === '' || $challengeToken === '') {
+            throw new \RuntimeException('Failed to issue ownership challenge.');
+        }
+
+        OwnershipProofStore::put($challengeId, $challengeToken, $expiresAt);
+        $payload['ownership_challenge_id'] = $challengeId;
+        $payload['ownership_proof_url'] = $this->buildOwnershipProofUrl($challengeId);
+
+        try {
+            $response = $fast
+                ? $this->client->registerSiteFast($payload)
+                : $this->client->registerSite($payload);
+
+            if (!empty($response['site_id'])) {
+                update_option('seoworkerai_site_id', (int) $response['site_id'], false);
+            }
+            if (!empty($response['api_key'])) {
+                $this->tokenManager->storeToken((string) $response['api_key']);
+            }
+
+            return $response;
+        } finally {
+            OwnershipProofStore::delete($challengeId);
+        }
+    }
+
+    private function resetLocalSiteIdentity(): void
+    {
+        update_option('seoworkerai_site_id', 0, false);
+        $this->tokenManager->clearToken();
+    }
+
+    private function shouldRetryAsFreshRegistration(\Throwable $exception): bool
+    {
+        return in_array((int) $exception->getCode(), [401, 404, 409], true);
     }
 
     /**

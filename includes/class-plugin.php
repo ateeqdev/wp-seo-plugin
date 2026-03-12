@@ -260,6 +260,7 @@ final class Plugin
         $this->container->get('menu_registrar')->registerHooks();
         add_action('seoworkerai_auto_register_site', [$this, 'handleAutoRegisterSite']);
         add_action('admin_init', [$this, 'maybeScheduleAutoRegister']);
+        add_action('admin_init', [$this, 'checkCronHealth']);
 
         add_action('rest_api_init', function (): void {
             $this->container->get('pages_endpoint')->registerRoutes();

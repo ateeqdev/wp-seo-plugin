@@ -111,6 +111,15 @@ final class MenuRegistrar
         if (!current_user_can('manage_options')) wp_die('Unauthorized');
         check_admin_referer('seoworkerai_start_oauth');
         try {
+            $siteId = (int) get_option('seoworkerai_site_id', 0);
+            if ($siteId <= 0) {
+                $registrationResult = $this->siteRegistrar->registerOrUpdate(true);
+                $siteId = (int) get_option('seoworkerai_site_id', 0);
+                if (isset($registrationResult['error']) || $siteId <= 0) {
+                    throw new \RuntimeException('Site registration is required before starting OAuth.');
+                }
+            }
+
             $oauthUrl = $this->oauthHandler->beginGoogleOAuth(['search_console', 'analytics']);
             if ($oauthUrl === '') throw new \RuntimeException('Missing oauth_url');
             wp_redirect($oauthUrl);
