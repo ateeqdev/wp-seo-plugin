@@ -319,6 +319,11 @@ final class SiteRegistrar
             return;
         }
 
+        $oauthStatus = (string) get_option('seoworkerai_oauth_status', 'pending');
+        if ($oauthStatus !== 'active') {
+            return;
+        }
+
         $requested = (bool) get_option('seoworkerai_initial_audit_requested', false);
         $status = (string) get_option('seoworkerai_initial_audit_status', 'pending');
 

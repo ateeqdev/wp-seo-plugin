@@ -643,6 +643,9 @@ final class MenuRegistrar
             && $auditMetrics['issues_found'] === 0
             && $auditMetrics['applied'] === 0
             && $auditMetrics['needs_human_review'] === 0;
+        if ($auditMetrics['is_sync_pending']) {
+            $shouldShowPaymentPrompt = false;
+        }
         $siteSettingTemplates = [];
         $availableLocations = $this->getAvailableLocationOptions();
         $domainRatingCheckedAt = !empty($siteSeoSettings['domain_rating_checked_at'])
@@ -1019,13 +1022,13 @@ final class MenuRegistrar
                         <div><span>Google</span><strong><?php echo esc_html($isConnected ? 'Connected' : 'Not connected'); ?></strong></div>
                         <div><span>Last Initial Audit</span><strong><?php echo esc_html($initialAuditLastRunLabel); ?></strong></div>
                     </div>
-                    <?php if ($shouldShowPaymentPrompt && $initialAuditCompletedAt > 0) : ?>
+                    <?php if (($shouldShowPaymentPrompt || $auditMetrics['is_sync_pending']) && $initialAuditCompletedAt > 0) : ?>
                         <p style="margin-top:-8px;margin-bottom:6px;font-weight:600;">
                             Your initial audit is complete and your core SEO baseline is now in place.
                         </p>
-                        <?php if ($auditMetricsUnavailable) : ?>
+                        <?php if ($auditMetrics['is_sync_pending'] || $auditMetricsUnavailable) : ?>
                             <p class="description" style="margin-top:0;margin-bottom:4px;">
-                                Results from <?php echo esc_html(wp_date('Y-m-d H:i', $initialAuditCompletedAt)); ?> are still syncing from the audit engine. Refresh in a minute to see exact counts.
+                                Results from <?php echo esc_html(wp_date('Y-m-d H:i', $initialAuditCompletedAt)); ?> are still syncing from the audit engine. We will unlock ongoing automation options once sync is complete.
                             </p>
                         <?php else : ?>
                             <p class="description" style="margin-top:0;margin-bottom:4px;">
@@ -2977,7 +2980,7 @@ final class MenuRegistrar
     }
 
     /**
-     * @return array{issues_found:int,applied:int,needs_human_review:int}
+     * @return array{issues_found:int,applied:int,needs_human_review:int,is_sync_pending:bool}
      */
     private function getInitialAuditMetrics(): array
     {
@@ -3008,10 +3011,35 @@ final class MenuRegistrar
         $prepared = $params !== [] ? $wpdb->prepare($query, ...$params) : $query;
         $row = $wpdb->get_row($prepared, ARRAY_A); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
 
+        $issuesFound = max(0, (int) ($row['issues_found'] ?? 0));
+        $applied = max(0, (int) ($row['applied'] ?? 0));
+        $needsHumanReview = max(0, (int) ($row['needs_human_review'] ?? 0));
+
+        // Fallback to global counts if audit timestamps were not synced accurately.
+        if ($issuesFound === 0 && $initialAuditCompletedAt > 0) {
+            $fallbackRow = $wpdb->get_row( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+                "SELECT
+                    COUNT(*) AS issues_found,
+                    SUM(CASE WHEN status = 'applied' THEN 1 ELSE 0 END) AS applied,
+                    SUM(CASE WHEN action_type = 'human-action-required' THEN 1 ELSE 0 END) AS needs_human_review
+                 FROM {$actionsTable}",
+                ARRAY_A
+            );
+            $issuesFound = max(0, (int) ($fallbackRow['issues_found'] ?? 0));
+            $applied = max(0, (int) ($fallbackRow['applied'] ?? 0));
+            $needsHumanReview = max(0, (int) ($fallbackRow['needs_human_review'] ?? 0));
+        }
+
+        $syncPending = ((int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            "SELECT COUNT(*) FROM {$actionsTable}
+             WHERE status IN ('received', 'queued', 'running', 'ack_pending', 'ack_failed')"
+        )) > 0;
+
         return [
-            'issues_found' => max(0, (int) ($row['issues_found'] ?? 0)),
-            'applied' => max(0, (int) ($row['applied'] ?? 0)),
-            'needs_human_review' => max(0, (int) ($row['needs_human_review'] ?? 0)),
+            'issues_found' => $issuesFound,
+            'applied' => $applied,
+            'needs_human_review' => $needsHumanReview,
+            'is_sync_pending' => $syncPending,
         ];
     }
 
@@ -3039,6 +3067,9 @@ final class MenuRegistrar
             && $auditMetrics['issues_found'] === 0
             && $auditMetrics['applied'] === 0
             && $auditMetrics['needs_human_review'] === 0;
+        if ($auditMetrics['is_sync_pending']) {
+            $showBillingBanner = false;
+        }
         ?>
         <div class="seoworkerai-shell-header">
             <div class="seoworkerai-shell-brand">
