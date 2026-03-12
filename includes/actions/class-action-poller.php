@@ -30,16 +30,6 @@ final class ActionPoller
             return;
         }
 
-        $billing = get_option('seoworkerai_billing', []);
-        $initialAuditStatus = (string) get_option('seoworkerai_initial_audit_status', 'pending');
-        $initialAuditCompletedAt = (int) get_option('seoworkerai_initial_audit_completed_at', 0);
-        $isInitialAuditActive = $initialAuditCompletedAt <= 0
-            && in_array($initialAuditStatus, ['queued', 'in_progress', 'already_started'], true);
-
-        if (is_array($billing) && !empty($billing['payment_required']) && !$isInitialAuditActive) {
-            return;
-        }
-
         try {
             $query = ['limit' => 20];
 
