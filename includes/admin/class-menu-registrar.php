@@ -59,6 +59,7 @@ final class MenuRegistrar
         add_action('admin_post_seoworkerai_revoke_oauth', [$this, 'handleRevokeOAuth']);
         add_action('admin_post_seoworkerai_rotate_token', [$this, 'handleRotateToken']);
         add_action('admin_post_seoworkerai_update_site_profile', [$this, 'handleUpdateSiteProfile']);
+        add_action('admin_post_seoworkerai_update_strategy_settings', [$this, 'handleUpdateStrategySettings']);
         add_action('admin_post_seoworkerai_update_task', [$this, 'handleUpdateTask']);
         add_action('admin_post_seoworkerai_schedule_task', [$this, 'handleScheduleTask']);
         add_action('admin_post_seoworkerai_link_brief', [$this, 'handleLinkBrief']);
@@ -250,6 +251,64 @@ final class MenuRegistrar
                 } catch (\Throwable $e) {
                     $this->logger->warning('admin_update_site_settings_failed', ['error' => $e->getMessage()], 'admin');
                     $notice = 'profile_failed';
+                }
+            }
+        }
+
+        wp_safe_redirect(add_query_arg(['page' => 'seoworkerai-settings', 'seoworkerai_notice' => $notice], admin_url('admin.php')));
+        exit;
+    }
+
+    public function handleUpdateStrategySettings(): void
+    {
+        if (!current_user_can('manage_options')) wp_die('Unauthorized');
+        check_admin_referer('seoworkerai_update_strategy_settings');
+
+        $existingSettings = get_option('seoworkerai_site_seo_settings', []);
+        if (!is_array($existingSettings)) {
+            $existingSettings = [];
+        }
+        $incomingSettings = $this->sanitizePostedSiteSettings($_POST);
+        if (!array_key_exists('site_settings_prefer_low_difficulty', $_POST)) {
+            $incomingSettings['prefer_low_difficulty'] = !empty($existingSettings['prefer_low_difficulty']);
+        }
+        if (!array_key_exists('site_settings_allow_low_volume', $_POST)) {
+            $incomingSettings['allow_low_volume'] = !empty($existingSettings['allow_low_volume']);
+        }
+        $siteSettings = array_merge($existingSettings, [
+            'template_id' => $incomingSettings['template_id'],
+            'domain_rating' => $incomingSettings['domain_rating'],
+            'min_search_volume' => $incomingSettings['min_search_volume'],
+            'max_search_volume' => $incomingSettings['max_search_volume'],
+            'max_keyword_difficulty' => $incomingSettings['max_keyword_difficulty'],
+            'preferred_keyword_type' => $incomingSettings['preferred_keyword_type'],
+            'prefer_low_difficulty' => $incomingSettings['prefer_low_difficulty'],
+            'allow_low_volume' => $incomingSettings['allow_low_volume'],
+        ]);
+
+        update_option('seoworkerai_site_seo_settings', $siteSettings, false);
+        update_option('seoworkerai_domain_rating_confirmed', $siteSettings['domain_rating'] !== null, false);
+
+        $result = $this->siteRegistrar->registerOrUpdate(true);
+        $notice = 'strategy_settings_ok';
+
+        if (isset($result['error'])) {
+            $notice = 'strategy_settings_failed';
+        } else {
+            $siteId = (int) ($result['site_id'] ?? get_option('seoworkerai_site_id', 0));
+            if ($siteId > 0) {
+                try {
+                    $settingsResponse = $this->client->updateSiteSettings($siteId, $this->buildRemoteSiteSettingsPayload($siteSettings));
+                    if (isset($settingsResponse['settings']) && is_array($settingsResponse['settings'])) {
+                        update_option(
+                            'seoworkerai_site_seo_settings',
+                            $this->siteRegistrar->sanitizeSiteSettingsPayload($settingsResponse['settings']),
+                            false
+                        );
+                    }
+                } catch (\Throwable $e) {
+                    $this->logger->warning('admin_update_strategy_settings_failed', ['error' => $e->getMessage()], 'admin');
+                    $notice = 'strategy_settings_failed';
                 }
             }
         }
@@ -688,6 +747,23 @@ final class MenuRegistrar
 
         $providerAlerts = get_option('seoworkerai_provider_connection_alerts', []);
         if (!is_array($providerAlerts)) $providerAlerts = [];
+        if ($siteId > 0 && $this->tokenManager->hasToken()) {
+            $health = $this->healthChecker->check();
+            if (isset($health['alerts']) && is_array($health['alerts'])) {
+                $providerAlerts = [];
+                foreach ($health['alerts'] as $index => $alert) {
+                    if (!is_array($alert)) {
+                        continue;
+                    }
+                    $providerAlerts[(string) $index] = [
+                        'provider_name' => 'Google integrations',
+                        'message' => sanitize_text_field((string) ($alert['message'] ?? 'Connection warning')),
+                        'resolution_hint' => '',
+                    ];
+                }
+                update_option('seoworkerai_provider_connection_alerts', $providerAlerts, false);
+            }
+        }
         $authorProfiles = $this->getAuthorProfiles();
 
         if ($siteId > 0 && $this->tokenManager->hasToken()) {
@@ -747,14 +823,56 @@ final class MenuRegistrar
         }
         ?>
         <div class="wrap seoworkerai-admin-page">
-            <?php $this->renderAdminShellHeader('SEOWorkerAI', 'seoworkerai', 'Run your first site-wide audit, connect Google data, and control auto-fixes.'); ?>
+            <?php $this->renderAdminShellHeader('SEOWorkerAI', 'seoworkerai', ''); ?>
 
             <?php $this->renderNotice($notice); ?>
-            <?php if (!$domainRatingConfirmed) : ?>
-                <div class="notice notice-warning">
-                    <p><strong>Set your domain authority before connecting Google.</strong> This helps tune your first content brief and strategy to your site's current strength.</p>
+
+            <div class="seoworkerai-card" style="margin-bottom:16px;border:2px solid #dba617;">
+                <div class="seoworkerai-card-head">
+                    <h2>Strategy Setup</h2>
                 </div>
-            <?php endif; ?>
+                <p class="description" style="margin-top:0;">
+                    Set these once before Google connection so your initial brief and keyword strategy match your site reality.
+                </p>
+                <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
+                    <?php wp_nonce_field('seoworkerai_update_strategy_settings'); ?>
+                    <input type="hidden" name="action" value="seoworkerai_update_strategy_settings">
+                    <div class="seoworkerai-form-grid seoworkerai-form-grid--three">
+                        <div class="seoworkerai-form-field">
+                            <label for="seoworkerai-strategy-domain-rating">Domain Rating</label>
+                            <input id="seoworkerai-strategy-domain-rating" type="number" min="0" max="100" name="site_settings_domain_rating" value="<?php echo esc_attr($domainRatingInputValue); ?>" required>
+                        </div>
+                        <div class="seoworkerai-form-field">
+                            <label for="seoworkerai-strategy-min-search-volume">Minimum Search Volume</label>
+                            <input id="seoworkerai-strategy-min-search-volume" type="number" min="0" name="site_settings_min_search_volume" value="<?php echo esc_attr((string) ($siteSeoSettings['min_search_volume'] ?? 0)); ?>">
+                        </div>
+                        <div class="seoworkerai-form-field">
+                            <label for="seoworkerai-strategy-max-search-volume">Maximum Search Volume</label>
+                            <input id="seoworkerai-strategy-max-search-volume" type="number" min="0" name="site_settings_max_search_volume" value="<?php echo esc_attr(($siteSeoSettings['max_search_volume'] ?? null) === null ? '' : (string) $siteSeoSettings['max_search_volume']); ?>">
+                        </div>
+                    </div>
+                    <div class="seoworkerai-form-grid seoworkerai-form-grid--two">
+                        <div class="seoworkerai-form-field">
+                            <label for="seoworkerai-strategy-template-id">Strategy</label>
+                            <select id="seoworkerai-strategy-template-id" name="site_settings_template_id">
+                                <option value="0">Keep current custom strategy</option>
+                                <?php foreach ($siteSettingTemplates as $template) : if (!is_array($template)) continue; ?>
+                                    <option value="<?php echo esc_attr((string) ($template['id'] ?? 0)); ?>" <?php selected((int) ($siteSeoSettings['template_id'] ?? 0), (int) ($template['id'] ?? 0)); ?>>
+                                        <?php echo esc_html((string) ($template['name'] ?? 'Strategy')); ?>
+                                    </option>
+                                <?php endforeach; ?>
+                            </select>
+                        </div>
+                        <div class="seoworkerai-form-field">
+                            <label for="seoworkerai-strategy-max-kd">Maximum Keyword Difficulty</label>
+                            <input id="seoworkerai-strategy-max-kd" type="number" min="0" max="100" name="site_settings_max_keyword_difficulty" value="<?php echo esc_attr((string) ($siteSeoSettings['max_keyword_difficulty'] ?? 100)); ?>">
+                        </div>
+                    </div>
+                    <div class="seoworkerai-button-row">
+                        <button type="submit" class="button button-primary"><?php echo esc_html($domainRatingConfirmed ? 'Update Strategy' : 'Save Strategy and Continue'); ?></button>
+                    </div>
+                </form>
+            </div>
 
             <?php if (!empty($providerAlerts)) : foreach ($providerAlerts as $key => $alert) : if (!is_array($alert)) continue; ?>
                 <div class="notice notice-warning">
@@ -904,7 +1022,7 @@ final class MenuRegistrar
                                     </div>
                                 </div>
                                 <div class="seoworkerai-form-field">
-                                    <label for="seoworkerai-site-settings-template-id">Seeded Strategy Template</label>
+                                    <label for="seoworkerai-site-settings-template-id">Strategy</label>
                                     <select
                                         id="seoworkerai-site-settings-template-id"
                                         name="site_settings_template_id"
@@ -993,18 +1111,22 @@ final class MenuRegistrar
                             <div class="seoworkerai-accordion-body">
                                 <p class="description" style="margin-top:0;">Add author handles once so article audits stop asking for them page by page.</p>
                                 <?php if ($authorProfiles !== []) : ?>
+                                    <div class="seoworkerai-button-row" style="margin:0 0 10px;justify-content:space-between;">
+                                        <input type="search" id="seoworkerai-author-search" placeholder="Search author or email..." style="max-width:280px;">
+                                        <div id="seoworkerai-author-pagination" class="seoworkerai-muted"></div>
+                                    </div>
                                     <div class="seoworkerai-table-wrap">
-                                        <table class="wp-list-table widefat">
+                                        <table class="wp-list-table widefat" id="seoworkerai-author-table" data-page-size="10">
                                             <thead>
                                                 <tr>
-                                                    <th>Author</th>
-                                                    <th>Email</th>
+                                                    <th><button type="button" class="button-link" data-sort-key="author">Author</button></th>
+                                                    <th><button type="button" class="button-link" data-sort-key="email">Email</button></th>
                                                     <th>Twitter/X Handle</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 <?php foreach ($authorProfiles as $authorProfile) : ?>
-                                                    <tr>
+                                                    <tr data-author="<?php echo esc_attr(strtolower((string) $authorProfile['display_name'])); ?>" data-email="<?php echo esc_attr(strtolower((string) $authorProfile['email'])); ?>">
                                                         <td><?php echo esc_html((string) $authorProfile['display_name']); ?></td>
                                                         <td><?php echo esc_html((string) $authorProfile['email']); ?></td>
                                                         <td>
@@ -1069,6 +1191,9 @@ final class MenuRegistrar
                         <?php else : ?>
                             <p class="description" style="margin-top:0;margin-bottom:4px;">
                                 Results from <?php echo esc_html(wp_date('Y-m-d H:i', $initialAuditCompletedAt)); ?>: <?php echo esc_html((string) $auditMetrics['issues_found']); ?> issues found, <?php echo esc_html((string) $auditMetrics['applied']); ?> fixed automatically, <?php echo esc_html((string) $auditMetrics['needs_human_review']); ?> flagged for human review.
+                                <?php if ($auditMetrics['pending_count'] > 0) : ?>
+                                    <?php echo esc_html(' ' . $auditMetrics['pending_count'] . ' still processing in queue.'); ?>
+                                <?php endif; ?>
                             </p>
                         <?php endif; ?>
                         <p class="description" style="margin-top:0;margin-bottom:16px;font-size:12px;opacity:.85;">
@@ -1078,7 +1203,7 @@ final class MenuRegistrar
                             <?php wp_nonce_field('seoworkerai_dismiss_audit_notice'); ?>
                             <input type="hidden" name="action" value="seoworkerai_dismiss_audit_notice">
                             <input type="hidden" name="return_page" value="seoworkerai">
-                            <button type="submit" class="button-link">Dismiss for 3 days</button>
+                            <button type="submit" class="button-link">Dismiss</button>
                         </form>
                     <?php endif; ?>
 
@@ -2685,6 +2810,8 @@ final class MenuRegistrar
             'rotate_failed'          => ['error',   'Token rotation failed. Check debug logs.'],
             'profile_ok'             => ['success', 'Site profile synced.'],
             'profile_failed'         => ['error',   'Profile sync failed.'],
+            'strategy_settings_ok'   => ['success', 'Strategy settings synced.'],
+            'strategy_settings_failed' => ['error', 'Failed to sync strategy settings.'],
             'task_update_ok'         => ['success', 'Task configuration saved.'],
             'task_update_failed'     => ['error',   'Task configuration update failed.'],
             'task_schedule_ok'       => ['success', 'Task scheduled successfully.'],
@@ -3031,7 +3158,7 @@ final class MenuRegistrar
     }
 
     /**
-     * @return array{issues_found:int,applied:int,needs_human_review:int,is_sync_pending:bool}
+     * @return array{issues_found:int,applied:int,needs_human_review:int,pending_count:int,is_sync_pending:bool}
      */
     private function getInitialAuditMetrics(): array
     {
@@ -3087,11 +3214,16 @@ final class MenuRegistrar
             "SELECT COUNT(*) FROM {$actionsTable}
              WHERE status IN ('received', 'queued', 'running', 'ack_pending', 'ack_failed')"
         )) > 0;
+        $pendingCount = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            "SELECT COUNT(*) FROM {$actionsTable}
+             WHERE status IN ('received', 'queued', 'running', 'ack_pending', 'ack_failed')"
+        );
 
         return [
             'issues_found' => $issuesFound,
             'applied' => $applied,
             'needs_human_review' => $needsHumanReview,
+            'pending_count' => max(0, $pendingCount),
             'is_sync_pending' => $syncPending,
         ];
     }
@@ -3126,15 +3258,10 @@ final class MenuRegistrar
         if ($showBillingBanner && $this->isAuditNoticeDismissed()) {
             $showBillingBanner = false;
         }
-        if (
-            $showBillingBanner
-            && $activePage !== 'seoworkerai'
-            && $activePage !== 'seoworkerai-settings'
-            && $initialAuditCompletedAt > 0
-            && time() < ($initialAuditCompletedAt + (3 * DAY_IN_SECONDS))
-        ) {
-            $showBillingBanner = false;
-        }
+        $showPaymentCenterShortcut = $isInitialAuditCompleted
+            && !empty($billing['payment_required'])
+            && !empty($billing['payment_url'])
+            && $this->isAuditNoticeDismissed();
         ?>
         <div class="seoworkerai-shell-header">
             <div class="seoworkerai-shell-brand">
@@ -3150,20 +3277,27 @@ final class MenuRegistrar
                     <?php if ($auditMetricsUnavailable) : ?>
                         <p style="margin:0 0 4px;">Initial audit results are still syncing. Refresh in a minute to see exact counts.</p>
                     <?php else : ?>
-                        <p style="margin:0 0 4px;"><?php echo esc_html('Initial audit results: ' . $auditMetrics['issues_found'] . ' issues found, ' . $auditMetrics['applied'] . ' fixed automatically, ' . $auditMetrics['needs_human_review'] . ' flagged for human review.'); ?></p>
+                        <p style="margin:0 0 4px;"><?php echo esc_html('Initial audit results: ' . $auditMetrics['issues_found'] . ' issues found, ' . $auditMetrics['applied'] . ' fixed automatically, ' . $auditMetrics['needs_human_review'] . ' flagged for human review.' . ($auditMetrics['pending_count'] > 0 ? ' ' . $auditMetrics['pending_count'] . ' still processing in queue.' : '')); ?></p>
                     <?php endif; ?>
                     <p style="margin:0 0 8px;font-size:12px;opacity:.85;"><?php echo esc_html($billingMessage); ?></p>
                     <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" style="margin:0 0 8px;">
                         <?php wp_nonce_field('seoworkerai_dismiss_audit_notice'); ?>
                         <input type="hidden" name="action" value="seoworkerai_dismiss_audit_notice">
                         <input type="hidden" name="return_page" value="<?php echo esc_attr($activePage); ?>">
-                        <button type="submit" class="button-link">Dismiss for 3 days</button>
+                        <button type="submit" class="button-link">Dismiss</button>
                     </form>
                     <?php if (!empty($billing['payment_url'])) : ?>
                         <p style="margin:0;">
                             <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Unlock ongoing automation</a>
                         </p>
                     <?php endif; ?>
+                </div>
+            <?php elseif ($showPaymentCenterShortcut) : ?>
+                <div class="notice notice-warning" style="margin:16px 0 0;padding:10px 16px;border-radius:10px;">
+                    <p style="margin:0;display:flex;align-items:center;gap:10px;justify-content:space-between;">
+                        <span style="font-weight:600;">Automation is paused until payment is active.</span>
+                        <a class="button button-primary button-small" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Payment Center</a>
+                    </p>
                 </div>
             <?php endif; ?>
             <div class="seoworkerai-shell-tabs">

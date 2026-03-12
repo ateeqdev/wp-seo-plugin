@@ -437,6 +437,106 @@
     });
   }
 
+  function initAuthorProfilesTable() {
+    var table = document.getElementById("seoworkerai-author-table");
+    if (!table) return;
+
+    var tbody = table.querySelector("tbody");
+    if (!tbody) return;
+    var searchInput = document.getElementById("seoworkerai-author-search");
+    var pagination = document.getElementById("seoworkerai-author-pagination");
+    var pageSize = parseInt(table.getAttribute("data-page-size") || "10", 10);
+    if (!Number.isFinite(pageSize) || pageSize <= 0) pageSize = 10;
+
+    var rows = Array.prototype.slice.call(tbody.querySelectorAll("tr"));
+    var currentPage = 1;
+    var currentSortKey = "author";
+    var currentSortDir = "asc";
+    var currentQuery = "";
+
+    function getCellValue(row, key) {
+      if (key === "email") return String(row.getAttribute("data-email") || "");
+      return String(row.getAttribute("data-author") || "");
+    }
+
+    function getFilteredRows() {
+      if (!currentQuery) return rows.slice();
+      return rows.filter(function (row) {
+        var author = String(row.getAttribute("data-author") || "");
+        var email = String(row.getAttribute("data-email") || "");
+        return author.indexOf(currentQuery) !== -1 || email.indexOf(currentQuery) !== -1;
+      });
+    }
+
+    function sortRows(filteredRows) {
+      filteredRows.sort(function (a, b) {
+        var av = getCellValue(a, currentSortKey);
+        var bv = getCellValue(b, currentSortKey);
+        if (av === bv) return 0;
+        var compare = av < bv ? -1 : 1;
+        return currentSortDir === "asc" ? compare : -compare;
+      });
+    }
+
+    function render() {
+      var filtered = getFilteredRows();
+      sortRows(filtered);
+
+      var totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+      if (currentPage > totalPages) currentPage = totalPages;
+      var start = (currentPage - 1) * pageSize;
+      var end = start + pageSize;
+      var visibleSet = new Set(filtered.slice(start, end));
+
+      rows.forEach(function (row) {
+        row.style.display = visibleSet.has(row) ? "" : "none";
+      });
+
+      if (pagination) {
+        var prevDisabled = currentPage <= 1 ? "disabled" : "";
+        var nextDisabled = currentPage >= totalPages ? "disabled" : "";
+        pagination.innerHTML =
+          '<button type="button" class="button-link" data-author-page="prev" ' + prevDisabled + ">Prev</button>" +
+          " <strong>" + currentPage + "/" + totalPages + "</strong> " +
+          '<button type="button" class="button-link" data-author-page="next" ' + nextDisabled + ">Next</button>";
+      }
+    }
+
+    if (searchInput) {
+      searchInput.addEventListener("input", function () {
+        currentQuery = String(searchInput.value || "").toLowerCase().trim();
+        currentPage = 1;
+        render();
+      });
+    }
+
+    table.querySelectorAll("thead [data-sort-key]").forEach(function (btn) {
+      btn.addEventListener("click", function () {
+        var nextKey = String(btn.getAttribute("data-sort-key") || "author");
+        if (nextKey === currentSortKey) {
+          currentSortDir = currentSortDir === "asc" ? "desc" : "asc";
+        } else {
+          currentSortKey = nextKey;
+          currentSortDir = "asc";
+        }
+        render();
+      });
+    });
+
+    if (pagination) {
+      pagination.addEventListener("click", function (event) {
+        var button = event.target.closest("[data-author-page]");
+        if (!button || button.disabled) return;
+        var direction = button.getAttribute("data-author-page");
+        if (direction === "prev") currentPage = Math.max(1, currentPage - 1);
+        if (direction === "next") currentPage += 1;
+        render();
+      });
+    }
+
+    render();
+  }
+
   // Run on DOM ready
   if (document.readyState === "loading") {
     document.addEventListener("DOMContentLoaded", function () {
@@ -444,12 +544,14 @@
       initPostPickers();
       initSiteSettingsTemplatePicker();
       initLocationsTable();
+      initAuthorProfilesTable();
     });
   } else {
     initAllFilterBars();
     initPostPickers();
     initSiteSettingsTemplatePicker();
     initLocationsTable();
+    initAuthorProfilesTable();
   }
 
   // ─── 2. Progression Timeline Toggle ────────────────────────────────────────
