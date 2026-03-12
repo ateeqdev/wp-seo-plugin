@@ -259,6 +259,7 @@ final class Plugin
         $this->container->get('event_collector')->registerHooks();
         $this->container->get('menu_registrar')->registerHooks();
         add_action('seoworkerai_auto_register_site', [$this, 'handleAutoRegisterSite']);
+        add_action('admin_init', [$this, 'maybeRunImmediateAutoRegister'], 1);
         add_action('admin_init', [$this, 'maybeScheduleAutoRegister']);
         add_action('admin_init', [$this, 'checkCronHealth']);
 
@@ -292,6 +293,27 @@ final class Plugin
         if (!wp_next_scheduled('seoworkerai_auto_register_site')) {
             wp_schedule_single_event(time() + 20, 'seoworkerai_auto_register_site');
         }
+    }
+
+    public function maybeRunImmediateAutoRegister(): void
+    {
+        if ((function_exists('wp_doing_ajax') && wp_doing_ajax()) || (function_exists('wp_doing_cron') && wp_doing_cron())) {
+            return;
+        }
+
+        $siteId = (int) get_option('seoworkerai_site_id', 0);
+        $pending = (bool) get_option('seoworkerai_auto_register_pending', false);
+        if ($siteId > 0 && !$pending) {
+            return;
+        }
+
+        $lockKey = 'seoworkerai_immediate_auto_register_lock';
+        if (get_transient($lockKey)) {
+            return;
+        }
+
+        set_transient($lockKey, 1, 30);
+        $this->handleAutoRegisterSite();
     }
 
     public function handleAutoRegisterSite(): void

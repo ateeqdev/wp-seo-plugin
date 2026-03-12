@@ -635,6 +635,10 @@ final class MenuRegistrar
         $initialAuditCompletedAt = (int) get_option('seoworkerai_initial_audit_completed_at', 0);
         $initialAuditLastRunAt = $initialAuditCompletedAt > 0 ? $initialAuditCompletedAt : $initialAuditStartedAt;
         $initialAuditLastRunLabel = $initialAuditLastRunAt > 0 ? wp_date('Y-m-d H:i', $initialAuditLastRunAt) : 'Not run yet';
+        $isInitialAuditCompleted = $initialAuditCompletedAt > 0 || in_array($initialAuditStatus, ['completed', 'already_completed'], true);
+        $isInitialAuditRunning = $initialAuditStartedAt > 0 || in_array($initialAuditStatus, ['queued', 'in_progress', 'already_started'], true);
+        $shouldShowPaymentPrompt = !empty($billing['payment_required']) && $isInitialAuditCompleted;
+        $auditMetrics = $this->getInitialAuditMetrics();
         $siteSettingTemplates = [];
         $availableLocations = $this->getAvailableLocationOptions();
         $domainRatingCheckedAt = !empty($siteSeoSettings['domain_rating_checked_at'])
@@ -677,6 +681,9 @@ final class MenuRegistrar
                     $initialAuditMessage = $initialAuditPayload['message'];
                     $initialAuditLastRunAt = $initialAuditCompletedAt > 0 ? $initialAuditCompletedAt : $initialAuditStartedAt;
                     $initialAuditLastRunLabel = $initialAuditLastRunAt > 0 ? wp_date('Y-m-d H:i', $initialAuditLastRunAt) : 'Not run yet';
+                    $isInitialAuditCompleted = $initialAuditCompletedAt > 0 || in_array($initialAuditStatus, ['completed', 'already_completed'], true);
+                    $isInitialAuditRunning = $initialAuditStartedAt > 0 || in_array($initialAuditStatus, ['queued', 'in_progress', 'already_started'], true);
+                    $shouldShowPaymentPrompt = !empty($billing['payment_required']) && $isInitialAuditCompleted;
                 }
                 $siteSettingTemplates = isset($settingsResponse['templates']) && is_array($settingsResponse['templates']) ? $settingsResponse['templates'] : [];
                 if (isset($settingsResponse['locations']) && is_array($settingsResponse['locations'])) {
@@ -729,7 +736,10 @@ final class MenuRegistrar
                 <div class="seoworkerai-stat-grid">
                     <div class="seoworkerai-stat"><span>Registration</span><strong><?php echo esc_html($siteId > 0 ? 'Active' : 'Not registered'); ?></strong></div>
                     <div class="seoworkerai-stat"><span>Google Connection</span><strong><?php echo esc_html($isConnected ? 'Connected' . ($oauthProvider !== '' ? ' (' . $oauthProvider . ')' : '') : 'Not connected'); ?></strong></div>
-                    <div class="seoworkerai-stat"><span>Automation Access</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Active'); ?></strong></div>
+                    <div class="seoworkerai-stat">
+                        <span>Automation Access</span>
+                        <strong><?php echo esc_html(empty($billing['payment_required']) ? 'Active' : ($isInitialAuditCompleted ? 'Payment required' : 'Included during first audit')); ?></strong>
+                    </div>
                     <div class="seoworkerai-stat">
                         <span>Initial Audit</span>
                         <strong>
@@ -977,25 +987,37 @@ final class MenuRegistrar
                 <section class="seoworkerai-card">
                     <div class="seoworkerai-card-head">
                         <h2>Billing &amp; Google</h2>
-                        <?php if (!empty($billing['payment_url'])) : ?>
+                        <?php if ($shouldShowPaymentPrompt && !empty($billing['payment_url'])) : ?>
                             <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Open Payment Center</a>
                         <?php endif; ?>
                     </div>
                     <p class="description" style="margin-top:0;">
-                        Your first site-wide audit is included. We scan every page once and fix issues automatically based on your Change Application Mode setting. Ongoing recommendations, daily audits, and monitoring start after payment.
+                        Your first site-wide audit is included. We scan every page once and fix issues automatically based on your Change Application Mode setting.
                     </p>
                     <?php if ($initialAuditMessage !== '') : ?>
                         <p class="description" style="margin-top:-8px;"><?php echo esc_html($initialAuditMessage); ?></p>
                     <?php endif; ?>
+                    <?php if (!$isInitialAuditCompleted) : ?>
+                        <p class="description" style="margin-top:-4px;">
+                            <?php echo esc_html($isInitialAuditRunning ? 'Initial audit is in progress.' : 'Initial audit will start automatically.'); ?>
+                            <?php
+                            $auditProgressParts = [];
+                            $auditProgressParts[] = 'Issues found: ' . (string) $auditMetrics['issues_found'];
+                            $auditProgressParts[] = 'Applied automatically: ' . (string) $auditMetrics['applied'];
+                            $auditProgressParts[] = 'Needs human review: ' . (string) $auditMetrics['needs_human_review'];
+                            echo esc_html(' ' . implode(' · ', $auditProgressParts));
+                            ?>
+                        </p>
+                    <?php endif; ?>
                     <div class="seoworkerai-kv-list" style="margin-bottom:16px;">
-                        <div><span>Status</span><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required' : 'Active'); ?></strong></div>
+                        <div><span>Status</span><strong><?php echo esc_html(empty($billing['payment_required']) ? 'Active' : ($isInitialAuditCompleted ? 'Payment required' : 'Initial audit included')); ?></strong></div>
                         <div><span>Plan</span><strong><?php echo esc_html((string) ($billing['plan_name'] ?? 'SEOWorkerAI Starter')); ?></strong></div>
                         <div><span>Google</span><strong><?php echo esc_html($isConnected ? 'Connected' : 'Not connected'); ?></strong></div>
                         <div><span>Last Initial Audit</span><strong><?php echo esc_html($initialAuditLastRunLabel); ?></strong></div>
                     </div>
-                    <?php if (!empty($billing['payment_required']) && $initialAuditCompletedAt > 0) : ?>
+                    <?php if ($shouldShowPaymentPrompt && $initialAuditCompletedAt > 0) : ?>
                         <p class="description" style="margin-top:-8px;margin-bottom:16px;">
-                            Your initial audit ran on <?php echo esc_html(wp_date('Y-m-d H:i', $initialAuditCompletedAt)); ?>. Upgrade to continue daily audits, recommendations, and automated fixes.
+                            Your initial audit ran on <?php echo esc_html(wp_date('Y-m-d H:i', $initialAuditCompletedAt)); ?>. We found <?php echo esc_html((string) $auditMetrics['issues_found']); ?> issues, applied <?php echo esc_html((string) $auditMetrics['applied']); ?> fixes automatically, and flagged <?php echo esc_html((string) $auditMetrics['needs_human_review']); ?> for human review. Upgrade to unlock audits on every page change, scheduled reports, and ongoing automation.
                         </p>
                     <?php endif; ?>
 
@@ -1008,7 +1030,7 @@ final class MenuRegistrar
                                 Connect with Google
                             </button>
                         </form>
-                        <?php if (!empty($billing['payment_required']) && !empty($billing['payment_url'])) : ?>
+                        <?php if ($shouldShowPaymentPrompt && !empty($billing['payment_url'])) : ?>
                             <a class="seoworkerai-google-cta" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Unlock ongoing automation</a>
                         <?php endif; ?>
                     <?php else : ?>
@@ -1029,7 +1051,7 @@ final class MenuRegistrar
                                 <input type="text" name="revocation_reason" placeholder="Reason (optional)" style="height:32px;padding:0 8px;border:1px solid var(--gray-300);border-radius:4px;font-size:13px;">
                                 <button type="submit" class="button seoworkerai-btn-danger">Disconnect</button>
                             </form>
-                            <?php if (!empty($billing['payment_required']) && !empty($billing['payment_url'])) : ?>
+                            <?php if ($shouldShowPaymentPrompt && !empty($billing['payment_url'])) : ?>
                                 <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Unlock ongoing automation</a>
                             <?php endif; ?>
                         </div>
@@ -2938,6 +2960,31 @@ final class MenuRegistrar
         return $items;
     }
 
+    /**
+     * @return array{issues_found:int,applied:int,needs_human_review:int}
+     */
+    private function getInitialAuditMetrics(): array
+    {
+        global $wpdb;
+
+        $actionsTable = $wpdb->prefix . 'seoworkerai_actions';
+        $itemsTable = $wpdb->prefix . 'seoworkerai_action_items';
+
+        $issuesFound = (int) $wpdb->get_var("SELECT COUNT(*) FROM {$actionsTable}"); // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+        $applied = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            "SELECT COUNT(*) FROM {$actionsTable} WHERE status = 'applied'"
+        );
+        $needsHumanReview = (int) $wpdb->get_var( // phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery
+            "SELECT COUNT(*) FROM {$itemsTable} WHERE status <> 'resolved'"
+        );
+
+        return [
+            'issues_found' => max(0, $issuesFound),
+            'applied' => max(0, $applied),
+            'needs_human_review' => max(0, $needsHumanReview),
+        ];
+    }
+
     private function renderAdminShellHeader(string $title, string $activePage, string $description = ''): void
     {
         $tabs = [
@@ -2950,10 +2997,14 @@ final class MenuRegistrar
         if (!is_array($billing)) {
             $billing = [];
         }
-        $showBillingBanner = !empty($billing['payment_required']) || !empty($billing['quota_blocked']);
+        $initialAuditStatus = (string) get_option('seoworkerai_initial_audit_status', 'pending');
+        $initialAuditCompletedAt = (int) get_option('seoworkerai_initial_audit_completed_at', 0);
+        $isInitialAuditCompleted = $initialAuditCompletedAt > 0 || in_array($initialAuditStatus, ['completed', 'already_completed'], true);
+        $showBillingBanner = (!empty($billing['payment_required']) || !empty($billing['quota_blocked'])) && $isInitialAuditCompleted;
         $billingMessage = !empty($billing['quota_message'])
             ? (string) $billing['quota_message']
-            : 'Your first site-wide audit is included. Ongoing recommendations, daily audits, and monitoring resume after payment.';
+            : 'Your initial audit is complete. Upgrade to continue with audits on page changes, scheduled reporting, and ongoing automation.';
+        $auditMetrics = $this->getInitialAuditMetrics();
         ?>
         <div class="seoworkerai-shell-header">
             <div class="seoworkerai-shell-brand">
@@ -2966,6 +3017,7 @@ final class MenuRegistrar
             <?php if ($showBillingBanner) : ?>
                 <div class="notice notice-warning" style="margin:16px 0 0;padding:12px 16px;border-radius:10px;">
                     <p style="margin:0 0 8px;"><strong><?php echo esc_html(!empty($billing['payment_required']) ? 'Payment required.' : 'Automation paused.'); ?></strong> <?php echo esc_html($billingMessage); ?></p>
+                    <p style="margin:0 0 8px;"><?php echo esc_html('Initial audit results: ' . $auditMetrics['issues_found'] . ' issues found, ' . $auditMetrics['applied'] . ' applied automatically, ' . $auditMetrics['needs_human_review'] . ' requiring human review.'); ?></p>
                     <?php if (!empty($billing['payment_url'])) : ?>
                         <p style="margin:0;">
                             <a class="button button-primary" href="<?php echo esc_url((string) $billing['payment_url']); ?>" target="_blank" rel="noopener noreferrer">Unlock ongoing automation</a>

@@ -68,6 +68,7 @@ final class Activator
         add_option('seoworkerai_api_last_error_at', 0, '', 'no');
         add_option('seoworkerai_ownership_challenges', [], '', 'no');
         add_option('seoworkerai_auto_register_pending', true, '', 'no');
+        update_option('seoworkerai_auto_register_pending', true, false);
     }
 
     private static function scheduleAutoRegistration(): void
