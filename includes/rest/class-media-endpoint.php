@@ -17,20 +17,19 @@ final class MediaEndpoint
 
     public function registerRoutes(): void
     {
-        foreach (['seoworkerai/v1', 'seo-platform/v1'] as $namespace) {
-            register_rest_route($namespace, '/media', [
-                'methods' => 'GET',
-                'callback' => [$this, 'listMedia'],
-                'permission_callback' => [$this, 'authorize'],
-            ]);
-        }
+        $namespace = 'seoworkerai/v1';
+        register_rest_route($namespace, '/media', [
+            'methods' => 'GET',
+            'callback' => [$this, 'listMedia'],
+            'permission_callback' => [$this, 'authorize'],
+        ]);
     }
 
     public function authorize(\WP_REST_Request $request)
     {
         $token = (string) $request->get_header('X-Site-Token');
 
-        if (!$this->tokenManager->verifyInboundToken($token)) {
+        if (! $this->tokenManager->verifyInboundToken($token)) {
             return new \WP_Error('seoworkerai_unauthorized', 'Invalid site token.', ['status' => 401]);
         }
 
@@ -68,7 +67,7 @@ final class MediaEndpoint
         $items = [];
 
         foreach ($query->posts as $post) {
-            if (!$post instanceof \WP_Post) {
+            if (! $post instanceof \WP_Post) {
                 continue;
             }
 

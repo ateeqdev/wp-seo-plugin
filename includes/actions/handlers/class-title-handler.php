@@ -25,6 +25,12 @@ final class TitleHandler extends AbstractActionHandler
     public function validate(array $action)
     {
         $postId = $this->resolvePostId($action);
+        $url = $this->resolveUrl($action);
+
+        if ($postId === 0 && $url !== '') {
+            return true;
+        }
+
         $post = get_post($postId);
 
         if (!$post || $post->post_status === 'trash') {
@@ -42,8 +48,8 @@ final class TitleHandler extends AbstractActionHandler
     {
         $postId = $this->resolvePostId($action);
         $post = get_post($postId);
-
-        if (!$post) {
+        
+        if (!$post && $postId > 0) {
             throw new Exception('Post not found.');
         }
 
@@ -57,6 +63,42 @@ final class TitleHandler extends AbstractActionHandler
 
         if ($title === '') {
             throw new Exception('No title provided.');
+        }
+
+        $url = $this->resolveUrl($action);
+        if ($postId === 0 && $url !== '') {
+            $store = $this->getUrlMetaStore();
+            $beforeTitle = (string) $store->getMeta($url, 'title');
+            
+            if (trim($beforeTitle) === trim($title)) {
+                return [
+                    'status' => 'applied',
+                    'metadata' => ['noop' => true],
+                    'before' => ['title' => $beforeTitle, 'post_title' => ''],
+                    'after' => ['title' => $beforeTitle, 'post_title' => ''],
+                ];
+            }
+            
+            $store->setMeta($url, 'title', $title);
+            return [
+                'status' => 'applied',
+                'metadata' => [
+                    'handler' => 'title',
+                    'adapter' => 'url_meta_store',
+                    'mirrored_post_title' => false,
+                ],
+                'before' => ['title' => $beforeTitle, 'post_title' => ''],
+                'after' => [
+                    'title' => $title,
+                    'post_title' => '',
+                    'adapter' => 'url_meta_store',
+                    'mirrored_post_title' => false,
+                ],
+            ];
+        }
+
+        if (!$post) {
+            throw new Exception('Post not found.');
         }
 
         $before = [
@@ -112,6 +154,17 @@ final class TitleHandler extends AbstractActionHandler
 
         $previousSeoTitle = isset($before['title']) ? (string) $before['title'] : '';
         $previousPostTitle = isset($before['post_title']) ? (string) $before['post_title'] : '';
+
+        $url = $this->resolveUrl($action);
+        if ($postId === 0 && $url !== '') {
+            $store = $this->getUrlMetaStore();
+            if ($previousSeoTitle !== '') {
+                $store->setMeta($url, 'title', $previousSeoTitle);
+            } else {
+                $store->deleteMeta($url, 'title');
+            }
+            return ['status' => 'rolled_back'];
+        }
 
         if ($previousSeoTitle !== '') {
             $this->adapter->setTitle($postId, $previousSeoTitle);

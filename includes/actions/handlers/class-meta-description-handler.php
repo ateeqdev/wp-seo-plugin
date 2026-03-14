@@ -25,6 +25,12 @@ final class MetaDescriptionHandler extends AbstractActionHandler
     public function validate(array $action)
     {
         $postId = $this->resolvePostId($action);
+        $url = $this->resolveUrl($action);
+
+        if ($postId === 0 && $url !== '') {
+            return true;
+        }
+
         $post = get_post($postId);
 
         if (!$post || $post->post_status === 'trash') {
@@ -58,6 +64,35 @@ final class MetaDescriptionHandler extends AbstractActionHandler
         $length = strlen($description);
         if ($length > 320) {
             throw new Exception('Meta description must be 320 characters or fewer.');
+        }
+
+        $url = $this->resolveUrl($action);
+        if ($postId === 0 && $url !== '') {
+            $store = $this->getUrlMetaStore();
+            $beforeDesc = (string) $store->getMeta($url, 'meta_description');
+            
+            if (trim($beforeDesc) === trim($description)) {
+                return [
+                    'status' => 'applied',
+                    'metadata' => ['noop' => true],
+                    'before' => ['meta_description' => $beforeDesc],
+                    'after' => ['meta_description' => $beforeDesc],
+                ];
+            }
+            
+            $store->setMeta($url, 'meta_description', $description);
+            return [
+                'status' => 'applied',
+                'metadata' => [
+                    'handler' => 'meta_description',
+                    'adapter' => 'url_meta_store',
+                ],
+                'before' => ['meta_description' => $beforeDesc],
+                'after' => [
+                    'meta_description' => $description,
+                    'adapter' => 'url_meta_store',
+                ],
+            ];
         }
 
         $before = [
@@ -108,6 +143,17 @@ final class MetaDescriptionHandler extends AbstractActionHandler
         }
 
         $previous = isset($before['meta_description']) ? (string) $before['meta_description'] : '';
+
+        $url = $this->resolveUrl($action);
+        if ($postId === 0 && $url !== '') {
+            $store = $this->getUrlMetaStore();
+            if ($previous !== '') {
+                $store->setMeta($url, 'meta_description', $previous);
+            } else {
+                $store->deleteMeta($url, 'meta_description');
+            }
+            return ['status' => 'rolled_back'];
+        }
 
         if ($previous !== '') {
             $this->adapter->setDescription($postId, $previous);

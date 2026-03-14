@@ -25,7 +25,7 @@ final class RestAccessCompatibility
     }
 
     /**
-     * @param mixed $result
+     * @param  mixed  $result
      * @return mixed
      */
     public function allowSeoAutoRequests($result)
@@ -35,7 +35,7 @@ final class RestAccessCompatibility
         }
 
         $route = $this->detectRestRoute();
-        if ($route === '' || !$this->isSeoAutoRoute($route)) {
+        if ($route === '' || ! $this->isSeoAutoRoute($route)) {
             return $result;
         }
 
@@ -44,7 +44,7 @@ final class RestAccessCompatibility
         }
 
         $token = $this->readInboundToken();
-        if ($token === '' || !$this->tokenManager->verifyInboundToken($token)) {
+        if ($token === '' || ! $this->tokenManager->verifyInboundToken($token)) {
             return $result;
         }
 
@@ -64,7 +64,7 @@ final class RestAccessCompatibility
         if (isset($wp) && is_object($wp) && isset($wp->query_vars['rest_route'])) {
             $route = (string) $wp->query_vars['rest_route'];
             if ($route !== '') {
-                return '/' . ltrim($route, '/');
+                return '/'.ltrim($route, '/');
             }
         }
 
@@ -74,31 +74,30 @@ final class RestAccessCompatibility
         }
 
         $path = (string) parse_url($uri, PHP_URL_PATH);
-        $prefix = '/' . trim((string) rest_get_url_prefix(), '/') . '/';
+        $prefix = '/'.trim((string) rest_get_url_prefix(), '/').'/';
         $position = strpos($path, $prefix);
 
         if ($position === false) {
             return '';
         }
 
-        return '/' . ltrim(substr($path, $position + strlen($prefix)), '/');
+        return '/'.ltrim(substr($path, $position + strlen($prefix)), '/');
     }
 
     private function isSeoAutoRoute(string $route): bool
     {
-        return strpos($route, '/seoworkerai/v1/') === 0 || strpos($route, '/seo-platform/v1/') === 0;
+        return strpos($route, '/seoworkerai/v1/') === 0;
     }
 
     private function isOwnershipProofRoute(string $route): bool
     {
-        return strpos($route, '/seoworkerai/v1/ownership-proof') === 0
-            || strpos($route, '/seo-platform/v1/ownership-proof') === 0;
+        return strpos($route, '/seoworkerai/v1/ownership-proof') === 0;
     }
 
     private function readInboundToken(): string
     {
         $serverValue = $_SERVER['HTTP_X_SITE_TOKEN'] ?? '';
-        if (!is_string($serverValue)) {
+        if (! is_string($serverValue)) {
             return '';
         }
 

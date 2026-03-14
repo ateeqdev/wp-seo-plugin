@@ -51,13 +51,39 @@ abstract class AbstractActionHandler implements InterfaceActionHandler
     {
         $target = isset($action['target_id']) ? (int) $action['target_id'] : 0;
 
+        if ($target === 0 && !empty($action['target_url'])) {
+            $target = url_to_postid($action['target_url']);
+        }
+
         if ($target > 0) {
             return $target;
         }
 
         $data = $this->payload($action);
 
-        return isset($data['post_id']) ? (int) $data['post_id'] : 0;
+        $target = isset($data['post_id']) ? (int) $data['post_id'] : 0;
+
+        if ($target === 0 && !empty($data['post_url'])) {
+            $target = url_to_postid($data['post_url']);
+        }
+
+        return $target;
+    }
+
+    protected function resolveUrl(array $action): string
+    {
+        $url = isset($action['target_url']) ? trim((string) $action['target_url']) : '';
+        if ($url !== '') {
+            return $url;
+        }
+
+        $data = $this->payload($action);
+        return isset($data['post_url']) ? trim((string) $data['post_url']) : '';
+    }
+
+    protected function getUrlMetaStore(): \SEOWorkerAI\Connector\Storage\UrlMetaStore
+    {
+        return new \SEOWorkerAI\Connector\Storage\UrlMetaStore();
     }
 
     protected function sanitizeText(string $value): string

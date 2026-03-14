@@ -89,7 +89,7 @@ final class SiteRegistrar
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<string, mixed>
      */
     private function registerFreshSite(array $payload, bool $fast): array
@@ -114,10 +114,10 @@ final class SiteRegistrar
                 ? $this->client->registerSiteFast($payload)
                 : $this->client->registerSite($payload);
 
-            if (!empty($response['site_id'])) {
+            if (! empty($response['site_id'])) {
                 update_option('seoworkerai_site_id', (int) $response['site_id'], false);
             }
-            if (!empty($response['api_key'])) {
+            if (! empty($response['api_key'])) {
                 $this->tokenManager->storeToken((string) $response['api_key']);
             }
 
@@ -176,7 +176,7 @@ final class SiteRegistrar
     private function resolveUserAvatarUrl(int $userId): string
     {
         $avatarUrl = get_avatar_url($userId, ['size' => 256]);
-        if (!is_string($avatarUrl) || trim($avatarUrl) === '') {
+        if (! is_string($avatarUrl) || trim($avatarUrl) === '') {
             return '';
         }
 
@@ -184,7 +184,7 @@ final class SiteRegistrar
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      */
     private function reactivateSiteWithOwnershipProof(int $siteId, array $payload): void
     {
@@ -230,22 +230,8 @@ final class SiteRegistrar
         $host = is_string($host) ? trim($host) : '';
 
         $description = trim((string) get_option('seoworkerai_site_profile_description', ''));
-        if ($description === '') {
-            if ($tagline !== '') {
-                $description = $tagline;
-            } elseif ($siteName !== '') {
-                $description = "{$siteName} website content and resources.";
-            } elseif ($host !== '') {
-                $description = "Website content and resources for {$host}.";
-            } else {
-                $description = 'Website content and resources.';
-            }
-        }
 
         $taste = trim((string) get_option('seoworkerai_site_profile_taste', ''));
-        if ($taste === '') {
-            $taste = 'Use a clear, factual, SEO-first writing style: concise headings, plain language, and actionable recommendations.';
-        }
 
         $locations = $this->normalizeLocationsOption(get_option('seoworkerai_site_locations', []));
         if ($locations === []) {
@@ -265,7 +251,7 @@ final class SiteRegistrar
     }
 
     /**
-     * @param array<string, mixed> $response
+     * @param  array<string, mixed>  $response
      */
     private function syncLocalSiteProfileFromResponse(array $response): void
     {
@@ -281,7 +267,7 @@ final class SiteRegistrar
         }
 
         $locations = isset($response['locations']) && is_array($response['locations']) ? $response['locations'] : [];
-        if (!empty($locations) && is_array($locations[0])) {
+        if (! empty($locations) && is_array($locations[0])) {
             $normalizedLocations = $this->normalizeLocationsOption($locations);
             $primaryLocation = $normalizedLocations[0];
             update_option('seoworkerai_site_locations', $normalizedLocations, false);
@@ -293,7 +279,7 @@ final class SiteRegistrar
             update_option('seoworkerai_site_seo_settings', $this->sanitizeSiteSettingsPayload($response['site_settings']), false);
         } elseif (array_key_exists('domain_rating', $response)) {
             $settings = get_option('seoworkerai_site_seo_settings', []);
-            if (!is_array($settings)) {
+            if (! is_array($settings)) {
                 $settings = [];
             }
 
@@ -351,7 +337,7 @@ final class SiteRegistrar
     }
 
     /**
-     * @param array<string, mixed> $response
+     * @param  array<string, mixed>  $response
      */
     private function syncInitialAuditFromResponse(array $response): void
     {
@@ -369,7 +355,7 @@ final class SiteRegistrar
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array{status:string,message:string,started_at:int,completed_at:int}
      */
     public static function sanitizeInitialAuditPayload(array $payload): array
@@ -383,7 +369,7 @@ final class SiteRegistrar
     }
 
     /**
-     * @param array<string, mixed> $settings
+     * @param  array<string, mixed>  $settings
      * @return array<string, mixed>
      */
     public function sanitizeSiteSettingsPayload(array $settings): array
@@ -399,8 +385,8 @@ final class SiteRegistrar
             'max_keyword_difficulty' => isset($settings['max_keyword_difficulty']) ? (int) $settings['max_keyword_difficulty'] : 100,
             'preferred_keyword_type' => sanitize_text_field((string) ($settings['preferred_keyword_type'] ?? '')),
             'content_briefs_per_run' => isset($settings['content_briefs_per_run']) ? (int) $settings['content_briefs_per_run'] : 3,
-            'prefer_low_difficulty' => !empty($settings['prefer_low_difficulty']),
-            'allow_low_volume' => !empty($settings['allow_low_volume']),
+            'prefer_low_difficulty' => ! empty($settings['prefer_low_difficulty']),
+            'allow_low_volume' => ! empty($settings['allow_low_volume']),
             'brand_twitter_handle' => sanitize_text_field((string) ($settings['brand_twitter_handle'] ?? '')),
             'default_social_image_url' => esc_url_raw((string) ($settings['default_social_image_url'] ?? '')),
             'selection_notes' => sanitize_textarea_field((string) ($settings['selection_notes'] ?? '')),
@@ -408,15 +394,15 @@ final class SiteRegistrar
     }
 
     /**
-     * @param array<string, mixed> $billing
+     * @param  array<string, mixed>  $billing
      * @return array<string, mixed>
      */
     public static function sanitizeBillingPayload(array $billing): array
     {
         return [
             'status' => sanitize_text_field((string) ($billing['status'] ?? 'payment_required')),
-            'payment_required' => !empty($billing['payment_required']),
-            'quota_blocked' => !empty($billing['quota_blocked']),
+            'payment_required' => ! empty($billing['payment_required']),
+            'quota_blocked' => ! empty($billing['quota_blocked']),
             'quota_message' => sanitize_text_field((string) ($billing['quota_message'] ?? '')),
             'company_id' => isset($billing['company_id']) ? (int) $billing['company_id'] : 0,
             'company_name' => sanitize_text_field((string) ($billing['company_name'] ?? '')),
@@ -433,18 +419,18 @@ final class SiteRegistrar
     }
 
     /**
-     * @param mixed $locations
+     * @param  mixed  $locations
      * @return array<int, array{location_type:string,location_code:int,location_name:string,priority:int}>
      */
     public function normalizeLocationsOption($locations): array
     {
-        if (!is_array($locations)) {
+        if (! is_array($locations)) {
             return [];
         }
 
         $rows = [];
         foreach ($locations as $index => $location) {
-            if (!is_array($location)) {
+            if (! is_array($location)) {
                 continue;
             }
 
@@ -477,7 +463,7 @@ final class SiteRegistrar
             $rows[$index]['priority'] = $index;
         }
 
-        if ($rows !== [] && !$seenPrimary) {
+        if ($rows !== [] && ! $seenPrimary) {
             $rows[0]['location_type'] = 'primary';
         }
 

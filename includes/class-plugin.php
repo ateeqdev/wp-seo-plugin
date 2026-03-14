@@ -28,6 +28,7 @@ use SEOWorkerAI\Connector\REST\MediaEndpoint;
 use SEOWorkerAI\Connector\REST\OwnershipProofEndpoint;
 use SEOWorkerAI\Connector\REST\PagesEndpoint;
 use SEOWorkerAI\Connector\REST\RestAccessCompatibility;
+use SEOWorkerAI\Connector\REST\SiteProfileEndpoint;
 use SEOWorkerAI\Connector\SEO\SeoDetector;
 use SEOWorkerAI\Connector\Storage\Schema;
 use SEOWorkerAI\Connector\Sync\BriefSyncer;
@@ -45,13 +46,13 @@ final class Plugin
 
     private function __construct()
     {
-        $this->container = new ServiceContainer();
+        $this->container = new ServiceContainer;
     }
 
     public static function instance(): self
     {
         if (self::$instance === null) {
-            self::$instance = new self();
+            self::$instance = new self;
         }
 
         return self::$instance;
@@ -72,14 +73,14 @@ final class Plugin
 
     private function registerServices(): void
     {
-        $this->container->register('logger', static fn (): Logger => new Logger(), true);
-        $this->container->register('token_encryption', static fn (): TokenEncryption => new TokenEncryption(), true);
+        $this->container->register('logger', static fn (): Logger => new Logger, true);
+        $this->container->register('token_encryption', static fn (): TokenEncryption => new TokenEncryption, true);
         $this->container->register(
             'site_token_manager',
             fn (ServiceContainer $c): SiteTokenManager => new SiteTokenManager($c->get('token_encryption')),
             true
         );
-        $this->container->register('retry_policy', static fn (): RetryPolicy => new RetryPolicy(), false);
+        $this->container->register('retry_policy', static fn (): RetryPolicy => new RetryPolicy, false);
         $this->container->register(
             'api_client',
             fn (ServiceContainer $c): ApiClient => new ApiClient($c->get('site_token_manager'), $c->get('logger')),
@@ -97,7 +98,7 @@ final class Plugin
         );
         $this->container->register(
             'action_repository',
-            fn (): ActionRepository => new ActionRepository(),
+            fn (): ActionRepository => new ActionRepository,
             true
         );
         $this->container->register(
@@ -138,12 +139,12 @@ final class Plugin
         );
         $this->container->register(
             'event_outbox',
-            fn (): EventOutbox => new EventOutbox(),
+            fn (): EventOutbox => new EventOutbox,
             true
         );
         $this->container->register(
             'event_mapper',
-            fn (): EventMapper => new EventMapper(),
+            fn (): EventMapper => new EventMapper,
             true
         );
         $this->container->register(
@@ -210,6 +211,11 @@ final class Plugin
             true
         );
         $this->container->register(
+            'site_profile_endpoint',
+            fn (ServiceContainer $c): SiteProfileEndpoint => new SiteProfileEndpoint($c->get('site_token_manager')),
+            true
+        );
+        $this->container->register(
             'pages_endpoint',
             fn (ServiceContainer $c): PagesEndpoint => new PagesEndpoint($c->get('site_token_manager'), $c->get('seo_detector')),
             true
@@ -226,7 +232,7 @@ final class Plugin
         );
         $this->container->register(
             'ownership_proof_endpoint',
-            fn (): OwnershipProofEndpoint => new OwnershipProofEndpoint(),
+            fn (): OwnershipProofEndpoint => new OwnershipProofEndpoint,
             true
         );
         $this->container->register(
@@ -263,9 +269,10 @@ final class Plugin
         add_action('admin_init', [$this, 'maybeRunImmediateAutoRegister'], 1);
         add_action('admin_init', [$this, 'maybeScheduleAutoRegister']);
         add_action('admin_init', [$this, 'checkCronHealth']);
-        add_filter('plugin_action_links_' . plugin_basename(SEOWORKERAI_PLUGIN_FILE), [$this, 'filterPluginActionLinks']);
+        add_filter('plugin_action_links_'.plugin_basename(SEOWORKERAI_PLUGIN_FILE), [$this, 'filterPluginActionLinks']);
 
         add_action('rest_api_init', function (): void {
+            $this->container->get('site_profile_endpoint')->registerRoutes();
             $this->container->get('pages_endpoint')->registerRoutes();
             $this->container->get('media_endpoint')->registerRoutes();
             $this->container->get('actions_endpoint')->registerRoutes();
@@ -273,6 +280,9 @@ final class Plugin
         });
 
         add_action('wp_head', function (): void {
+            $urlStore = new \SEOWorkerAI\Connector\Storage\UrlMetaStore;
+            $urlStore->renderMetaTags();
+
             $adapter = SeoDetector::instance()->getAdapter();
             if (method_exists($adapter, 'renderMetaTags')) {
                 $adapter->renderMetaTags();
@@ -288,11 +298,11 @@ final class Plugin
         $siteId = (int) get_option('seoworkerai_site_id', 0);
         $pending = (bool) get_option('seoworkerai_auto_register_pending', false);
 
-        if (!$pending && $siteId > 0) {
+        if (! $pending && $siteId > 0) {
             return;
         }
 
-        if (!wp_next_scheduled('seoworkerai_auto_register_site')) {
+        if (! wp_next_scheduled('seoworkerai_auto_register_site')) {
             wp_schedule_single_event(time() + 20, 'seoworkerai_auto_register_site');
         }
     }
@@ -305,7 +315,7 @@ final class Plugin
 
         $siteId = (int) get_option('seoworkerai_site_id', 0);
         $pending = (bool) get_option('seoworkerai_auto_register_pending', false);
-        if ($siteId > 0 && !$pending) {
+        if ($siteId > 0 && ! $pending) {
             return;
         }
 
@@ -320,13 +330,13 @@ final class Plugin
 
     public function maybeRedirectAfterActivation(): void
     {
-        if (!is_admin() || !current_user_can('manage_options')) {
+        if (! is_admin() || ! current_user_can('manage_options')) {
             return;
         }
         if ((function_exists('wp_doing_ajax') && wp_doing_ajax()) || (function_exists('wp_doing_cron') && wp_doing_cron())) {
             return;
         }
-        if (!((bool) get_option('seoworkerai_activation_redirect', false))) {
+        if (! ((bool) get_option('seoworkerai_activation_redirect', false))) {
             return;
         }
         update_option('seoworkerai_activation_redirect', false, false);
@@ -338,13 +348,14 @@ final class Plugin
     {
         $result = $this->container->get('site_registrar')->registerOrUpdate(true);
         $siteId = (int) get_option('seoworkerai_site_id', 0);
-        if (!isset($result['error']) && $siteId > 0) {
+        if (! isset($result['error']) && $siteId > 0) {
             update_option('seoworkerai_auto_register_pending', false, false);
+
             return;
         }
 
         update_option('seoworkerai_auto_register_pending', true, false);
-        if (!wp_next_scheduled('seoworkerai_auto_register_site')) {
+        if (! wp_next_scheduled('seoworkerai_auto_register_site')) {
             wp_schedule_single_event(time() + 5 * MINUTE_IN_SECONDS, 'seoworkerai_auto_register_site');
         }
     }
@@ -363,7 +374,7 @@ final class Plugin
     }
 
     /**
-     * @param array<int, string> $links
+     * @param  array<int, string>  $links
      * @return array<int, string>
      */
     public function filterPluginActionLinks(array $links): array

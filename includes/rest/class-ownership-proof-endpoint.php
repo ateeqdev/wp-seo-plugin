@@ -10,13 +10,12 @@ final class OwnershipProofEndpoint
 {
     public function registerRoutes(): void
     {
-        foreach (['seoworkerai/v1', 'seo-platform/v1'] as $namespace) {
-            register_rest_route($namespace, '/ownership-proof', [
-                'methods' => 'GET',
-                'callback' => [$this, 'showProof'],
-                'permission_callback' => '__return_true',
-            ]);
-        }
+        $namespace = 'seoworkerai/v1';
+        register_rest_route($namespace, '/ownership-proof', [
+            'methods' => 'GET',
+            'callback' => [$this, 'showProof'],
+            'permission_callback' => '__return_true',
+        ]);
     }
 
     /**
