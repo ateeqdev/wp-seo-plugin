@@ -279,10 +279,10 @@ final class Plugin
             $this->container->get('ownership_proof_endpoint')->registerRoutes();
         });
 
-        add_action('wp_head', function (): void {
-            $urlStore = new \SEOWorkerAI\Connector\Storage\UrlMetaStore;
-            $urlStore->renderMetaTags();
+        $urlStore = new \SEOWorkerAI\Connector\Storage\UrlMetaStore;
+        $urlStore->registerFrontendHooks();
 
+        add_action('wp_head', static function (): void {
             $adapter = SeoDetector::instance()->getAdapter();
             if (method_exists($adapter, 'renderMetaTags')) {
                 $adapter->renderMetaTags();
