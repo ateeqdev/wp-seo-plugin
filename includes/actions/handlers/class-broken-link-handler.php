@@ -16,23 +16,16 @@ final class BrokenLinkHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return bool|\WP_Error
      */
     public function validate(array $action)
     {
-        $postId = $this->resolvePostId($action);
-        $post = get_post($postId);
-
-        if (!$post || $post->post_status === 'trash') {
-            return new \WP_Error('missing_post', 'Target post not found.');
-        }
-
-        return true;
+        return $this->validateStrictPostTarget($action);
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function execute(array $action): array
@@ -40,7 +33,7 @@ final class BrokenLinkHandler extends AbstractActionHandler
         $postId = $this->resolvePostId($action);
         $post = get_post($postId);
 
-        if (!$post instanceof \WP_Post) {
+        if (! $post instanceof \WP_Post) {
             throw new Exception('Post not found.');
         }
 
@@ -60,7 +53,7 @@ final class BrokenLinkHandler extends AbstractActionHandler
         try {
             $content = (string) $post->post_content;
             $blocks = parse_blocks($content);
-            $hasBlocks = !empty($blocks);
+            $hasBlocks = ! empty($blocks);
 
             $totalReplacements = 0;
             $mutatedContent = $content;
@@ -111,13 +104,13 @@ final class BrokenLinkHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<int, array<string, mixed>> $blocks
+     * @param  array<int, array<string, mixed>>  $blocks
      * @return array<int, array<string, mixed>>
      */
     private function replaceUrlsInBlocks(array $blocks, string $brokenUrl, string $replacementUrl, int &$totalReplacements): array
     {
         foreach ($blocks as &$block) {
-            if (!is_array($block)) {
+            if (! is_array($block)) {
                 continue;
             }
 
@@ -134,7 +127,7 @@ final class BrokenLinkHandler extends AbstractActionHandler
 
                 if (isset($block['innerContent']) && is_array($block['innerContent'])) {
                     foreach ($block['innerContent'] as &$part) {
-                        if (!is_string($part) || $part === '') {
+                        if (! is_string($part) || $part === '') {
                             continue;
                         }
 
@@ -161,7 +154,7 @@ final class BrokenLinkHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function rollback(array $action): array
@@ -170,7 +163,7 @@ final class BrokenLinkHandler extends AbstractActionHandler
         $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
         $before = json_decode($rawBefore, true);
 
-        if (!is_array($before) || empty($before)) {
+        if (! is_array($before) || empty($before)) {
             return ['status' => 'failed', 'error' => 'Missing before snapshot'];
         }
 

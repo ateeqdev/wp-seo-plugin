@@ -19,23 +19,16 @@ final class SchemaHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return bool|\WP_Error
      */
     public function validate(array $action)
     {
-        $postId = $this->resolvePostId($action);
-        $post = get_post($postId);
-
-        if (!$post || $post->post_status === 'trash') {
-            return new \WP_Error('missing_post', 'Target post not found.');
-        }
-
-        return true;
+        return $this->validatePostOrUrlTarget($action);
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function execute(array $action): array
@@ -47,32 +40,62 @@ final class SchemaHandler extends AbstractActionHandler
 
         if (isset($payload['schema_data']) && is_array($payload['schema_data'])) {
             $schema = $payload['schema_data'];
-        } elseif (!empty($payload['json_ld']) && is_string($payload['json_ld'])) {
+        } elseif (! empty($payload['json_ld']) && is_string($payload['json_ld'])) {
             $decoded = json_decode($payload['json_ld'], true);
             if (is_array($decoded)) {
                 $schema = $decoded;
             }
         }
 
-        if (!is_array($schema)) {
+        if (! is_array($schema)) {
             throw new Exception('No schema data provided.');
         }
 
-        if (!isset($schema['@context'])) {
+        if (! isset($schema['@context'])) {
             $schema['@context'] = 'https://schema.org';
         }
 
-        if (!isset($schema['@type']) && isset($payload['schema_type'])) {
+        if (! isset($schema['@type']) && isset($payload['schema_type'])) {
             $schema['@type'] = (string) $payload['schema_type'];
         }
 
-        if (!isset($schema['@type'])) {
+        if (! isset($schema['@type'])) {
             throw new Exception('Schema missing @type.');
         }
 
         $json = wp_json_encode($schema);
-        if (!is_string($json) || strlen($json) > 256 * 1024) {
+        if (! is_string($json) || strlen($json) > 256 * 1024) {
             throw new Exception('Schema exceeds 256KB limit.');
+        }
+
+        $url = $this->resolveUrl($action);
+        if ($postId === 0 && $url !== '') {
+            $store = $this->getUrlMetaStore();
+            $beforeSchema = $store->getMeta($url, 'schema');
+            if (is_string($beforeSchema)) {
+                $beforeSchema = json_decode($beforeSchema, true);
+            }
+            if (! is_array($beforeSchema)) {
+                $beforeSchema = null;
+            }
+
+            $store->setMeta($url, 'schema', $schema);
+
+            return [
+                'status' => 'applied',
+                'metadata' => [
+                    'handler' => 'schema',
+                    'schema_type' => (string) $schema['@type'],
+                    'adapter' => 'url_meta_store',
+                    'adapter_success' => true,
+                ],
+                'before' => ['schema' => $beforeSchema],
+                'after' => [
+                    'schema' => $schema,
+                    'adapter' => 'url_meta_store',
+                    'adapter_success' => true,
+                ],
+            ];
         }
 
         $before = [
@@ -104,7 +127,7 @@ final class SchemaHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function rollback(array $action): array
@@ -113,12 +136,24 @@ final class SchemaHandler extends AbstractActionHandler
         $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
         $before = json_decode($rawBefore, true);
 
-        if (!is_array($before)) {
+        if (! is_array($before)) {
             return ['status' => 'failed', 'error' => 'Missing before snapshot'];
         }
 
         $schema = isset($before['schema']) && is_array($before['schema']) ? $before['schema'] : null;
         $pluginSchema = isset($before['plugin_schema']) && is_array($before['plugin_schema']) ? $before['plugin_schema'] : null;
+
+        $url = $this->resolveUrl($action);
+        if ($postId === 0 && $url !== '') {
+            $store = $this->getUrlMetaStore();
+            if (is_array($schema) && $schema !== []) {
+                $store->setMeta($url, 'schema', $schema);
+            } else {
+                $store->deleteMeta($url, 'schema');
+            }
+
+            return ['status' => 'rolled_back'];
+        }
 
         if (is_array($schema) && $schema !== []) {
             $this->adapter->setSchema($postId, $schema);

@@ -16,23 +16,16 @@ final class InternalLinkHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return bool|\WP_Error
      */
     public function validate(array $action)
     {
-        $postId = $this->resolvePostId($action);
-        $post = get_post($postId);
-
-        if (!$post || $post->post_status === 'trash') {
-            return new \WP_Error('missing_post', 'Target post not found.');
-        }
-
-        return true;
+        return $this->validateStrictPostTarget($action);
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function execute(array $action): array
@@ -40,7 +33,7 @@ final class InternalLinkHandler extends AbstractActionHandler
         $postId = $this->resolvePostId($action);
         $post = get_post($postId);
 
-        if (!$post instanceof \WP_Post) {
+        if (! $post instanceof \WP_Post) {
             throw new Exception('Post not found.');
         }
 
@@ -55,7 +48,7 @@ final class InternalLinkHandler extends AbstractActionHandler
         try {
             $content = (string) $post->post_content;
             $blocks = parse_blocks($content);
-            $hasBlocks = !empty($blocks);
+            $hasBlocks = ! empty($blocks);
 
             $applied = [];
 
@@ -104,7 +97,7 @@ final class InternalLinkHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $payload
+     * @param  array<string, mixed>  $payload
      * @return array<int, array{to_url:string,anchor_text:string}>
      */
     private function normalizeSuggestions(array $payload): array
@@ -120,7 +113,7 @@ final class InternalLinkHandler extends AbstractActionHandler
         $normalized = [];
 
         foreach ($input as $suggestion) {
-            if (!is_array($suggestion)) {
+            if (! is_array($suggestion)) {
                 continue;
             }
 
@@ -141,9 +134,9 @@ final class InternalLinkHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<int, array<string, mixed>> $blocks
-     * @param array<int, array{to_url:string,anchor_text:string}> $suggestions
-     * @param array<int, array{to_url:string,anchor_text:string,insertion:string}> $applied
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @param  array<int, array{to_url:string,anchor_text:string}>  $suggestions
+     * @param  array<int, array{to_url:string,anchor_text:string,insertion:string}>  $applied
      * @return array<int, array<string, mixed>>
      */
     private function applySuggestionsToBlocks(array $blocks, array $suggestions, array &$applied): array
@@ -157,15 +150,15 @@ final class InternalLinkHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<int, array<string, mixed>> $blocks
-     * @param array{to_url:string,anchor_text:string} $suggestion
-     * @param array<int, array{to_url:string,anchor_text:string,insertion:string}> $applied
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @param  array{to_url:string,anchor_text:string}  $suggestion
+     * @param  array<int, array{to_url:string,anchor_text:string,insertion:string}>  $applied
      * @return array<int, array<string, mixed>>
      */
     private function insertSuggestionIntoBlocks(array $blocks, array $suggestion, bool &$inserted, array &$applied): array
     {
         foreach ($blocks as &$block) {
-            if (!is_array($block)) {
+            if (! is_array($block)) {
                 continue;
             }
 
@@ -199,7 +192,7 @@ final class InternalLinkHandler extends AbstractActionHandler
                 }
             }
 
-            if (!$inserted && isset($block['innerBlocks']) && is_array($block['innerBlocks'])) {
+            if (! $inserted && isset($block['innerBlocks']) && is_array($block['innerBlocks'])) {
                 $block['innerBlocks'] = $this->insertSuggestionIntoBlocks(
                     $block['innerBlocks'],
                     $suggestion,
@@ -214,8 +207,8 @@ final class InternalLinkHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<int, array{to_url:string,anchor_text:string}> $suggestions
-     * @param array<int, array{to_url:string,anchor_text:string,insertion:string}> $applied
+     * @param  array<int, array{to_url:string,anchor_text:string}>  $suggestions
+     * @param  array<int, array{to_url:string,anchor_text:string,insertion:string}>  $applied
      */
     private function applySuggestionsToRawContent(string $content, array $suggestions, array &$applied): string
     {
@@ -242,7 +235,7 @@ final class InternalLinkHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function rollback(array $action): array
@@ -251,7 +244,7 @@ final class InternalLinkHandler extends AbstractActionHandler
         $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
         $before = json_decode($rawBefore, true);
 
-        if (!is_array($before) || empty($before)) {
+        if (! is_array($before) || empty($before)) {
             return ['status' => 'failed', 'error' => 'Missing before snapshot'];
         }
 

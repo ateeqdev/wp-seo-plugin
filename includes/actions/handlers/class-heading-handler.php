@@ -15,23 +15,16 @@ final class HeadingHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return bool|\WP_Error
      */
     public function validate(array $action)
     {
-        $postId = $this->resolvePostId($action);
-        $post = get_post($postId);
-
-        if (!$post || $post->post_status === 'trash') {
-            return new \WP_Error('missing_post', 'Target post not found.');
-        }
-
-        return true;
+        return $this->validateStrictPostTarget($action);
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function execute(array $action): array
@@ -39,7 +32,7 @@ final class HeadingHandler extends AbstractActionHandler
         $postId = $this->resolvePostId($action);
         $post = get_post($postId);
 
-        if (!$post instanceof \WP_Post) {
+        if (! $post instanceof \WP_Post) {
             throw new Exception('Post not found.');
         }
 
@@ -48,6 +41,7 @@ final class HeadingHandler extends AbstractActionHandler
 
         if (empty($adjustments)) {
             $snapshot = $this->capturePostSnapshot($postId);
+
             return [
                 'status' => 'applied',
                 'metadata' => ['noop' => true, 'reason' => 'No heading adjustments'],
@@ -82,7 +76,7 @@ final class HeadingHandler extends AbstractActionHandler
             $this->collectHeadingLevels($mutatedBlocks, $levels);
             $validation = $this->validateHierarchy($levels);
             if ($validation['valid'] === false) {
-                throw new Exception('Resulting heading hierarchy invalid: ' . implode('; ', $validation['issues']));
+                throw new Exception('Resulting heading hierarchy invalid: '.implode('; ', $validation['issues']));
             }
 
             $mutatedContent = serialize_blocks($mutatedBlocks);
@@ -116,15 +110,15 @@ final class HeadingHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<int, array<string, mixed>> $blocks
-     * @param array<int, mixed> $adjustments
-     * @param array<int, array{heading:string,from:int,to:int}> $changes
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @param  array<int, mixed>  $adjustments
+     * @param  array<int, array{heading:string,from:int,to:int}>  $changes
      * @return array<int, array<string, mixed>>
      */
     private function applyAdjustmentsToBlocks(array $blocks, array $adjustments, array &$changes): array
     {
         foreach ($blocks as &$block) {
-            if (!is_array($block)) {
+            if (! is_array($block)) {
                 continue;
             }
 
@@ -133,13 +127,13 @@ final class HeadingHandler extends AbstractActionHandler
                 $headingText = wp_strip_all_tags((string) ($block['innerHTML'] ?? ''));
 
                 foreach ($adjustments as $adjustment) {
-                    if (!is_array($adjustment)) {
+                    if (! is_array($adjustment)) {
                         continue;
                     }
 
                     $targetText = wp_strip_all_tags((string) ($adjustment['heading_text'] ?? ''));
-                    $from = (int) str_replace('h', '', strtolower((string) ($adjustment['current_level'] ?? 'h' . $currentLevel)));
-                    $to = (int) str_replace('h', '', strtolower((string) ($adjustment['target_level'] ?? 'h' . $currentLevel)));
+                    $from = (int) str_replace('h', '', strtolower((string) ($adjustment['current_level'] ?? 'h'.$currentLevel)));
+                    $to = (int) str_replace('h', '', strtolower((string) ($adjustment['target_level'] ?? 'h'.$currentLevel)));
 
                     if ($targetText === '' || $to < 1 || $to > 6) {
                         continue;
@@ -183,24 +177,24 @@ final class HeadingHandler extends AbstractActionHandler
             return $html;
         }
 
-        $updated = preg_replace('/<h' . $from . '(\s[^>]*)?>/i', '<h' . $to . '$1>', $html, 1);
-        if (!is_string($updated)) {
+        $updated = preg_replace('/<h'.$from.'(\s[^>]*)?>/i', '<h'.$to.'$1>', $html, 1);
+        if (! is_string($updated)) {
             $updated = $html;
         }
 
-        $updated = preg_replace('/<\/h' . $from . '>/i', '</h' . $to . '>', $updated, 1);
+        $updated = preg_replace('/<\/h'.$from.'>/i', '</h'.$to.'>', $updated, 1);
 
         return is_string($updated) ? $updated : $html;
     }
 
     /**
-     * @param array<int, array<string, mixed>> $blocks
-     * @param int[] $levels
+     * @param  array<int, array<string, mixed>>  $blocks
+     * @param  int[]  $levels
      */
     private function collectHeadingLevels(array $blocks, array &$levels): void
     {
         foreach ($blocks as $block) {
-            if (!is_array($block)) {
+            if (! is_array($block)) {
                 continue;
             }
 
@@ -215,7 +209,7 @@ final class HeadingHandler extends AbstractActionHandler
     }
 
     /**
-     * @param int[] $levels
+     * @param  int[]  $levels
      * @return array{valid:bool,issues:array<int,string>}
      */
     private function validateHierarchy(array $levels): array
@@ -242,7 +236,7 @@ final class HeadingHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function rollback(array $action): array
@@ -251,7 +245,7 @@ final class HeadingHandler extends AbstractActionHandler
         $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
         $before = json_decode($rawBefore, true);
 
-        if (!is_array($before) || empty($before)) {
+        if (! is_array($before) || empty($before)) {
             return ['status' => 'failed', 'error' => 'Missing before snapshot'];
         }
 

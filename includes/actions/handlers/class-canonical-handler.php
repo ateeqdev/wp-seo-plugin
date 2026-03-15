@@ -19,23 +19,16 @@ final class CanonicalHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return bool|\WP_Error
      */
     public function validate(array $action)
     {
-        $postId = $this->resolvePostId($action);
-        $post = get_post($postId);
-
-        if (!$post || $post->post_status === 'trash') {
-            return new \WP_Error('missing_post', 'Target post not found.');
-        }
-
-        return true;
+        return $this->validatePostOrUrlTarget($action);
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function execute(array $action): array
@@ -59,11 +52,50 @@ final class CanonicalHandler extends AbstractActionHandler
             }
         }
 
+        $url = $this->resolveUrl($action);
+        if ($postId === 0 && $url !== '') {
+            $store = $this->getUrlMetaStore();
+            $beforeCanonical = (string) $store->getMeta($url, 'canonical');
+
+            if (trim($beforeCanonical) === trim($canonical)) {
+                return [
+                    'status' => 'applied',
+                    'metadata' => ['noop' => true],
+                    'before' => ['canonical' => $beforeCanonical],
+                    'after' => ['canonical' => $beforeCanonical],
+                ];
+            }
+
+            $store->setMeta($url, 'canonical', $canonical);
+
+            return [
+                'status' => 'applied',
+                'metadata' => [
+                    'handler' => 'canonical',
+                    'adapter' => 'url_meta_store',
+                ],
+                'before' => ['canonical' => $beforeCanonical],
+                'after' => [
+                    'canonical' => $canonical,
+                    'adapter' => 'url_meta_store',
+                ],
+            ];
+        }
+
         $before = [
             'canonical' => (string) ($this->adapter->getCanonical($postId) ?? ''),
         ];
 
-        if (!$this->adapter->setCanonical($postId, $canonical)) {
+        if (trim($before['canonical']) === trim($canonical)) {
+            return [
+                'status' => 'applied',
+                'metadata' => ['noop' => true],
+                'before' => $before,
+                'after' => $before,
+            ];
+        }
+
+        if (! $this->adapter->setCanonical($postId, $canonical)) {
             throw new Exception('Adapter failed to set canonical URL.');
         }
 
@@ -81,5 +113,45 @@ final class CanonicalHandler extends AbstractActionHandler
             'before' => $before,
             'after' => $after,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $action
+     * @return array<string, mixed>
+     */
+    public function rollback(array $action): array
+    {
+        $postId = $this->resolvePostId($action);
+        $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
+        $before = json_decode($rawBefore, true);
+
+        if (! is_array($before)) {
+            return ['status' => 'failed', 'error' => 'Missing before snapshot'];
+        }
+
+        $previous = isset($before['canonical']) ? (string) $before['canonical'] : '';
+
+        $url = $this->resolveUrl($action);
+        if ($postId === 0 && $url !== '') {
+            $store = $this->getUrlMetaStore();
+            if ($previous !== '') {
+                $store->setMeta($url, 'canonical', $previous);
+            } else {
+                $store->deleteMeta($url, 'canonical');
+            }
+
+            return ['status' => 'rolled_back'];
+        }
+
+        if ($previous !== '') {
+            $this->adapter->setCanonical($postId, $previous);
+        } else {
+            delete_post_meta($postId, '_seoworkerai_canonical');
+            delete_post_meta($postId, '_yoast_wpseo_canonical');
+            delete_post_meta($postId, '_rank_math_canonical_url');
+            delete_post_meta($postId, '_aioseo_canonical_url');
+        }
+
+        return ['status' => 'rolled_back'];
     }
 }

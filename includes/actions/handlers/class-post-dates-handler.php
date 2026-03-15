@@ -15,23 +15,16 @@ final class PostDatesHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return bool|\WP_Error
      */
     public function validate(array $action)
     {
-        $postId = $this->resolvePostId($action);
-        $post = get_post($postId);
-
-        if (!$post || $post->post_status === 'trash') {
-            return new \WP_Error('missing_post', 'Target post not found.');
-        }
-
-        return true;
+        return $this->validateStrictPostTarget($action);
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function execute(array $action): array
@@ -40,11 +33,11 @@ final class PostDatesHandler extends AbstractActionHandler
         $post = get_post($postId);
         $payload = $this->payload($action);
 
-        if (!$post instanceof \WP_Post) {
+        if (! $post instanceof \WP_Post) {
             throw new Exception('Post not found.');
         }
 
-        $onlyIfMissing = !empty($payload['only_if_missing']);
+        $onlyIfMissing = ! empty($payload['only_if_missing']);
         $publishedAt = (string) ($payload['published_at'] ?? '');
         $modifiedAt = (string) ($payload['modified_at'] ?? '');
 
@@ -59,7 +52,7 @@ final class PostDatesHandler extends AbstractActionHandler
 
         $updates = ['ID' => $postId];
 
-        if (!$onlyIfMissing || $post->post_date_gmt === '0000-00-00 00:00:00' || $post->post_date_gmt === '') {
+        if (! $onlyIfMissing || $post->post_date_gmt === '0000-00-00 00:00:00' || $post->post_date_gmt === '') {
             if ($publishedAt !== '') {
                 $publishedTs = strtotime($publishedAt);
                 if ($publishedTs !== false) {
@@ -69,7 +62,7 @@ final class PostDatesHandler extends AbstractActionHandler
             }
         }
 
-        if (!$onlyIfMissing || $post->post_modified_gmt === '0000-00-00 00:00:00' || $post->post_modified_gmt === '') {
+        if (! $onlyIfMissing || $post->post_modified_gmt === '0000-00-00 00:00:00' || $post->post_modified_gmt === '') {
             if ($modifiedAt !== '') {
                 $modifiedTs = strtotime($modifiedAt);
                 if ($modifiedTs !== false) {
@@ -101,7 +94,7 @@ final class PostDatesHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function rollback(array $action): array
@@ -110,7 +103,7 @@ final class PostDatesHandler extends AbstractActionHandler
         $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
         $before = json_decode($rawBefore, true);
 
-        if (!is_array($before)) {
+        if (! is_array($before)) {
             return ['status' => 'failed', 'error' => 'Missing before snapshot'];
         }
 

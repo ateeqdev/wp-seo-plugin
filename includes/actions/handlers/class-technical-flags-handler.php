@@ -19,23 +19,16 @@ final class TechnicalFlagsHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return bool|\WP_Error
      */
     public function validate(array $action)
     {
-        $postId = $this->resolvePostId($action);
-        $post = get_post($postId);
-
-        if (!$post || $post->post_status === 'trash') {
-            return new \WP_Error('missing_post', 'Target post not found.');
-        }
-
-        return true;
+        return $this->validatePostOrUrlTarget($action);
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function execute(array $action): array
@@ -43,15 +36,39 @@ final class TechnicalFlagsHandler extends AbstractActionHandler
         $postId = $this->resolvePostId($action);
         $payload = $this->payload($action);
 
-        if (!isset($payload['robots']) || !is_array($payload['robots'])) {
+        if (! isset($payload['robots']) || ! is_array($payload['robots'])) {
             throw new Exception('No robots directives provided.');
+        }
+
+        $url = $this->resolveUrl($action);
+        if ($postId === 0 && $url !== '') {
+            $store = $this->getUrlMetaStore();
+            $beforeRobots = $store->getMeta($url, 'robots');
+            if (! is_array($beforeRobots)) {
+                $beforeRobots = [];
+            }
+
+            $store->setMeta($url, 'robots', $payload['robots']);
+
+            return [
+                'status' => 'applied',
+                'metadata' => [
+                    'handler' => 'technical_seo_flags',
+                    'adapter' => 'url_meta_store',
+                ],
+                'before' => ['robots' => $beforeRobots],
+                'after' => [
+                    'robots' => $payload['robots'],
+                    'adapter' => 'url_meta_store',
+                ],
+            ];
         }
 
         $before = [
             'robots' => $this->adapter->getRobots($postId),
         ];
 
-        if (!$this->adapter->setRobots($postId, $payload['robots'])) {
+        if (! $this->adapter->setRobots($postId, $payload['robots'])) {
             throw new Exception('Failed to set robots directives.');
         }
 
@@ -69,5 +86,46 @@ final class TechnicalFlagsHandler extends AbstractActionHandler
             'before' => $before,
             'after' => $after,
         ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $action
+     * @return array<string, mixed>
+     */
+    public function rollback(array $action): array
+    {
+        $postId = $this->resolvePostId($action);
+        $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
+        $before = json_decode($rawBefore, true);
+
+        if (! is_array($before)) {
+            return ['status' => 'failed', 'error' => 'Missing before snapshot'];
+        }
+
+        $previous = isset($before['robots']) && is_array($before['robots']) ? $before['robots'] : [];
+
+        $url = $this->resolveUrl($action);
+        if ($postId === 0 && $url !== '') {
+            $store = $this->getUrlMetaStore();
+            if ($previous !== []) {
+                $store->setMeta($url, 'robots', $previous);
+            } else {
+                $store->deleteMeta($url, 'robots');
+            }
+
+            return ['status' => 'rolled_back'];
+        }
+
+        if ($previous !== []) {
+            $this->adapter->setRobots($postId, $previous);
+        } else {
+            $this->adapter->setRobots($postId, []);
+            delete_post_meta($postId, '_seoworkerai_robots');
+            delete_post_meta($postId, '_yoast_wpseo_meta-robots-noindex');
+            delete_post_meta($postId, '_yoast_wpseo_meta-robots-nofollow');
+            delete_post_meta($postId, 'rank_math_robots');
+        }
+
+        return ['status' => 'rolled_back'];
     }
 }

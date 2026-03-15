@@ -21,25 +21,7 @@ final class SocialTagsHandler extends AbstractActionHandler
      */
     public function validate(array $action)
     {
-        $postId = $this->resolvePostId($action);
-
-        // post_id=0 means a theme-rendered page (e.g. the homepage).
-        // We store social tags in UrlMetaStore for these — no real post needed.
-        if ($postId === 0) {
-            $url = $this->resolveUrl($action);
-            if ($url === '') {
-                return new \WP_Error('missing_url', 'No target URL available for theme-rendered page.');
-            }
-
-            return true;
-        }
-
-        $post = get_post($postId);
-        if (! $post || $post->post_status === 'trash') {
-            return new \WP_Error('missing_post', 'Target post not found.');
-        }
-
-        return true;
+        return $this->validatePostOrUrlTarget($action);
     }
 
     /**

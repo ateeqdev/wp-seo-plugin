@@ -19,45 +19,33 @@ final class TitleHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return bool|\WP_Error
      */
     public function validate(array $action)
     {
-        $postId = $this->resolvePostId($action);
-        $url = $this->resolveUrl($action);
-
-        if ($postId === 0 && $url !== '') {
-            return true;
-        }
-
-        $post = get_post($postId);
-
-        if (!$post || $post->post_status === 'trash') {
-            return new \WP_Error('missing_post', 'Target post not found.');
-        }
-
-        return true;
+        return $this->validatePostOrUrlTarget($action);
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function execute(array $action): array
     {
         $postId = $this->resolvePostId($action);
         $post = get_post($postId);
-        
-        if (!$post && $postId > 0) {
+
+        if (! $post && $postId > 0) {
             throw new Exception('Post not found.');
         }
 
         $payload = $this->payload($action);
         $title = (string) (
-            $payload['title']
-            ?? $payload['recommended_title']
-            ?? ($payload['title_variants'][0] ?? '')
+            $payload['recommended_title']
+            ?? $payload['title_variants'][0]
+            ?? $payload['title']
+            ?? ''
         );
         $title = trim($title);
 
@@ -69,7 +57,7 @@ final class TitleHandler extends AbstractActionHandler
         if ($postId === 0 && $url !== '') {
             $store = $this->getUrlMetaStore();
             $beforeTitle = (string) $store->getMeta($url, 'title');
-            
+
             if (trim($beforeTitle) === trim($title)) {
                 return [
                     'status' => 'applied',
@@ -78,8 +66,9 @@ final class TitleHandler extends AbstractActionHandler
                     'after' => ['title' => $beforeTitle, 'post_title' => ''],
                 ];
             }
-            
+
             $store->setMeta($url, 'title', $title);
+
             return [
                 'status' => 'applied',
                 'metadata' => [
@@ -97,7 +86,7 @@ final class TitleHandler extends AbstractActionHandler
             ];
         }
 
-        if (!$post) {
+        if (! $post) {
             throw new Exception('Post not found.');
         }
 
@@ -106,7 +95,7 @@ final class TitleHandler extends AbstractActionHandler
             'post_title' => (string) $post->post_title,
         ];
 
-        if (!$this->adapter->setTitle($postId, $title)) {
+        if (! $this->adapter->setTitle($postId, $title)) {
             throw new Exception('Adapter failed to set title.');
         }
 
@@ -139,7 +128,7 @@ final class TitleHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function rollback(array $action): array
@@ -148,7 +137,7 @@ final class TitleHandler extends AbstractActionHandler
         $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
         $before = json_decode($rawBefore, true);
 
-        if (!is_array($before)) {
+        if (! is_array($before)) {
             return ['status' => 'failed', 'error' => 'Missing before snapshot'];
         }
 
@@ -163,6 +152,7 @@ final class TitleHandler extends AbstractActionHandler
             } else {
                 $store->deleteMeta($url, 'title');
             }
+
             return ['status' => 'rolled_back'];
         }
 

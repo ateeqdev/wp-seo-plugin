@@ -19,29 +19,16 @@ final class MetaDescriptionHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return bool|\WP_Error
      */
     public function validate(array $action)
     {
-        $postId = $this->resolvePostId($action);
-        $url = $this->resolveUrl($action);
-
-        if ($postId === 0 && $url !== '') {
-            return true;
-        }
-
-        $post = get_post($postId);
-
-        if (!$post || $post->post_status === 'trash') {
-            return new \WP_Error('missing_post', 'Target post not found.');
-        }
-
-        return true;
+        return $this->validatePostOrUrlTarget($action);
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function execute(array $action): array
@@ -70,7 +57,7 @@ final class MetaDescriptionHandler extends AbstractActionHandler
         if ($postId === 0 && $url !== '') {
             $store = $this->getUrlMetaStore();
             $beforeDesc = (string) $store->getMeta($url, 'meta_description');
-            
+
             if (trim($beforeDesc) === trim($description)) {
                 return [
                     'status' => 'applied',
@@ -79,8 +66,9 @@ final class MetaDescriptionHandler extends AbstractActionHandler
                     'after' => ['meta_description' => $beforeDesc],
                 ];
             }
-            
+
             $store->setMeta($url, 'meta_description', $description);
+
             return [
                 'status' => 'applied',
                 'metadata' => [
@@ -108,7 +96,7 @@ final class MetaDescriptionHandler extends AbstractActionHandler
             ];
         }
 
-        if (!$this->adapter->setDescription($postId, $description)) {
+        if (! $this->adapter->setDescription($postId, $description)) {
             throw new Exception('Adapter failed to set description.');
         }
 
@@ -129,7 +117,7 @@ final class MetaDescriptionHandler extends AbstractActionHandler
     }
 
     /**
-     * @param array<string, mixed> $action
+     * @param  array<string, mixed>  $action
      * @return array<string, mixed>
      */
     public function rollback(array $action): array
@@ -138,7 +126,7 @@ final class MetaDescriptionHandler extends AbstractActionHandler
         $rawBefore = isset($action['before_snapshot']) ? (string) $action['before_snapshot'] : '';
         $before = json_decode($rawBefore, true);
 
-        if (!is_array($before)) {
+        if (! is_array($before)) {
             return ['status' => 'failed', 'error' => 'Missing before snapshot'];
         }
 
@@ -152,6 +140,7 @@ final class MetaDescriptionHandler extends AbstractActionHandler
             } else {
                 $store->deleteMeta($url, 'meta_description');
             }
+
             return ['status' => 'rolled_back'];
         }
 
