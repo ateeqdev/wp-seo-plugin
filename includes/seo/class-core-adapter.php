@@ -53,19 +53,16 @@ final class CoreAdapter implements InterfaceSeoAdapter
 
         if (is_array($value)) {
             return [
-                'noindex' => !empty($value['noindex']),
-                'nofollow' => !empty($value['nofollow']),
+                'noindex' => ! empty($value['noindex']),
+                'nofollow' => ! empty($value['nofollow']),
             ];
         }
 
-        return [
-            'noindex' => false,
-            'nofollow' => false,
-        ];
+        return ['noindex' => false, 'nofollow' => false];
     }
 
     /**
-     * @param array<string, bool> $robots
+     * @param  array<string, bool>  $robots
      */
     public function setRobots(int $postId, array $robots): bool
     {
@@ -73,8 +70,8 @@ final class CoreAdapter implements InterfaceSeoAdapter
             $postId,
             self::PREFIX . 'robots',
             [
-                'noindex' => !empty($robots['noindex']),
-                'nofollow' => !empty($robots['nofollow']),
+                'noindex' => ! empty($robots['noindex']),
+                'nofollow' => ! empty($robots['nofollow']),
             ]
         );
     }
@@ -96,7 +93,7 @@ final class CoreAdapter implements InterfaceSeoAdapter
     }
 
     /**
-     * @param array<string, mixed> $schema
+     * @param  array<string, mixed>  $schema
      */
     public function setSchema(int $postId, array $schema): bool
     {
@@ -131,54 +128,83 @@ final class CoreAdapter implements InterfaceSeoAdapter
         ];
     }
 
+    /**
+     * Registers wp_head and title hooks for singular post pages.
+     * Called from Plugin::registerHooks() after plugin services are booted.
+     */
+    public function registerFrontendHooks(): void
+    {
+        // Use pre_get_document_title filter instead of echoing a raw <title>
+        // tag — prevents the double-title problem where WordPress and our hook
+        // both output <title> independently.
+        add_filter('pre_get_document_title', [$this, 'filterDocumentTitle'], 10);
+        add_action('wp_head', [$this, 'renderMetaTags'], 1);
+    }
+
+    /**
+     * Filters the document title for singular posts that have a stored title.
+     */
+    public function filterDocumentTitle(string $title): string
+    {
+        if (! is_singular()) {
+            return $title;
+        }
+
+        $postId = get_the_ID();
+        if (! is_int($postId) || $postId <= 0) {
+            return $title;
+        }
+
+        $stored = $this->getTitle($postId);
+
+        return $stored !== null && $stored !== '' ? $stored : $title;
+    }
+
+    /**
+     * Outputs non-title <head> meta tags for singular posts.
+     * Title is handled by filterDocumentTitle() via pre_get_document_title.
+     */
     public function renderMetaTags(): void
     {
-        if (!is_singular()) {
+        if (! is_singular()) {
             return;
         }
 
         $postId = get_the_ID();
-        if (!is_int($postId) || $postId <= 0) {
+        if (! is_int($postId) || $postId <= 0) {
             return;
-        }
-
-        $title = $this->getTitle($postId);
-        if ($title !== null) {
-            echo "<title>" . esc_html($title) . "</title>\n";
         }
 
         $description = $this->getDescription($postId);
         if ($description !== null) {
-            echo '<meta name="description" content="' . esc_attr($description) . '">';
-            echo "\n";
+            echo '<meta name="description" content="'.esc_attr($description).'">'."\n";
         }
 
         $canonical = $this->getCanonical($postId);
         if ($canonical !== null) {
-            echo '<link rel="canonical" href="' . esc_url($canonical) . '">';
-            echo "\n";
+            echo '<link rel="canonical" href="'.esc_url($canonical).'">'."\n";
         }
 
         $robots = $this->getRobots($postId);
         $directives = [];
-        if (!empty($robots['noindex'])) {
+        if (! empty($robots['noindex'])) {
             $directives[] = 'noindex';
         }
-        if (!empty($robots['nofollow'])) {
+        if (! empty($robots['nofollow'])) {
             $directives[] = 'nofollow';
         }
-        if (!empty($directives)) {
-            echo '<meta name="robots" content="' . esc_attr(implode(',', $directives)) . '">';
-            echo "\n";
+        if (! empty($directives)) {
+            echo '<meta name="robots" content="'.esc_attr(implode(',', $directives)).'">'."\n";
         }
 
         $schema = $this->getSchema($postId);
         if ($schema !== null) {
-            echo "<script type=\"application/ld+json\">";
+            echo '<script type="application/ld+json">';
             echo wp_json_encode($schema, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             echo "</script>\n";
         }
 
+        $title = $this->getTitle($postId);
         $socialMap = [
             'og:title' => (string) get_post_meta($postId, '_seoworkerai_og_title', true),
             'og:type' => (string) get_post_meta($postId, '_seoworkerai_og_type', true),
@@ -192,6 +218,7 @@ final class CoreAdapter implements InterfaceSeoAdapter
             'twitter:image' => (string) get_post_meta($postId, '_seoworkerai_twitter_image', true),
         ];
 
+        // Fallback: use stored title/description for OG if no dedicated OG value.
         if ($title !== null && $socialMap['og:title'] === '') {
             $socialMap['og:title'] = $title;
         }
@@ -205,13 +232,11 @@ final class CoreAdapter implements InterfaceSeoAdapter
                 continue;
             }
 
-            $isProperty = str_starts_with($name, 'og:');
-            if ($isProperty) {
-                echo '<meta property="' . esc_attr($name) . '" content="' . esc_attr($value) . '">' . "\n";
-                continue;
+            if (str_starts_with($name, 'og:')) {
+                echo '<meta property="'.esc_attr($name).'" content="'.esc_attr($value).'">'."\n";
+            } else {
+                echo '<meta name="'.esc_attr($name).'" content="'.esc_attr($value).'">'."\n";
             }
-
-            echo '<meta name="' . esc_attr($name) . '" content="' . esc_attr($value) . '">' . "\n";
         }
     }
 }

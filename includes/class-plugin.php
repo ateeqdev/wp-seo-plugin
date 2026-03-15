@@ -282,12 +282,12 @@ final class Plugin
         $urlStore = new \SEOWorkerAI\Connector\Storage\UrlMetaStore;
         $urlStore->registerFrontendHooks();
 
-        add_action('wp_head', static function (): void {
-            $adapter = SeoDetector::instance()->getAdapter();
-            if (method_exists($adapter, 'renderMetaTags')) {
-                $adapter->renderMetaTags();
-            }
-        }, 1);
+        $adapter = SeoDetector::instance()->getAdapter();
+        if (method_exists($adapter, 'registerFrontendHooks')) {
+            $adapter->registerFrontendHooks();
+        } elseif (method_exists($adapter, 'renderMetaTags')) {
+            add_action('wp_head', [$adapter, 'renderMetaTags'], 1);
+        }
 
         RedirectRuntime::registerHooks();
         RobotsRuntime::registerHooks();

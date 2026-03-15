@@ -57,32 +57,101 @@ final class UrlMetaStore
     }
 
     /**
-     * Registers all frontend hooks needed to surface stored meta values.
-     *
-     * Call this once from Plugin::registerHooks() instead of calling
-     * renderMetaTags() directly from a wp_head closure.
+     * Registers all frontend hooks.
+     * Call once from Plugin::registerHooks().
      */
     public function registerFrontendHooks(): void
     {
-        // Title: filter the document title instead of echoing a raw <title> tag.
-        // This prevents the double-title problem where WordPress and our hook
-        // both output <title> independently.
-        add_filter('pre_get_document_title', [$this, 'filterDocumentTitle'], 10);
+        // Priority 99 so we run AFTER the theme and other plugins, ensuring
+        // our stored title always wins for theme-rendered pages.
+        add_filter('pre_get_document_title', [$this, 'filterDocumentTitle'], 99);
 
-        // All other head tags (description, canonical, OG, Twitter, robots,
-        // schema) are emitted via wp_head at priority 1 so they land early.
+        // Priority 1 outputs our tags early; priority 0 attempts to remove
+        // any theme hooks that would produce duplicate OG/Twitter tags.
+        add_action('wp_head', [$this, 'suppressThemeMetaDuplicates'], 0);
         add_action('wp_head', [$this, 'renderMetaTags'], 1);
     }
 
     /**
-     * Filters the document <title> for theme-rendered pages that have a stored
-     * title override. Returns '' (empty) to let WordPress fall through to its
-     * own title logic when no override exists.
+     * Attempts to remove theme wp_head hooks that output OG / social meta
+     * for URLs where we have stored overrides, preventing duplicate tags.
+     *
+     * Runs at wp_head priority 0, before any content is output.
+     */
+    public function suppressThemeMetaDuplicates(): void
+    {
+        if (is_singular() && get_the_ID() > 0) {
+            return;
+        }
+
+        $currentUrl = $this->resolveCurrentUrl();
+        if ($currentUrl === '') {
+            return;
+        }
+
+        $hash = md5(rtrim($currentUrl, '/'));
+        $data = $this->getAll();
+
+        if (!isset($data[$hash])) {
+            return;
+        }
+
+        $meta          = $data[$hash];
+        $hasSocialTags = $this->resolveOgArray($meta) !== []
+            || $this->resolveTwitterArray($meta) !== [];
+
+        if (!$hasSocialTags) {
+            return;
+        }
+
+        global $wp_filter;
+        if (!isset($wp_filter['wp_head'])) {
+            return;
+        }
+
+        $themeDir  = get_stylesheet_directory();
+        $parentDir = get_template_directory();
+
+        foreach ($wp_filter['wp_head']->callbacks as $priority => $callbacks) {
+            if ($priority <= 1) {
+                continue; // Don't remove ourselves.
+            }
+
+            foreach ($callbacks as $callback) {
+                $function = $callback['function'];
+                $file     = $this->resolveCallbackFile($function);
+
+                if ($file === null) {
+                    continue;
+                }
+
+                // Only target hooks defined in the active theme.
+                if (
+                    strpos($file, $themeDir) !== 0
+                    && strpos($file, $parentDir) !== 0
+                ) {
+                    continue;
+                }
+
+                $name = $this->resolveCallbackName($function);
+                if (
+                    $name !== null
+                    && preg_match('/og|open.?graph|social|meta.?tag|twitter|opengraph/i', $name)
+                ) {
+                    remove_action('wp_head', $function, $priority);
+                }
+            }
+        }
+    }
+
+    /**
+     * Filters the document <title> for theme-rendered pages.
+     * Runs at priority 99 to override the theme's own title.
      */
     public function filterDocumentTitle(string $title): string
     {
         if (is_singular() && get_the_ID() > 0) {
-            return $title; // Real post — let the SEO plugin handle it.
+            return $title;
         }
 
         $currentUrl = $this->resolveCurrentUrl();
@@ -90,27 +159,16 @@ final class UrlMetaStore
             return $title;
         }
 
-        $hash    = md5(rtrim($currentUrl, '/'));
-        $data    = $this->getAll();
-        $stored  = isset($data[$hash]['title']) ? (string) $data[$hash]['title'] : '';
+        $hash   = md5(rtrim($currentUrl, '/'));
+        $data   = $this->getAll();
+        $stored = isset($data[$hash]['title']) ? (string) $data[$hash]['title'] : '';
 
         return $stored !== '' ? $stored : $title;
     }
 
     /**
      * Outputs non-title <head> meta tags for the current URL when stored
-     * overrides exist.
-     *
-     * Only runs for non-singular pages (theme-rendered URLs). For singular posts
-     * the active SEO plugin (Yoast / RankMath / etc.) handles tag output and we
-     * should not duplicate.
-     *
-     * For the homepage WordPress may resolve it as singular (the "static front
-     * page" setting). We special-case it: if is_front_page() is true but
-     * is_singular() is false (pure theme homepage), we still render our tags.
-     * If it's a static page assigned as the front page, url_to_postid() will
-     * have returned a real post_id, so actions were already applied via the post
-     * path and the SEO plugin renders the output.
+     * overrides exist. Runs at wp_head priority 1.
      */
     public function renderMetaTags(): void
     {
@@ -162,16 +220,9 @@ final class UrlMetaStore
             echo '<meta name="robots" content="' . esc_attr($robotsMeta) . '">' . "\n";
         }
 
-        // ── Open Graph tags ──────────────────────────────────────────────────
-        $og = isset($meta['og']) && is_array($meta['og']) ? $meta['og'] : [];
-
-        // Also support the social_tags sub-key written by SocialTagsHandler
-        // when it goes through the url_meta_store path.
-        if ($og === [] && isset($meta['social_tags']['og']) && is_array($meta['social_tags']['og'])) {
-            $og = $meta['social_tags']['og'];
-        }
-
-        $ogFields = [
+        // ── Open Graph ───────────────────────────────────────────────────────
+        $og = $this->resolveOgArray($meta);
+        foreach ([
             'title'       => 'og:title',
             'type'        => 'og:type',
             'image'       => 'og:image',
@@ -179,29 +230,22 @@ final class UrlMetaStore
             'description' => 'og:description',
             'locale'      => 'og:locale',
             'site_name'   => 'og:site_name',
-        ];
-        foreach ($ogFields as $key => $property) {
+        ] as $key => $property) {
             $value = isset($og[$key]) ? (string) $og[$key] : '';
             if ($value !== '') {
                 echo '<meta property="' . esc_attr($property) . '" content="' . esc_attr($value) . '">' . "\n";
             }
         }
 
-        // ── Twitter card tags ────────────────────────────────────────────────
-        $twitter = isset($meta['twitter']) && is_array($meta['twitter']) ? $meta['twitter'] : [];
-
-        if ($twitter === [] && isset($meta['social_tags']['twitter']) && is_array($meta['social_tags']['twitter'])) {
-            $twitter = $meta['social_tags']['twitter'];
-        }
-
-        $twitterFields = [
+        // ── Twitter ──────────────────────────────────────────────────────────
+        $twitter = $this->resolveTwitterArray($meta);
+        foreach ([
             'card'        => 'twitter:card',
             'site'        => 'twitter:site',
             'title'       => 'twitter:title',
             'description' => 'twitter:description',
             'image'       => 'twitter:image',
-        ];
-        foreach ($twitterFields as $key => $name) {
+        ] as $key => $name) {
             $value = isset($twitter[$key]) ? (string) $twitter[$key] : '';
             if ($value !== '') {
                 echo '<meta name="' . esc_attr($name) . '" content="' . esc_attr($value) . '">' . "\n";
@@ -214,6 +258,85 @@ final class UrlMetaStore
             echo wp_json_encode($meta['schema_json_ld'], JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE);
             echo "</script>\n";
         }
+    }
+
+    // ── Private helpers ───────────────────────────────────────────────────────
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function resolveOgArray(array $meta): array
+    {
+        if (isset($meta['og']) && is_array($meta['og']) && $meta['og'] !== []) {
+            return $meta['og'];
+        }
+        if (
+            isset($meta['social_tags']['og'])
+            && is_array($meta['social_tags']['og'])
+            && $meta['social_tags']['og'] !== []
+        ) {
+            return $meta['social_tags']['og'];
+        }
+        return [];
+    }
+
+    /**
+     * @param  array<string, mixed>  $meta
+     * @return array<string, mixed>
+     */
+    private function resolveTwitterArray(array $meta): array
+    {
+        if (isset($meta['twitter']) && is_array($meta['twitter']) && $meta['twitter'] !== []) {
+            return $meta['twitter'];
+        }
+        if (
+            isset($meta['social_tags']['twitter'])
+            && is_array($meta['social_tags']['twitter'])
+            && $meta['social_tags']['twitter'] !== []
+        ) {
+            return $meta['social_tags']['twitter'];
+        }
+        return [];
+    }
+
+    /**
+     * @param  callable|array<mixed>|string  $function
+     */
+    private function resolveCallbackFile(mixed $function): ?string
+    {
+        try {
+            if (is_array($function) && count($function) === 2) {
+                $ref = new \ReflectionMethod($function[0], (string) $function[1]);
+            } elseif (is_string($function) && str_contains($function, '::')) {
+                [$class, $method] = explode('::', $function, 2);
+                $ref = new \ReflectionMethod($class, $method);
+            } elseif ($function instanceof \Closure || is_string($function)) {
+                $ref = new \ReflectionFunction($function); // @phpstan-ignore-line
+            } else {
+                return null;
+            }
+            return $ref->getFileName() ?: null;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * @param  callable|array<mixed>|string  $function
+     */
+    private function resolveCallbackName(mixed $function): ?string
+    {
+        if (is_array($function) && isset($function[1]) && is_string($function[1])) {
+            return $function[1];
+        }
+        if (is_string($function)) {
+            return $function;
+        }
+        if ($function instanceof \Closure) {
+            return '{closure}';
+        }
+        return null;
     }
 
     /**

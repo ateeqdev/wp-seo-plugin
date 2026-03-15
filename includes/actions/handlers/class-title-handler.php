@@ -41,30 +41,31 @@ final class TitleHandler extends AbstractActionHandler
         }
 
         $payload = $this->payload($action);
-        $title = (string) (
+
+        // Prefer recommended_title (the actual optimised SEO value) over title
+        // which is the recommendation label e.g. "Policy - Expand page title".
+        $title = trim((string) (
             $payload['recommended_title']
-            ?? $payload['title_variants'][0]
+            ?? ($payload['title_variants'][0] ?? null)
             ?? $payload['title']
             ?? ''
-        );
-        $title = trim($title);
+        ));
 
         if ($title === '') {
             throw new Exception('No title provided.');
         }
 
+        // ── URL meta store path (theme-rendered / post_id=0 pages) ───────────
         $url = $this->resolveUrl($action);
         if ($postId === 0 && $url !== '') {
             $store = $this->getUrlMetaStore();
-            $beforeTitle = (string) $store->getMeta($url, 'title');
+            $beforeTitle = (string) ($store->getMeta($url, 'title') ?? '');
 
             if (trim($beforeTitle) === trim($title)) {
-                return [
-                    'status' => 'applied',
-                    'metadata' => ['noop' => true],
-                    'before' => ['title' => $beforeTitle, 'post_title' => ''],
-                    'after' => ['title' => $beforeTitle, 'post_title' => ''],
-                ];
+                return $this->identicalResult(
+                    ['title' => $beforeTitle, 'post_title' => ''],
+                    'title already matches stored value in url_meta_store'
+                );
             }
 
             $store->setMeta($url, 'title', $title);
@@ -90,10 +91,19 @@ final class TitleHandler extends AbstractActionHandler
             throw new Exception('Post not found.');
         }
 
+        // ── Real post path ────────────────────────────────────────────────────
+        $currentTitle = (string) ($this->adapter->getTitle($postId) ?? '');
         $before = [
-            'title' => (string) ($this->adapter->getTitle($postId) ?? ''),
+            'title' => $currentTitle,
             'post_title' => (string) $post->post_title,
         ];
+
+        if (trim($currentTitle) === trim($title)) {
+            return $this->identicalResult(
+                $before,
+                'title already matches value stored by adapter'
+            );
+        }
 
         if (! $this->adapter->setTitle($postId, $title)) {
             throw new Exception('Adapter failed to set title.');
@@ -101,19 +111,9 @@ final class TitleHandler extends AbstractActionHandler
 
         $mirrored = false;
         if ((bool) get_option('seoworkerai_mirror_post_title', false)) {
-            wp_update_post([
-                'ID' => $postId,
-                'post_title' => $title,
-            ]);
+            wp_update_post(['ID' => $postId, 'post_title' => $title]);
             $mirrored = true;
         }
-
-        $after = [
-            'title' => (string) ($this->adapter->getTitle($postId) ?? ''),
-            'post_title' => (string) get_post_field('post_title', $postId),
-            'adapter' => $this->adapter->getName(),
-            'mirrored_post_title' => $mirrored,
-        ];
 
         return [
             'status' => 'applied',
@@ -123,7 +123,12 @@ final class TitleHandler extends AbstractActionHandler
                 'mirrored_post_title' => $mirrored,
             ],
             'before' => $before,
-            'after' => $after,
+            'after' => [
+                'title' => (string) ($this->adapter->getTitle($postId) ?? ''),
+                'post_title' => (string) get_post_field('post_title', $postId),
+                'adapter' => $this->adapter->getName(),
+                'mirrored_post_title' => $mirrored,
+            ],
         ];
     }
 
@@ -167,10 +172,7 @@ final class TitleHandler extends AbstractActionHandler
         }
 
         if ($previousPostTitle !== '') {
-            wp_update_post([
-                'ID' => $postId,
-                'post_title' => $previousPostTitle,
-            ]);
+            wp_update_post(['ID' => $postId, 'post_title' => $previousPostTitle]);
         }
 
         return ['status' => 'rolled_back'];

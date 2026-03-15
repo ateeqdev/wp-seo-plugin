@@ -1,4 +1,5 @@
 <?php
+
 /**
  * Plugin Name: SEOWorkerAI.com
  * Plugin URI: https://seoworkerai.com/
@@ -11,7 +12,7 @@
 
 declare(strict_types=1);
 
-if (!defined('ABSPATH')) {
+if (! defined('ABSPATH')) {
     exit;
 }
 

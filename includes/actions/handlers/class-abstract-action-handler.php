@@ -104,7 +104,6 @@ abstract class AbstractActionHandler implements InterfaceActionHandler
         }
 
         $data = $this->payload($action);
-
         $target = isset($data['post_id']) ? (int) $data['post_id'] : 0;
 
         if ($target === 0 && ! empty($data['post_url'])) {
@@ -134,6 +133,32 @@ abstract class AbstractActionHandler implements InterfaceActionHandler
     protected function sanitizeText(string $value): string
     {
         return trim(wp_strip_all_tags($value));
+    }
+
+    /**
+     * Returns a standardised "identical" result used when the value we are
+     * about to write already matches what is stored.
+     *
+     * Status is 'identical' so the executor / status reporter can distinguish
+     * it from a genuine no-op ('applied' with noop:true) and from a real
+     * applied change. The before/after snapshots reflect the ACTUAL current
+     * state, not the incoming payload, so the change log is truthful.
+     *
+     * @param  array<string, mixed>  $currentState  The actual stored values right now.
+     * @param  string  $reason  Human-readable explanation.
+     * @return array<string, mixed>
+     */
+    protected function identicalResult(array $currentState, string $reason = 'value already matches'): array
+    {
+        return [
+            'status' => 'identical',
+            'metadata' => [
+                'noop' => true,
+                'reason' => $reason,
+            ],
+            'before' => $currentState,
+            'after' => $currentState,
+        ];
     }
 
     /**
